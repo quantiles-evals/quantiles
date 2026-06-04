@@ -118,7 +118,7 @@ qt run my-eval --input '{"model_name":"openai:gpt-4o-mini","num_examples":100}' 
 
 Rules:
 
-- Workflow names must be unique within the file. `entrypoint()` uses `DURA_WORKFLOW_NAME` from the CLI.
+- Workflow names must be unique within the file. `entrypoint()` uses `QUANTILES_WORKFLOW_NAME` from the CLI.
 - `step()` caches by `step_key`. Use deterministic keys (e.g., sample IDs) so reruns skip completed work.
 - `emit()` writes metrics to the local SQLite/Parquet store. They show up in `qt show` and `qt compare`.
 - `dataset()` must be called inside the handler, not at module level, because it needs the `WorkflowContext`.
@@ -166,10 +166,10 @@ qt run my-workflow -- echo "hello"
 
 Key env vars injected by `qt run`:
 
-- `DURA_BASE_URL` — local server URL (default `http://127.0.0.1:8765`)
-- `DURA_RUN_ID` — existing run ID (if resuming)
-- `DURA_WORKFLOW_NAME` — the workflow name passed to `qt run`
-- `DURA_INPUT` — JSON input from `--input`
+- `QUANTILES_BASE_URL` — local server URL (default `http://127.0.0.1:8765`)
+- `QUANTILES_RUN_ID` — existing run ID (if resuming)
+- `QUANTILES_WORKFLOW_NAME` — the workflow name passed to `qt run`
+- `QUANTILES_INPUT` — JSON input from `--input`
 
 ### Legacy SDK direct run
 
@@ -231,7 +231,7 @@ qt show <run-id>                 # detailed view of one run
 qt compare <run-id-1> <run-id-2> # side-by-side diff of steps, inputs, outputs, and metrics
 ```
 
-These commands read from the local SQLite/Parquet store (`.dura/dura.sqlite` and adjacent Parquet files by default).
+These commands read from the local SQLite/Parquet store (`.quantiles/quantiles.sqlite` and adjacent Parquet files by default).
 
 ### Dashboard analysis
 
@@ -248,7 +248,7 @@ If results were ingested into the web app:
 - **Dataset loading must go through `Dataset[T]`**. Do not import `datasets.load_dataset` directly in new benchmark code inside `sdk/`.
 - **Step keys must be unique and deterministic**. Collisions or nondeterministic keys break caching and restart behavior in `qt-sdk-python`.
 - **`benchmark_type` consistency**. All results in a run should share the same `benchmark_type`. It drives dashboard filtering and derived metric selection.
-- **Environment variables**. The legacy SDK reads `OPENAI_API_KEY`, `NUM_EXAMPLES`, `EXPORT_PATH`, etc. `qt-sdk-python` reads `DURA_BASE_URL`, `DURA_WORKFLOW_NAME`, `DURA_INPUT`, etc.
+- **Environment variables**. The legacy SDK reads `OPENAI_API_KEY`, `NUM_EXAMPLES`, `EXPORT_PATH`, etc. `qt-sdk-python` reads `QUANTILES_BASE_URL`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_INPUT`, etc.
 - **Static checks**. After changing `sdk/`, run `make check-sdk`. After changing `qt-sdk-python/`, run `mise run all` (or `fmt`, `lint`, `typecheck`, `test`).
 
 ## Useful paths
