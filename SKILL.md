@@ -1,91 +1,97 @@
 ---
-name: benchmark-runner
-description: Use this skill when writing, running, or analyzing benchmarks and evals using the Quantiles Python SDK, TypeScript SDK, or qt CLI.
+name: eval-runner
+description: Use this skill when writing, running, or analyzing evals and evals using the Quantiles Python SDK, TypeScript SDK, or qt CLI.
 ---
 
-# Quantiles Benchmark Runner
+# Quantiles eval runner
 
-## When to use
+The `qt` CLI is the main entrypoint into all Quantiles evals. If you are asked to run any evals, or analyze any Quantiles evals, use the `qt` CLI.
+
+## When to use this skill
 
 Use this skill when the user asks to:
 
-- Write a new benchmark or eval for the Quantiles platform
-- Run an existing benchmark locally or against the Quantiles backend
-- Analyze benchmark results, compare runs, or export metrics
+- Run a Quantiles eval
+- Analyze one or more Quantiles evals that already ran
+- Write a new custom eval for the Quantiles platform
 - Convert an ad-hoc Python eval script into a durable Quantiles workflow
-- Debug why a benchmark failed, produced unexpected metrics, or didn’t ingest into the dashboard
 
-## Writing benchmarks
+## Install
 
-### Choose an SDK
+To install the CLI, run the following command:
 
-Quantiles supports three ways to write benchmarks:
+```bash
+curl -fsSL https://cli.quantiles.io/install.sh | bash
+```
+
+## Running built-in evals
+
+The `qt` CLI has several built-in evals:
+
+- `pubmedqa`: the PubMedQA eval to evaluate a model on standard healthcare knowledge
+- `simpleqa-verified`: an update SimpleQA dataset for testing models for general knowledge
+- `financebench`: a small finance-specific eval
+
+To run any of these evals, run `qt run <eval name>`. For example, to run the `pubmedqa` eval, run the following:
+
+```bash
+qt run pubmedqa --json
+```
+
+>Warning: all commands to run built-in evals will run against a fake model that generates random data. By default, these commands should be used for initial testing, but their results should not be considered as valid.
+
+Always pass `--json` to this command. You will receive a JSON dictionary that contains data about the run, including:
+
+- the `run_id`, which can be used to identify the run later
+- high-level aggregate metrics, which can be used to summarize how it went
+
+## Analyzing evals
+
+If you have run a eval with `qt run`, like in the previous section, you can get take the `run_id` that was returned, and use `qt show` to see lots more detail about it:
+
+```bash
+qt show <run_id> --json
+```
+
+Always pass `--json` to this command. You will receive a JSON dictionary that contains summary statistics about the run, along with every sample (in the `samples` key) and its sample-specific metrics, inputs and outputs.
+
+## Comparing evals
+
+The `qt` CLI can compare two evals. To do a comparison, you need to have the two `run_id` values for the evals you want to compare. You may already have them in your memory, but if you don't, you can find them by running:
+
+```bash
+qt list --json
+```
+
+This command will output a JSON dictionary with information about each run. After you find the two `run_id`s to compare, run this command:
+
+```bash
+qt compare <run_id 1> <run_id 2> --json
+```
+
+Always pass the `--json` flag to both the `qt list` and `qt compare ...` commands, like the others above. This `qt compare` command will output a JSON dictionary with lots of metrics and information about each run. Users will most often want you to use this information to determine which of the two runs was "better" in some way.
+
+## Custom evals
+
+Use the subsections in this section _only_ if the user needs to write custom evals using the Quantiles Python or TypeScript SDKs
+
+### Writing evals
+
+#### Choose an SDK
+
+Quantiles supports built-in ahnd three ways to write evals:
 
 | Approach | Best for | Entry point |
 |---|---|---|
-| **Python SDK (`sdk/`)** | Full-featured evals with dataset loading, LLM sampling, scoring, and export | `sdk/src/quantiles/examples/<benchmark>/__main__.py` |
-| **Python SDK (`qt-sdk-python`)** | Lightweight, `qt`-native workflows with steps, emits, and local observability | `qt-sdk-python/examples/<benchmark>.py` |
+| **Python SDK (`sdk/`)** | Full-featured evals with dataset loading, LLM sampling, scoring, and export | `sdk/src/quantiles/examples/<eval>/__main__.py` |
+| **Python SDK (`qt-sdk-python`)** | Lightweight, `qt`-native workflows with steps, emits, and local observability | `qt-sdk-python/examples/<eval>.py` |
 | **TypeScript SDK** | Frontend-integrated or Node-based evals | `frontend/src/app/documentation/page.mdx` (reference) |
 
 If the user is inside `sdk/`, use the **legacy Python SDK**. If they are inside `qt-sdk-python/`, use the **new Python SDK**. Only use TypeScript if the eval lives in the NextJS frontend or the user explicitly asks for Node/TS.
 
-### Legacy Python SDK pattern (`sdk/`)
+#### Python
 
-A minimal benchmark has three parts:
-
-1. **Dataset** — use `HuggingFaceDataset` or any `Dataset[T]` implementation.
-2. **Eval loop** — an async generator that yields `EvalResult` objects.
-3. **Export** — wrap the loop in `save_eval(...)` to write Parquet/JSONL and handle progress bars.
-
-Example skeleton:
-
-```python
-import asyncio
-from collections.abc import AsyncIterator
-from quantiles.data import HuggingFaceDataset
-from quantiles.evals import EvalResult
-from quantiles.evals.apis import LLMProvider
-from quantiles.export.save import save_eval
-
-async def _run_my_eval(provider: LLMProvider) -> AsyncIterator[EvalResult]:
-    dataset = HuggingFaceDataset("quantiles/PubMedQA", config_name="pqa_labeled", split_name="train")
-    sampler = provider.get_sampler()
-
-    async for row in await dataset.get_iter(lambda x: x):
-        sampled = await sampler.sample_freeform(...)
-        yield EvalResult(
-            benchmark_type="my-benchmark",
-            name=row["id"],
-            conversation=[...],
-            primary_metric="accuracy",
-            metrics={"accuracy": 1.0 if correct else 0.0},
-            metadata={"model_response": sampled.content},
-        )
-
-async def main() -> None:
-    provider = LLMProvider.openai_from_env(model_name="gpt-4o-mini")
-    await save_eval(
-        eval_name="my-benchmark",
-        eval_func=lambda: _run_my_eval(provider),
-        expected_total=100,
-        export_strategy="my-benchmark.jsonl",  # or None for Parquet
-    )
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-Rules:
-
-- Always load datasets through `Dataset[T]` (see `.codex/sdk.md`). Do not hand-roll HuggingFace loaders.
-- Parse rows with Pydantic `BaseModel` subclasses. Do not use `typing.Any` or bare `dict` traversal.
-- Use `LLMProvider.openai_from_env()` for OpenAI. For other providers, check `quantiles.evals.apis` first.
-- Set `benchmark_type` to a stable, kebab-case string. It is used for filtering in the dashboard and derived metrics.
-- Put reusable benchmark logic in `sdk/src/quantiles/evals/<benchmark>/`. Put examples in `sdk/src/quantiles/examples/<benchmark>/`.
-
-### New Python SDK pattern (`qt-sdk-python`)
-
-Use this when the user wants `qt` observability (steps, emits, caching, `qt compare`) out of the box.
+Python is a very popular technology for building and testing AI applications. Many users will already have a lot of Python code, and in these cases, the Quantiles Python SDK will be a good choice for them, if they want to build custom evals.
 
 ```python
 from quantiles import workflow, step, emit, entrypoint, dataset, call_llm
@@ -123,9 +129,9 @@ Rules:
 - `emit()` writes metrics to the local SQLite/Parquet store. They show up in `qt show` and `qt compare`.
 - `dataset()` must be called inside the handler, not at module level, because it needs the `WorkflowContext`.
 
-### TypeScript SDK pattern
+#### TypeScript
 
-Use this only for frontend or Node-based evals:
+If the user does not have lots of Python code already, and they do have lots of Javascript / Typescript code, it might be appropriate for them to use the Quantiles TypeScript SDK.
 
 ```typescript
 import { workflow, step, emit, entrypoint } from "@quantiles/sdk";
@@ -147,119 +153,27 @@ Run it with:
 qt run eval -- bun run ./my_eval.ts
 ```
 
-## Running benchmarks
+### Running custom evals
 
-### Local run with `qt` CLI
+Like with built-in evals, running custom evals is done with the `qt` CLI. The below commands start a local server, inject run metadata into the subprocess, and tear down when done.
 
-The preferred way to run a benchmark is through the `qt` CLI. It starts a local server, injects run metadata into the subprocess, and tears down when done.
+Use the below for a Python custom eval:
 
 ```bash
-# Python (qt-sdk-python)
 qt run my-workflow --input '{"key":"value"}' -- uv run python my_eval.py
-
-# TypeScript
-qt run my-workflow --input '{"key":"value"}' -- bun run my_eval.ts
-
-# Arbitrary shell command
-qt run my-workflow -- echo "hello"
 ```
 
-Key env vars injected by `qt run`:
+And use the below for a TypeScript custom eval:
+
+```bash
+qt run my-workflow -- bun run my_eval.ts
+```
+
+In any commands like this, the `qt run` command will automatically inject the following environment variables:
 
 - `QUANTILES_BASE_URL` — local server URL (default `http://127.0.0.1:8765`)
 - `QUANTILES_RUN_ID` — existing run ID (if resuming)
 - `QUANTILES_WORKFLOW_NAME` — the workflow name passed to `qt run`
 - `QUANTILES_INPUT` — JSON input from `--input`
 
-### Legacy SDK direct run
-
-If the benchmark uses the legacy `sdk/` package and does not need `qt` step tracking, run it directly:
-
-```bash
-cd sdk
-export OPENAI_API_KEY=...
-export OPENAI_MODEL=gpt-4o-mini
-export NUM_EXAMPLES=25
-export EXPORT_PATH=my-benchmark.jsonl   # optional
-uv run python -m quantiles.examples.my_benchmark
-```
-
-### Ingesting into the web dashboard
-
-To push results to the Quantiles web app (NextJS backend):
-
-1. Create a benchmark via the API or UI to get a `benchmarkUID`.
-2. Use an exporter that POSTs to `/api/eval/batch`. The SDK does not yet ship a built-in HTTP exporter, so implement a small `BenchmarkExporter` subclass or write JSONL and POST manually.
-3. Each `EvalResult` must include `benchmark_type` and a stable `name` (sample ID).
-
-The frontend ingests protobuf `BenchmarkResult` messages. See `frontend/src/app/api/eval/ingest.ts` for field validation rules.
-
-## Analyzing results
-
-### Local file analysis
-
-By default, `save_eval()` writes a timestamped Parquet file:
-
-```
-{timestamp}_{eval_name}_{uuid}.parquet
-```
-
-If `export_strategy` is a path ending in `.jsonl`, it writes newline-delimited JSON instead.
-
-Read Parquet results in Python:
-
-```python
-import pandas as pd
-df = pd.read_parquet("2024-..._my-benchmark_....parquet")
-print(df["metrics"].mean())
-```
-
-Read JSONL results:
-
-```python
-import pandas as pd
-df = pd.read_json("my-benchmark.jsonl", lines=True)
-```
-
-### `qt` CLI analysis
-
-When using `qt-sdk-python`, use the CLI to inspect runs:
-
-```bash
-qt list                          # show all runs
-qt show <run-id>                 # detailed view of one run
-qt compare <run-id-1> <run-id-2> # side-by-side diff of steps, inputs, outputs, and metrics
-```
-
-These commands read from the local SQLite/Parquet store (`.quantiles/quantiles.sqlite` and adjacent Parquet files by default).
-
-### Dashboard analysis
-
-If results were ingested into the web app:
-
-- Navigate to the benchmark page in the dashboard.
-- The primary metric is surfaced automatically from `EvalResult.primary_metric`.
-- Derived metrics (e.g., `macro_f1` for PubMedQA) are computed in `frontend/src/lib/analytics/derived_metrics.ts`.
-- Sample-level metadata is queryable through BigQuery or the local DuckDB layer, depending on the `AnalyticsStorage` backend.
-
-## Common gotchas
-
-- **Do not use `typing.Any` in `sdk/`**. Parse everything through Pydantic models (see `.codex/sdk.md`).
-- **Dataset loading must go through `Dataset[T]`**. Do not import `datasets.load_dataset` directly in new benchmark code inside `sdk/`.
-- **Step keys must be unique and deterministic**. Collisions or nondeterministic keys break caching and restart behavior in `qt-sdk-python`.
-- **`benchmark_type` consistency**. All results in a run should share the same `benchmark_type`. It drives dashboard filtering and derived metric selection.
-- **Environment variables**. The legacy SDK reads `OPENAI_API_KEY`, `NUM_EXAMPLES`, `EXPORT_PATH`, etc. `qt-sdk-python` reads `QUANTILES_BASE_URL`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_INPUT`, etc.
-- **Static checks**. After changing `sdk/`, run `make check-sdk`. After changing `qt-sdk-python/`, run `mise run all` (or `fmt`, `lint`, `typecheck`, `test`).
-
-## Useful paths
-
-- Legacy Python SDK examples: `sdk/src/quantiles/examples/`
-- Legacy Python SDK eval core: `sdk/src/quantiles/evals/`
-- Legacy Python SDK export: `sdk/src/quantiles/export/save.py`
-- New Python SDK examples: `qt-sdk-python/examples/`
-- New Python SDK workflow API: `qt-sdk-python/src/quantiles/workflow.py`
-- TypeScript SDK ref: `frontend/src/app/documentation/page.mdx`
-- Frontend eval ingest: `frontend/src/app/api/eval/ingest.ts`
-- Frontend batch route: `frontend/src/app/api/eval/batch/route.ts`
-- Derived metrics: `frontend/src/lib/analytics/derived_metrics.ts`
-- SDK conventions: `.codex/sdk.md`
+Make sure to use the Quantiles SDKs for Python or TypeScript, as appropriate. They will automatically detect and handle these variables. The above examples use the SDKs.
