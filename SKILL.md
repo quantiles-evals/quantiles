@@ -1,5 +1,5 @@
 ---
-name: eval-runner
+name: quantiles
 description: Use this skill when writing, running, or analyzing evals and evals using the Quantiles Python SDK, TypeScript SDK, or qt CLI.
 ---
 
