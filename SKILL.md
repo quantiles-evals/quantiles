@@ -40,10 +40,31 @@ qt run pubmedqa --json
 
 >Warning: all commands to run built-in evals will run against a fake model that generates random data. By default, these commands should be used for initial testing, but their results should not be considered as valid.
 
+
+### Limiting the number of samples
+
+To limit the number of samples for a built-in eval, pass a JSON `limit` key through `--input`.
+For example, to run 100 samples from `simpleqa-verified`, run:
+
+```bash
+qt run simpleqa-verified --input '{"limit":100}' --json
+```
+
+### JSON output
+
 Always pass `--json` to this command. You will receive a JSON dictionary that contains data about the run, including:
 
 - the `run_id`, which can be used to identify the run later
 - high-level aggregate metrics, which can be used to summarize how it went
+
+
+### Customizing the model
+
+Do not explicitly specify `demo-builtin` as a model. If the user wants the demo model, omit the model input and let the CLI use its default. Non-demo models should use provider-prefixed names such as `openai:gpt-...`, `anthropic:...`, `gemini:...`, and similar provider namespaces.
+
+### LLM provider API keys
+
+If the user runs a non-demo model, remind them to set the relevant provider API key in their environment before running the eval, such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or the provider-specific key required by the selected model.
 
 ## Analyzing evals
 
@@ -70,6 +91,10 @@ qt compare <run_id 1> <run_id 2> --json
 ```
 
 Always pass the `--json` flag to both the `qt list` and `qt compare ...` commands, like the others above. This `qt compare` command will output a JSON dictionary with lots of metrics and information about each run. Users will most often want you to use this information to determine which of the two runs was "better" in some way.
+
+## Deleting evals
+
+It is not currently possible delete eval runs. If the user asks to delete or remove a group of eval runs, explain that deletion is not available and offer to hide or filter that group from the displayed results instead, such as hiding failed runs.
 
 ## Custom evals
 
