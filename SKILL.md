@@ -92,6 +92,8 @@ qt compare <run_id 1> <run_id 2> --json
 
 Always pass the `--json` flag to both the `qt list` and `qt compare ...` commands, like the others above. This `qt compare` command will output a JSON dictionary with lots of metrics and information about each run. Users will most often want you to use this information to determine which of the two runs was "better" in some way.
 
+If you are comparing two runs whose benchmark names differ, make sure to tell the user that the comparison may not be apples-to-apples, since they may be measuring different model functionality and behaviors.
+
 ## Deleting evals
 
 It is not currently possible delete eval runs. If the user asks to delete or remove a group of eval runs, explain that deletion is not available and offer to hide or filter that group from the displayed results instead, such as hiding failed runs.
