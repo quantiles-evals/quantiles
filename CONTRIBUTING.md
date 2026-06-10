@@ -2,7 +2,7 @@
 
 Thanks for contributing to Quantiles.
 
-Quantiles is open-source, local-first eval infrastructure for AI systems. Contributions should keep the project technical, reliable, reproducible, and easy for both engineers and coding agents to use.
+Quantiles Open-source is a local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
 
 ## Ways to Contribute
 
@@ -87,11 +87,6 @@ quantiles/
 ├─ CONTRIBUTING.md
 ├─ AGENTS.md
 ├─ llms.txt
-│
-├─ .agents/
-│  └─ skills/
-│     └─ quantiles/
-│        └─ SKILL.md
 │
 ├─ .github/
 ├─ packages/
@@ -321,16 +316,12 @@ When changing agent-facing files, make sure they are:
 
 Agent-facing files include:
 
-```text
-AGENTS.md
-.agents/skills/quantiles/SKILL.md
-docs/agents/
-llms.txt
-```
+- [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md)
+- [`AGENT.md`](https://github.com/quantiles-evals/skill/blob/main/AGENT.md)
 
-The root `AGENTS.md` should contain repository-specific instructions for agents working on Quantiles.
+`SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
 
-The reusable skill in `.agents/skills/quantiles/SKILL.md` should contain portable Quantiles behavior that agents can use inside other repositories.
+`AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
 
 Do not put project-specific implementation details into the reusable skill unless they apply to Quantiles usage across projects.
 
@@ -356,19 +347,13 @@ If you discover a security vulnerability, do not open a public GitHub issue.
 
 See:
 
-```text
-SECURITY.md
-```
+[SECURITY.md](./SECURITY.md)
 
 ## Code of Conduct
 
 All contributors are expected to follow the project Code of Conduct.
 
-See:
-
-```text
-CODE_OF_CONDUCT.md
-```
+[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 
 ## Review Process
 
@@ -381,7 +366,7 @@ Maintainers may ask for:
 - Compatibility notes
 - Changes to naming, structure, or API design
 
-Review is part of keeping Quantiles reliable and maintainable.
+Review is part of keeping Quantiles Open-source reliable and maintainable.
 
 ## Release Notes
 
@@ -401,10 +386,4 @@ Use clear, technical language and include migration notes when needed.
 
 ## License
 
-By contributing to Quantiles, you agree that your contributions will be licensed under the project license.
-
-See:
-
-```text
-LICENSE
-```
+By contributing to Quantiles Open-source, you agree that your contributions will be licensed under the  [Apache License 2.0](./LICENSE).
