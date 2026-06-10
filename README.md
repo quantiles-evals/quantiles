@@ -23,7 +23,7 @@ With Quantiles, you can:
 Install the CLI:
 
 ```bash
-npm install -g @quantiles/cli
+curl -fsSL https://cli.quantiles.io/install.sh | sh
 ```
 
 Initialize Quantiles in your project:
@@ -219,7 +219,7 @@ Important directories:
 | `packages/` | CLI, core runtime, and SDK packages |
 | `benchmarks/` | Built-in benchmark implementations and templates |
 | `examples/` | Runnable examples for common evaluation workflows |
-| `.agents/skills/` | Reusable agent skills for using Quantiles |
+| `.skill/` | Reusable agent skills for using Quantiles |
 | `docs/` | Documentation for CLI, SDKs, benchmarks, agents, and reference material |
 | `tests/` | CLI, SDK, runtime, storage, and benchmark tests |
 | `.github/` | GitHub Actions, issue templates, and pull request templates |
@@ -271,9 +271,7 @@ Good contributions include:
 
 Before opening a pull request, read:
 
-```text
-CONTRIBUTING.md
-```
+[CONTRIBUTING.md](./CONTRIBUTING.md)
 
 When changing benchmark behavior, scoring, CLI output, run schemas, or SDK APIs, update the relevant documentation and changelog.
 
@@ -283,18 +281,14 @@ Please do not report security vulnerabilities through public GitHub issues.
 
 See:
 
-```text
-SECURITY.md
-```
+[SECURITY.md](./SECURITY.md)
 
 ## Support
 
 For questions, usage help, and community support, see:
 
-```text
-SUPPORT.md
-```
+[SUPPORT.md](./SUPPORT.md)
 
 ## License
 
-Quantiles is open source. See `LICENSE` for details.
+Quantiles OSS is licensed under the [Apache License 2.0](./LICENSE). Hosted, enterprise, or managed Quantiles products may be offered under separate commercial terms.
