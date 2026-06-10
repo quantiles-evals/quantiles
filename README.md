@@ -1,12 +1,12 @@
 # Quantiles
 
-Open-source, local-first eval infrastructure for benchmarking AI systems, inspecting runs, comparing results, and debugging regressions with a CLI, SDKs, and coding-agent workflows.
+Open-source, local-first eval infrastructure for AI systems.
 
-Quantiles helps AI teams define, run, inspect, and compare evaluations close to the development environment. Start with a local run, inspect sample-level outputs, compare results across runs, and give coding agents a repeatable workflow for evaluating changes.
+Quantiles gives AI engineers a repeatable workflow for running evaluations, recording results, inspecting sample-level outputs, comparing runs, and debugging regressions from inside a repository. It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
 
 ## Why Quantiles
 
-AI systems change quickly. Models, prompts, tools, retrieval logic, and agent workflows can all affect behavior. Quantiles gives teams a durable evaluation loop for measuring those changes before they reach production.
+AI systems change quickly. Models, prompts, tools, retrieval logic, and agent workflows can all affect behavior. Quantiles helps teams measure those changes before they reach production by keeping evaluations close to the development environment.
 
 With Quantiles, you can:
 
@@ -14,11 +14,17 @@ With Quantiles, you can:
 - Inspect recorded runs and sample-level outputs
 - Compare runs to identify regressions
 - Resume interrupted workflows
-- Record metrics, artifacts, and execution history locally
-- Use coding agents to run, inspect, and summarize evals
+- Record metrics, artifacts, errors, and execution history locally
+- Give coding agents a repeatable workflow for evaluating changes
 - Keep evaluation evidence close to the repository
 
 ## Quickstart
+
+Install the CLI:
+
+```bash
+npm install -g @quantiles/cli
+```
 
 Initialize Quantiles in your project:
 
@@ -64,7 +70,7 @@ debug regressions
 repeat
 ```
 
-The `qt` CLI records local run history so results can be inspected, compared, and summarized without relying on ad hoc logs or one-off scripts.
+The `qt` CLI records local run history so results can be inspected, compared, and summarized without relying on ad hoc logs, spreadsheets, or one-off scripts.
 
 ## CLI
 
@@ -88,21 +94,22 @@ qt compare 1 2
 
 Use `qt show` to inspect a single run and `qt compare` to compare behavior across runs.
 
-## SDKs
+## Local-First by Default
 
-Quantiles includes SDKs for defining custom evaluations in code.
+Quantiles is designed for the early evaluation loop inside a repository.
 
-Planned SDK surfaces include:
+By default, evaluation state is recorded locally so teams can iterate quickly, inspect results, and preserve evidence while developing AI systems. Local state can include:
 
-- Python workflows
-- TypeScript workflows
-- Durable steps
+- Run metadata
+- Step records
 - Metrics
 - Artifacts
-- Run metadata
-- Local execution history
+- Inputs
+- Outputs
+- Errors
+- Runtime metadata
 
-See the SDK documentation for examples.
+This makes Quantiles useful before an evaluation workflow needs production orchestration, hosted observability, or centralized experiment tracking.
 
 ## Built-in Benchmarks
 
@@ -116,15 +123,15 @@ Example:
 qt run simpleqa-verified
 ```
 
-Benchmark documentation includes:
+Benchmark documentation should include:
 
-- what the benchmark evaluates
-- input and output shape
-- scoring method
-- metrics
-- provenance
-- known limitations
-- comparability notes
+- What the benchmark evaluates
+- Input and output shape
+- Scoring method
+- Metrics
+- Provenance
+- Known limitations
+- Comparability notes
 
 ## Custom Evaluations
 
@@ -132,53 +139,53 @@ Use custom evaluations when you need to test your own model, prompt, retrieval f
 
 A custom eval can record:
 
-- inputs
-- outputs
-- intermediate steps
-- metrics
-- artifacts
-- errors
-- runtime metadata
+- Inputs
+- Outputs
+- Intermediate steps
+- Metrics
+- Artifacts
+- Errors
+- Runtime metadata
 
 Custom evaluations can be run locally and compared using the same `qt` workflow as built-in benchmarks.
+
+## SDKs
+
+Quantiles includes SDKs for defining custom evaluations in code.
+
+SDK surfaces include:
+
+- Python workflows
+- TypeScript workflows
+- Durable steps
+- Metrics
+- Artifacts
+- Run metadata
+- Local execution history
+
+See the SDK documentation for examples.
 
 ## Coding Agents
 
 Quantiles is designed to work well with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
 
-The repository includes:
+The repository includes agent-facing instructions and reusable skill files:
 
 ```text
 AGENTS.md
-skills/quantiles/SKILL.md
+.agents/skills/quantiles/SKILL.md
 docs/agents/
 ```
 
-Use the Quantiles skill to give coding agents reusable behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions.
+The root `AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
+
+The reusable skill in `.agents/skills/quantiles/SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
 
 Example agent prompt:
 
 ```text
 Use the Quantiles eval skill. Run the SimpleQA Verified benchmark with the built-in sampler, inspect the sample-level results, compare the latest run to the previous run if available, and summarize any regressions with evidence from the run output.
 ```
-
-The root `AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself. The reusable skill in `skills/quantiles/SKILL.md` is for agents using Quantiles inside other projects.
-
-## Local-First by Default
-
-Quantiles is designed for the early evaluation loop inside a repository.
-
-By default, evaluation state is recorded locally so teams can iterate quickly, inspect results, and preserve evidence while developing AI systems.
-
-Typical local state includes:
-
-- run metadata
-- step records
-- metrics
-- artifacts
-- outputs
-- errors
-- comparison history
 
 ## Repository Structure
 
@@ -194,11 +201,15 @@ quantiles/
 ├─ AGENTS.md
 ├─ llms.txt
 │
+├─ .agents/
+│  └─ skills/
+│     └─ quantiles/
+│        └─ SKILL.md
+│
 ├─ .github/
 ├─ packages/
 ├─ benchmarks/
 ├─ examples/
-├─ skills/
 ├─ docs/
 ├─ tests/
 └─ scripts/
@@ -211,7 +222,7 @@ Important directories:
 | `packages/` | CLI, core runtime, and SDK packages |
 | `benchmarks/` | Built-in benchmark implementations and templates |
 | `examples/` | Runnable examples for common evaluation workflows |
-| `skills/` | Reusable agent skills for using Quantiles |
+| `.agents/skills/` | Reusable agent skills for using Quantiles |
 | `docs/` | Documentation for CLI, SDKs, benchmarks, agents, and reference material |
 | `tests/` | CLI, SDK, runtime, storage, and benchmark tests |
 | `.github/` | GitHub Actions, issue templates, and pull request templates |
@@ -238,14 +249,14 @@ https://quantiles.io/documentation
 
 The `examples/` directory includes workflows for:
 
-- running a first benchmark
-- using the built-in sampler
-- inspecting sample-level outputs
-- comparing runs
-- resuming interrupted runs
-- writing a custom Python eval
-- writing a custom TypeScript eval
-- using Quantiles with coding agents
+- Running a first benchmark
+- Using the built-in sampler
+- Inspecting sample-level outputs
+- Comparing runs
+- Resuming interrupted runs
+- Writing a custom Python eval
+- Writing a custom TypeScript eval
+- Using Quantiles with coding agents
 
 ## Contributing
 
@@ -253,13 +264,13 @@ Contributions are welcome.
 
 Good contributions include:
 
-- bug fixes
-- documentation improvements
-- benchmark integrations
+- Bug fixes
+- Documentation improvements
+- Benchmark integrations
 - SDK examples
 - CLI improvements
-- tests and fixtures
-- agent workflow examples
+- Tests and fixtures
+- Agent workflow examples
 
 Before opening a pull request, read:
 
