@@ -1,16 +1,12 @@
 # Code of Conduct
 
-## Our Pledge
-
-Quantiles is an open-source project for AI evaluation infrastructure. We want the project to be useful, technical, and welcoming for contributors with different backgrounds, experience levels, and perspectives.
-
-We expect everyone participating in the Quantiles community to act with professionalism, respect, and care.
+Quantiles Open-source is a project for AI evaluation infrastructure. We aim to build a technically rigorous, practical, and welcoming project for contributors across experience levels and backgrounds.
 
 This Code of Conduct applies to all project spaces, including GitHub issues, pull requests, discussions, documentation, examples, agent-facing files, community channels, events, and any other spaces where people represent the project.
 
 ## Expected Behavior
 
-Examples of behavior that contributes to a healthy project community include:
+Examples of behavior that contribute to a healthy project community include:
 
 - Using clear, respectful, and constructive communication
 - Giving and receiving technical feedback in good faith
@@ -63,7 +59,7 @@ When using coding agents, contributors remain responsible for the final contribu
 Agent-assisted contributions should:
 
 - Be reviewed by the contributor before submission
-- Follow `AGENTS.md`, `CONTRIBUTING.md`, and project documentation
+- Follow `SKILL.md`, `AGENTS.md`, `CONTRIBUTING.md`, and project documentation
 - Include tests when behavior changes
 - Avoid fabricated citations, benchmark claims, APIs, or implementation details
 - Avoid committing secrets, private data, or generated artifacts that do not belong in the repository
@@ -94,7 +90,7 @@ Do not report Code of Conduct incidents through public GitHub issues.
 Send reports to:
 
 ```text
-conduct@quantiles.io
+help@quantiles.io
 ```
 
 A report should include as much relevant information as possible:
@@ -144,4 +140,4 @@ Examples of representing the project include:
 
 ## Attribution
 
-This Code of Conduct is inspired by widely used open-source community standards and adapted for Quantiles as an engineering-focused AI evaluation infrastructure project.
+This Code of Conduct is adapted for Quantiles Open-source from widely used open-source community standards.
