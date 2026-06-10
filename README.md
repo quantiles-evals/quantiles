@@ -171,11 +171,8 @@ Quantiles is designed to work well with coding agents such as Codex, Claude Code
 
 The repository includes agent-facing instructions and reusable skill files:
 
-```text
-AGENTS.md
-.agents/skills/quantiles/SKILL.md
-docs/agents/
-```
+[`SKILL.md`](.skill/SKILL.md) 
+[`AGENTS.md`](.skill/AGENTS.md) 
 
 The root `AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
 
