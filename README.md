@@ -1,22 +1,22 @@
 # Quantiles Open-source
 
-Open-source, local-first eval infrastructure for AI systems.
+Quantiles is a local-first CLI and SDK for running AI evaluation workflows with fast, continuous feedback. Teams can iterate on model behavior, prompts, agent workflows, and debugging scripts while preserving the metrics and run histories needed to understand what improved, what regressed, and why.
 
-Quantiles gives AI engineers a repeatable workflow for running evaluations, recording results, inspecting sample-level outputs, comparing runs, and debugging regressions from inside a repository. It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
+It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
 
 ## Why Quantiles
 
-AI systems change quickly. Models, prompts, tools, retrieval logic, and agent workflows can all affect behavior. Quantiles helps teams measure those changes before they reach production by keeping evaluations close to the development environment.
+Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives without slowing down iteration.
 
-With Quantiles, you can:
+With Quantiles, teams can rely on built-in infrastructure for:
 
-- Run built-in and custom evaluations from the command line
-- Inspect recorded runs and sample-level outputs
-- Compare runs to identify regressions
-- Resume interrupted workflows
-- Record metrics, artifacts, errors, and execution history locally
-- Give coding agents a repeatable workflow for evaluating changes
-- Keep evaluation evidence close to the repository
+- Write standard Python or TypeScript, with familiar developer patterns
+- Run workflows locally from the CLI
+- Automatically record runs, steps, metrics, events, inputs, and final outputs
+- Store execution history locally in open data formats
+- Debug individual samples with full step-by-step traces, inputs, and outputs
+- Inspect and compare runs directly from the same `qt` CLI
+- Resilient execution by default with step caching and restartable failed runs
 
 ## Quickstart
 
@@ -56,29 +56,13 @@ For the complete command reference:
 qt --help
 ```
 
-## Core Workflow
-
-Quantiles is built around a simple evaluation loop:
-
-```text
-define eval
-run eval
-record results
-inspect samples
-compare runs
-debug regressions
-repeat
-```
-
-The `qt` CLI records local run history so results can be inspected, compared, and summarized without relying on ad hoc logs, spreadsheets, or one-off scripts.
-
 ## CLI
 
 Common commands:
 
 ```bash
 qt init
-qt run <workflow>
+qt run <evaluation>
 qt list
 qt show <run_id>
 qt compare <run_id_a> <run_id_b>
@@ -88,82 +72,47 @@ Example:
 
 ```bash
 qt run simpleqa-verified
-qt show 1
+qt show 1 --json
 qt compare 1 2
 ```
 
 Use `qt show` to inspect a single run and `qt compare` to compare behavior across runs.
 
-## Local-First by Default
+## Local-First and Offline by Default
 
-Quantiles is designed for the early evaluation loop inside a repository.
+Quantiles is built as a local-first, offline system that keeps benchmark execution, metadata, metrics, and analysis on your computer by default. 
 
-By default, evaluation state is recorded locally so teams can iterate quickly, inspect results, and preserve evidence while developing AI systems. Local state can include:
+The Quantiles toolchain, including the qt CLI, SDKs, on-disk data formats, and REST API, is optimized to use the local computing power by default instead of relying on cloud or other non-local resources.
 
-- Run metadata
-- Step records
-- Metrics
-- Artifacts
-- Inputs
-- Outputs
-- Errors
-- Runtime metadata
+The CLI and SDKs (TypeScript or Python) support offline benchmark workflows, including the following local execution and analysis features:
 
-This makes Quantiles useful before an evaluation workflow needs production orchestration, hosted observability, or centralized experiment tracking.
+- Benchmark code runs locally on your machine
+- Measurements are computed locally, except for remote model calls, hosted judges, external tools, and LLM-as-judge evaluations that may call remote providers (e.g. OpenAI, Anthropic, cloud providers, etc.)
+- Metadata is recorded to a local, on-disk database
+- Metrics and evaluation outputs are recorded to local, on-disk files
+- `qt show` and `qt compare` commands access only local metadata and analytics databases
 
 ## Built-in Benchmarks
 
-Quantiles supports built-in benchmarks as ready-to-run evaluation workflows with defined datasets, scoring, metrics, and result shapes.
+Built-in benchmarks are ready-to-run evaluation harnesses with predefined datasets, scoring methodology, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
-Built-in benchmarks are useful when you want a repeatable baseline, a standard reference point, or a quick way to validate that the evaluation workflow is working.
-
-Example:
-
-```bash
-qt run simpleqa-verified
-```
-
-Benchmark documentation should include:
-
-- What the benchmark evaluates
-- Input and output shape
-- Scoring method
-- Metrics
-- Provenance
-- Known limitations
-- Comparability notes
+| Code                                                        | When to use                                                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `qt run <benchmark>`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
+| `qt run <benchmark> --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
 
 ## Custom Evaluations
 
-Use custom evaluations when you need to test your own model, prompt, retrieval flow, tool call, or agent workflow.
+A custom evaluation is a normal Python or TypeScript program that runs through the qt CLI as a tracked Quantiles workflow. Your code owns the evaluation logic: loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles records the run, durable steps, emitted metrics, events, inputs, outputs, and comparisons.
 
-A custom eval can record:
-
-- Inputs
-- Outputs
-- Intermediate steps
-- Metrics
-- Artifacts
-- Errors
-- Runtime metadata
-
-Custom evaluations can be run locally and compared using the same `qt` workflow as built-in benchmarks.
+Use custom evaluations when you need to measure behavior that is specific to your product, workflow, prompt, dataset, rubric, or release process.
 
 ## SDKs
 
-Quantiles includes SDKs for defining custom evaluations in code.
+Use the official Quantiles SDKs to build with higher-level workflow primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python and TypeScript. SDKs integrate tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
 
-SDK surfaces include:
-
-- Python workflows
-- TypeScript workflows
-- Durable steps
-- Metrics
-- Artifacts
-- Run metadata
-- Local execution history
-
-See the SDK documentation for examples.
+- Link python sdk
+- Link Typescript sdk
 
 ## Coding Agents
 
@@ -181,7 +130,7 @@ The repository includes agent-facing instructions and reusable skill files:
 Example agent prompt:
 
 ```text
-Use the Quantiles eval skill. Run the SimpleQA Verified benchmark with the built-in sampler, inspect the sample-level results, compare the latest run to the previous run if available, and summarize any regressions with evidence from the run output.
+Use the Quantiles eval skill. Run the SimpleQA Verified benchmark and summarize the results.
 ```
 
 ## Repository Structure
@@ -198,10 +147,6 @@ quantiles/
 ├─ AGENTS.md
 ├─ llms.txt
 │
-├─ .agents/
-│  └─ skills/
-│     └─ quantiles/
-│        └─ SKILL.md
 │
 ├─ .github/
 ├─ packages/
@@ -226,34 +171,17 @@ Important directories:
 
 ## Documentation
 
-Start here:
-
-- Quickstart: `docs/quickstart.md`
-- CLI reference: `docs/cli/`
-- SDKs: `docs/sdks/`
-- Benchmarks: `docs/benchmarks/`
-- Agents: `docs/agents/`
-- Examples: `docs/examples/`
-- Reference: `docs/reference/`
 
 Full documentation is available at:
 
-```text
-https://quantiles.io/documentation
-```
+[`Quantiles Documentation`](https://quantiles.io/documentation/)
 
-## Examples
+Start here:
 
-The `examples/` directory includes workflows for:
-
-- Running a first benchmark
-- Using the built-in sampler
-- Inspecting sample-level outputs
-- Comparing runs
-- Resuming interrupted runs
-- Writing a custom Python eval
-- Writing a custom TypeScript eval
-- Using Quantiles with coding agents
+- [`Quickstart`](https://quantiles.io/documentation/quickstart)
+- [`Agent Overview`](https://quantiles.io/documentation/evals-with-agents)
+- [`Python SDK`](https://quantiles.io/documentation/reference/python-sdk)
+- [`TypeScript SDK`](https://quantiles.io/documentation/reference/typescript-sdk)
 
 ## Contributing
 
