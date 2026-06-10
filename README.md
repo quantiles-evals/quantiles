@@ -174,9 +174,9 @@ The repository includes agent-facing instructions and reusable skill files:
 - [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md)
 - [`AGENT.md`](https://github.com/quantiles-evals/skill/blob/main/AGENT.md)
 
-The root `AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
+`SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
 
-The reusable skill in `.agents/skills/quantiles/SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
+`AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
 
 Example agent prompt:
 
