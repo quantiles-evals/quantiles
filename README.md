@@ -1,4 +1,4 @@
-# Quantiles
+# Quantiles Open-source
 
 Open-source, local-first eval infrastructure for AI systems.
 
@@ -291,4 +291,4 @@ For questions, usage help, and community support, see:
 
 ## License
 
-Quantiles OSS is licensed under the [Apache License 2.0](./LICENSE). Hosted, enterprise, or managed Quantiles products may be offered under separate commercial terms.
+Quantiles Open-source is licensed under the [Apache License 2.0](./LICENSE). Hosted, enterprise, or managed Quantiles products may be offered under separate commercial terms.
