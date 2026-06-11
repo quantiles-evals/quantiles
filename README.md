@@ -38,6 +38,8 @@ Run a built-in benchmark:
 qt run simpleqa-verified
 ```
 
+>Important note: this `qt run` command will run the [`simpleqa-verified`](https://arxiv.org/abs/2509.07968) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
+
 Inspect the recorded run:
 
 ```bash
@@ -98,8 +100,8 @@ Built-in benchmarks are ready-to-run evaluation harnesses with predefined datase
 
 | Code                                                        | When to use                                                                                             |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `qt run <benchmark>`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
-| `qt run <benchmark> --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
+| `qt run $BENCHMARK`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
+| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
 
 ## Custom Evaluations
 
@@ -121,53 +123,14 @@ Quantiles is designed to work well with coding agents such as Codex, Claude Code
 The repository includes agent-facing instructions and reusable skill files:
 
 - [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md)
-- [`AGENT.md`](https://github.com/quantiles-evals/skill/blob/main/AGENT.md)
 
 `SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
-
-`AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
 
 Example agent prompt:
 
 ```text
 Use the Quantiles eval skill. Run the SimpleQA Verified benchmark and summarize the results.
 ```
-
-## Repository Structure
-
-```text
-quantiles/
-├─ README.md
-├─ LICENSE
-├─ CHANGELOG.md
-├─ CONTRIBUTING.md
-├─ CODE_OF_CONDUCT.md
-├─ SECURITY.md
-├─ SUPPORT.md
-├─ AGENTS.md
-├─ llms.txt
-│
-│
-├─ .github/
-├─ packages/
-├─ benchmarks/
-├─ examples/
-├─ docs/
-├─ tests/
-└─ scripts/
-```
-
-Important directories:
-
-| Path | Purpose |
-|---|---|
-| `packages/` | CLI, core runtime, and SDK packages |
-| `benchmarks/` | Built-in benchmark implementations and templates |
-| `examples/` | Runnable examples for common evaluation workflows |
-| `.skill/` | Reusable agent skills for using Quantiles |
-| `docs/` | Documentation for CLI, SDKs, benchmarks, agents, and reference material |
-| `tests/` | CLI, SDK, runtime, storage, and benchmark tests |
-| `.github/` | GitHub Actions, issue templates, and pull request templates |
 
 ## Documentation
 
