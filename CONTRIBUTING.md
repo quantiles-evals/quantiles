@@ -317,11 +317,8 @@ When changing agent-facing files, make sure they are:
 Agent-facing files include:
 
 - [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md)
-- [`AGENT.md`](https://github.com/quantiles-evals/skill/blob/main/AGENT.md)
 
 `SKILL.md` gives agents durable Quantiles behavior for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill in another repository, copy the `quantiles` skill directory into that repository’s agent-supported skills directory.
-
-`AGENTS.md` provides repository-specific instructions for agents working on Quantiles itself.
 
 Do not put project-specific implementation details into the reusable skill unless they apply to Quantiles usage across projects.
 
