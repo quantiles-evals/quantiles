@@ -132,42 +132,6 @@ Example agent prompt:
 Use the Quantiles eval skill. Run the SimpleQA Verified benchmark and summarize the results.
 ```
 
-## Repository Structure
-
-```text
-quantiles/
-├─ README.md
-├─ LICENSE
-├─ CHANGELOG.md
-├─ CONTRIBUTING.md
-├─ CODE_OF_CONDUCT.md
-├─ SECURITY.md
-├─ SUPPORT.md
-├─ AGENTS.md
-├─ llms.txt
-│
-│
-├─ .github/
-├─ packages/
-├─ benchmarks/
-├─ examples/
-├─ docs/
-├─ tests/
-└─ scripts/
-```
-
-Important directories:
-
-| Path | Purpose |
-|---|---|
-| `packages/` | CLI, core runtime, and SDK packages |
-| `benchmarks/` | Built-in benchmark implementations and templates |
-| `examples/` | Runnable examples for common evaluation workflows |
-| `.skill/` | Reusable agent skills for using Quantiles |
-| `docs/` | Documentation for CLI, SDKs, benchmarks, agents, and reference material |
-| `tests/` | CLI, SDK, runtime, storage, and benchmark tests |
-| `.github/` | GitHub Actions, issue templates, and pull request templates |
-
 ## Documentation
 
 
