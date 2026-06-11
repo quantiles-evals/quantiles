@@ -1,6 +1,6 @@
 # Contributing to Quantiles
 
-Thanks for contributing to Quantiles.
+Thanks for contributing to Quantiles!
 
 Quantiles Open-source is a local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
 
