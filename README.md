@@ -38,6 +38,8 @@ Run a built-in benchmark:
 qt run simpleqa-verified
 ```
 
+>Important note: this `qt run` command will run the [`simpleqa-verified`](https://arxiv.org/abs/2509.07968) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
+
 Inspect the recorded run:
 
 ```bash
