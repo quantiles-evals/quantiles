@@ -100,8 +100,8 @@ Built-in benchmarks are ready-to-run evaluation harnesses with predefined datase
 
 | Code                                                        | When to use                                                                                             |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `qt run <benchmark>`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
-| `qt run <benchmark> --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
+| `qt run $BENCHMARK`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
+| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
 
 ## Custom Evaluations
 
