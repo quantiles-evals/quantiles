@@ -38,7 +38,7 @@ Run a built-in benchmark:
 qt run simpleqa-verified
 ```
 
->Important note: this `qt run` command will run the [`simpleqa-verified`](https://arxiv.org/abs/2509.07968) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
+> Important note: this `qt run` command will run the [`simpleqa-verified`](https://arxiv.org/abs/2509.07968) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
 
 Inspect the recorded run:
 
@@ -82,7 +82,7 @@ Use `qt show` to inspect a single run and `qt compare` to compare behavior acros
 
 ## Local-First and Offline by Default
 
-Quantiles is built as a local-first, offline system that keeps benchmark execution, metadata, metrics, and analysis on your computer by default. 
+Quantiles is built as a local-first, offline system that keeps benchmark execution, metadata, metrics, and analysis on your computer by default.
 
 The Quantiles toolchain, including the qt CLI, SDKs, on-disk data formats, and REST API, is optimized to use the local computing power by default instead of relying on cloud or other non-local resources.
 
@@ -98,10 +98,10 @@ The CLI and SDKs (TypeScript or Python) support offline benchmark workflows, inc
 
 Built-in benchmarks are ready-to-run evaluation harnesses with predefined datasets, scoring methodology, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
-| Code                                                        | When to use                                                                                             |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `qt run $BENCHMARK`                                        | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
-| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'`      | Run your model against a built-in benchmark                                                             |
+| Code                                                  | When to use                                                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `qt run $BENCHMARK`                                   | Use the demo sampler to inspect benchmark samples, scoring behavior, workflow steps, and metric outputs |
+| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'` | Run your model against a built-in benchmark                                                             |
 
 ## Custom Evaluations
 
@@ -134,7 +134,6 @@ Use the Quantiles eval skill. Run the SimpleQA Verified benchmark and summarize 
 
 ## Documentation
 
-
 Full documentation is available at:
 
 [`Quantiles Documentation`](https://quantiles.io/documentation/)
@@ -148,37 +147,13 @@ Start here:
 
 ## Contributing
 
-Contributions are welcome.
+Quantiles exists to make AI evaluation workflows more practical, repeatable, and useful for engineering teams. We welcome contributions from the community, whether you are fixing bugs, improving documentation, adding evaluations and benchmarks, or helping make Quantiles-OS more reliable for AI engineers and researchers.
 
-Good contributions include:
-
-- Bug fixes
-- Documentation improvements
-- Benchmark integrations
-- SDK examples
-- CLI improvements
-- Tests and fixtures
-- Agent workflow examples
-
-Before opening a pull request, read:
-
-[CONTRIBUTING.md](./CONTRIBUTING.md)
-
-When changing benchmark behavior, scoring, CLI output, run schemas, or SDK APIs, update the relevant documentation and changelog.
+Read our [contributing guide](./CONTRIBUTING.md) to get started.
 
 ## Security
 
-Please do not report security vulnerabilities through public GitHub issues.
-
-See:
-
-[SECURITY.md](./SECURITY.md)
-
-## Support
-
-For questions, usage help, and community support, see:
-
-[SUPPORT.md](./SUPPORT.md)
+Please do not report security vulnerabilities through public GitHub issues. Follow the reporting guidance in [SECURITY.md](./SECURITY.md).
 
 ## License
 
