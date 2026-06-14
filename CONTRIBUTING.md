@@ -1,8 +1,8 @@
 # Contributing to Quantiles
 
-Thank you for interest in contributing to Quantiles Open-source!
+Thank you for interest in contributing to Quantiles Open source!
 
-Quantiles OS is a local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
+Quantiles open source projects provide local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
 
 ## Before You Start
 
@@ -12,7 +12,7 @@ Before opening a pull request, please:
 2. Open an issue for large changes, new benchmark integrations, schema changes, or API changes.
 3. Keep changes focused and reviewable.
 4. Update tests and documentation when behavior changes.
-5. Follow the repository instructions in `AGENTS.md` when using a coding agent.
+5. If you use one, make sure your coding agent follows the instructions in `AGENTS.md`.
 
 ## Code and Documentation Guidelines
 
@@ -31,37 +31,9 @@ git clone https://github.com/quantiles-evals/quantiles.git
 cd quantiles
 ```
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Initialize the local Quantiles workspace:
-
-```bash
-qt init
-```
-
-Run the test suite:
-
-```bash
-npm test
-```
-
-Run linting:
-
-```bash
-npm run lint
-```
-
-Run type checks:
-
-```bash
-npm run typecheck
-```
-
-If the package manager or commands differ in this repository, use the commands defined in `package.json`.
+<!--
+TODO: describe different setups for python, typescript and CLI
+-->
 
 ## Security
 
