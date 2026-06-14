@@ -1,13 +1,12 @@
 # Code of Conduct
 
-In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in Quantiles a harassment-free experience for everyone.
+In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in Quantiles open source projects a harassment-free experience for everyone.
 
 We welcome participation regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, sexual identity and orientation, technical background, or area of expertise.
 
 ## Our Standards
 
-Examples of behavior that contributes to creating a positive environment
-include:
+Examples of behavior that contributes to creating a positive environment include:
 
 - Using welcoming and inclusive language
 - Being respectful of differing viewpoints and experiences
@@ -23,8 +22,7 @@ Examples of unacceptable behavior include:
 - Trolling, insulting/derogatory comments, and personal or political attacks
 - Public or private harassment
 - Publishing others' private information, such as a physical or electronic address, without explicit permission
-- Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+- Other conduct which could reasonably be considered inappropriate in a professional setting
 
 ## Our Responsibilities
 
@@ -39,7 +37,7 @@ Quantiles is designed to work well with coding agents, and we welcome contributo
 Agent-assisted contributions should:
 
 - Be reviewed by the contributor before submission
-- Follow `SKILL.md`, `AGENTS.md`, [CONTRIBUTING.md](./CONTRIBUTING.md), and project documentation
+- Follow `AGENTS.md`, [CONTRIBUTING.md](./CONTRIBUTING.md), and project documentation
 - Include tests when behavior changes
 - Avoid fabricated citations, benchmark claims, APIs, or implementation details
 - Avoid committing secrets, private data, or generated artifacts that do not belong in the repository
