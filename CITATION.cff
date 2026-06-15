@@ -1,0 +1,30 @@
+cff-version: 1
+
+message: >-
+  If you use Quantiles OS, please cite it as below.
+
+title: "Quantiles OS: Local-first AI evaluation infrastructure"
+
+abstract: >-
+  Quantiles OS is an open-source, local-first CLI and SDK toolchain for
+  running AI evaluation workflows, recording runs, inspecting sample-level
+  results, comparing regressions, and supporting coding-agent evaluation
+  workflows.
+
+type: software
+
+authors:
+  - name: "Quantiles Contributors"
+
+repository-code: "https://github.com/quantiles-evals/quantiles-os"
+
+url: "https://quantiles.io"
+
+license: Apache-2.0
+
+keywords:
+  - "AI evaluation"
+  - "AI benchmarking"
+  - "evaluation infrastructure"
+  - "LLM evaluation"
+  - "agent evaluation"
