@@ -31,7 +31,6 @@ Do:
 - Verify commands, links, package names, benchmark names, and release status before documenting them.
 - Update public docs when CLI behavior, SDK APIs, workflows, benchmarks, schemas, setup steps, or agent guidance changes.
 - Prefer concrete examples with commands, file paths, inputs, outputs, and expected behavior.
-- Use the nearest subdirectory `AGENTS.md` before making implementation changes.
 - Leave clear notes when something could not be verified.
 
 Do not:
@@ -42,6 +41,17 @@ Do not:
 - Invent links, package names, commands, benchmarks, features, roadmap claims, or release status.
 - Make broad refactors, formatting-only churn, or unrelated edits unless explicitly asked.
 - Report or discuss security vulnerabilities in public issues, discussions, pull requests, examples, or documentation. Follow [`SECURITY.md`](./SECURITY.md).
+
+## Before Editing
+
+Before making changes:
+
+1. Read this file.
+2. Identify the affected subdirectory.
+3. Read the nearest subdirectory `AGENTS.md` if present.
+4. Inspect the relevant README, package configuration, and existing tests before changing behavior.
+5. Prefer the smallest change that satisfies the task.
+6. Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 
 ## Safety And Privacy
 
@@ -72,8 +82,6 @@ Subdirectories may include:
 - `benchmarks`: built-in or example benchmark harnesses, datasets, fixtures, and scoring logic, when present.
 - `docs`: public documentation, examples, guides, and reference material, when present.
 
-When working in a subdirectory, read its README, nearest `AGENTS.md`, and validation commands before editing.
-
 ## Authoritative Files
 
 Start with these files before making public-facing changes:
@@ -83,9 +91,7 @@ Start with these files before making public-facing changes:
 - [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
 - [`LICENSE`](./LICENSE): Apache 2.0 license text.
-- [`CHANGELOG.md`](./CHANGELOG.md): notable public changes, when present.
-
-For implementation details, read the relevant subdirectory and its nearest `AGENTS.md` first.
+<!-- - (AARON: should we make this?)  -->[`CHANGELOG.md`](./CHANGELOG.md): notable public changes, when present.
 
 ## Product Terminology
 
@@ -107,11 +113,67 @@ Prefer `local-first` and `offline by default` for open-source behavior.
 
 When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
+## Quantiles Evaluation Workflow
+
+Use the `qt` CLI as the source of truth for running, listing, inspecting, comparing, and resuming Quantiles evaluations.
+
+Prefer CLI output over manually reading `.quantiles/` files. Do not manually edit or delete `.quantiles/` files unless explicitly asked.
+
+Run `qt init` before other `qt` commands if the repository has not been initialized.
+
+Use `--json` for `qt list`, `qt show`, and `qt compare` when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
+
+Common commands:
+
+```bash
+qt init
+qt run <evaluation> --json
+qt list --json
+qt show <run_id> --json
+qt compare <baseline_run_id> <candidate_run_id> --json
+qt run <evaluation> --resume <run_id> --json
+```
+
+Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
+
+Start with the smallest useful sample limit before running a full benchmark. Ask before running any evaluation that is expected to be slow, expensive, provider-backed, network-dependent, destructive, or likely to modify local run state in a meaningful way.
+
+Safe commands may include read-only inspection commands, local format checks, type checks, and unit tests. Small smoke tests are allowed only when they are local, cheap, relevant to the task, and do not call external providers.
+
+If no real model is specified, built-in evaluations may use the demo model. Treat demo model runs as workflow validation only, not model-quality benchmark evidence.
+
+Do not run provider-backed evaluations unless explicitly asked or given a provider-prefixed model. Before running provider-backed evaluations, verify that the required provider API key is configured without printing the key value.
+
+Provider-backed model inputs should use provider-prefixed model names, for example:
+
+```json
+{"model":"openai:<model>"}
+{"model":"anthropic:<model>"}
+{"model":"gemini:<model>"}
+```
+
+Example provider-backed run:
+
+```bash
+qt run simpleqa-verified --input '{"limit":10,"model":"openai:<model>"}' --json
+```
+
 ## Root Validation
 
-The root repository may not have a build or test suite that applies to every change.
+<!-- (AARON: is this true?)  --> The root repository may not have a build or test suite that applies to every change.
 
 Before running checks, inspect the repository for configured tooling. Do not invent root commands.
+
+When discovering validation commands, check files such as:
+
+- `mise.toml`
+- `justfile`
+- `Makefile`
+- `package.json`
+- `pyproject.toml`
+- `Cargo.toml`
+- `README.md`
+- the nearest subdirectory `AGENTS.md`
 
 For documentation-only changes, at minimum:
 
@@ -141,8 +203,6 @@ qt compare
 
 When editing the CLI subdirectory, preserve local-first behavior, SQLite data model assumptions, clear Rust error handling, and stable command behavior.
 
-Use the CLI subdirectory's own `AGENTS.md` and validation targets as the source of truth.
-
 ### Python SDK
 
 The Python SDK is a Python 3.12 SDK for authoring local AI workload workflows against the Quantiles local observability server at `http://127.0.0.1:8765` by default.
@@ -150,8 +210,6 @@ The Python SDK is a Python 3.12 SDK for authoring local AI workload workflows ag
 It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, dataset iteration, async helpers, metrics, and LLM helpers.
 
 When editing the Python subdirectory, preserve async behavior, stable JSON payloads, replay semantics, and public API exports.
-
-Use the Python subdirectory's own `AGENTS.md` and validation targets as the source of truth.
 
 ### TypeScript SDK
 
@@ -161,17 +219,17 @@ It exposes workflow primitives, `QuantilesClient`, `QuantilesRun`, stable JSON u
 
 When editing the TypeScript subdirectory, preserve strict typing, JSON-serializable public surfaces, ESM behavior, and documented package exports.
 
-Use the TypeScript subdirectory's own `AGENTS.md` and validation targets as the source of truth.
-
 ### Agent Skill
 
 The [`skill`](./skill/) subdirectory contains reusable instructions for coding agents that use Quantiles to run, inspect, compare, and summarize evaluation workflows.
 
-When editing the skill subdirectory, keep instructions operational, command-driven, and safe for public use. Do not treat runs that use the demo model as model-quality benchmark evidence.
+When editing the skill subdirectory, keep instructions operational, command-driven, and safe for public use.
 
 Read [`skill/SKILL.md`](./skill/SKILL.md) for the reusable agent skill instructions.
 
-### Benchmarks (should we have this?)
+### Benchmarks
+
+<!-- (AARON: do we have this?) -->
 
 The `benchmarks` subdirectory may contain built-in or example benchmark harnesses, datasets, fixtures, scoring logic, and benchmark documentation.
 
@@ -181,6 +239,7 @@ When editing benchmark content:
 - Record benchmark source, version, commit, dataset revision, scoring configuration, and any local patches when relevant.
 - Do not present demo sampler results as model-quality benchmark evidence.
 - Avoid adding large datasets, generated outputs, or cached results unless explicitly required and appropriate for the repository.
+- If benchmark content changes, call out whether the change affects comparability with prior runs.
 
 ## Working In This Repository
 
@@ -201,6 +260,62 @@ Use forward slashes in public docs unless a block is explicitly Windows or Power
 
 ## Common Tasks
 
+### Run or inspect an evaluation
+
+Use the Quantiles CLI as the source of truth for local runs.
+
+Prefer this flow:
+
+```bash
+qt init
+qt run <evaluation>
+qt show <run_id> --json
+```
+
+When summarizing results, include the command, run ID, workflow or benchmark name, model, input JSON, status, key metrics, failures, and recommended next command.
+
+### Compare evaluation runs
+
+Use `qt compare` to compare a baseline run against a candidate run:
+
+```bash
+qt compare <baseline_run_id> <candidate_run_id> --json
+```
+
+Before saying one run is better, verify that the comparison is apples-to-apples.
+
+Keep benchmark or workflow name, dataset, dataset split, sample count, scorer, metric definitions, model-vs-demo setup, workflow input, and provider settings stable unless the user intentionally changed one variable.
+
+Treat exit code `1` from `qt compare` as a signal that runs differ, not necessarily as a command failure.
+
+For small sample counts, describe comparison results as directional or smoke-test evidence.
+
+### Debug a regression
+
+When debugging a regression:
+
+1. Identify the baseline and candidate runs.
+2. Run `qt compare <baseline_run_id> <candidate_run_id> --json`.
+3. Inspect failing or changed samples with `qt show <run_id> --json`.
+4. Look for changed inputs, outputs, metrics, step status, model configuration, prompt version, dataset row IDs, judge configuration, and sampling parameters.
+5. Summarize the highest-impact fixes for reliability, cost, and latency.
+
+### Resume a run
+
+Resume only failed or interrupted runs caused by operational issues such as timeouts, rate limits, process exits, or network errors.
+
+Do not resume a completed run. Start a new run instead.
+
+When resuming a run, use the same workflow name and input JSON. For custom evaluations, also use the same command.
+
+Start a new run instead of resuming when the model, prompt, dataset, rubric, workflow input, or scoring logic intentionally changed.
+
+<!-- (AARON: is this command right? or is run id suppose to be benchmark name?) -->
+
+```bash
+qt run <run_id> --resume
+```
+
 ### Handle security-related content
 
 Read [`SECURITY.md`](./SECURITY.md).
@@ -214,6 +329,28 @@ Public vulnerability reports should be redirected to the private reporting proce
 Open the relevant subdirectory and follow its nearest `AGENTS.md`.
 
 Do not use this root file as the source of truth for implementation-specific commands, tests, package managers, release steps, or code style when a subdirectory has more specific guidance.
+
+## Output Style For Coding Agents
+
+- Be concise, technical, and action-oriented.
+- Prefer runnable commands, real file paths, concrete inputs, and expected outputs.
+- When reporting evaluation results, include run IDs, compared runs, key metrics, regressions, failures, caveats, and recommended next steps.
+- If a command needs credentials, name the required environment variables but do not inspect or print their values.
+
+## Evaluation Reporting
+
+After running, inspecting, comparing, or resuming Quantiles evaluations, report:
+
+- Exact command used.
+- Run ID or run IDs.
+- Evaluation or benchmark name.
+- Model, including whether it was a demo model.
+- Input and output JSON.
+- Status and success or failure.
+- Key metrics.
+- Important sample-level failures, regressions, or changed outputs.
+- Caveats, including demo model use, small sample count, non-comparable runs, or external API issues.
+- Recommended next command.
 
 ## Git And Pull Request Rules
 
