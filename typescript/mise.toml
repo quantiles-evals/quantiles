@@ -1,0 +1,34 @@
+[tasks.check]
+run = "bun run check"
+
+[tasks.typecheck]
+run = "bunx tsc --noEmit"
+
+[tasks.lint]
+run = "bunx biome ci"
+
+[tasks.fmt]
+run = "bun run fmt"
+
+[tasks.example-prompt-eval]
+run = "qt run support-triage -- bun run examples/prompt_eval.ts"
+
+[tasks.install-frozen]
+run = "bun install --frozen-lockfile"
+
+[tasks.ci]
+run = [
+    "bun install --frozen-lockfile",
+    "mise run ci-checks"
+]
+
+[tasks.ci-checks]
+depends = ["typecheck", "lint"]
+
+# requires that the CLI is installed already
+[tasks.e2e]
+depends = ["install-frozen"]
+run = [
+    "qt run --input '{\"iterations\": 3}' e2e-smoke-ts -- bunx tsx tests/e2e/smoke.ts"
+    # TODO: check output
+]

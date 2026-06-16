@@ -1,0 +1,45 @@
+mod cli;
+mod commands;
+
+use std::time::Instant;
+
+use anyhow::Result;
+use clap::Parser;
+
+fn main() -> Result<()> {
+    let process_start = Instant::now();
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(async_main(process_start))
+}
+
+async fn async_main(process_start: Instant) -> Result<()> {
+    let cli = cli::Cli::parse();
+
+    match cli.command {
+        cli::Command::Init => commands::init().await,
+        cli::Command::List { json } => commands::list(json).await,
+        cli::Command::Compare { run_a, run_b, json } => commands::compare(run_a, run_b, json).await,
+        cli::Command::Run {
+            workflow_name,
+            input,
+            resume,
+            json,
+            command,
+        } => {
+            commands::run(
+                &workflow_name,
+                input.as_deref(),
+                resume,
+                json,
+                &command,
+                process_start,
+            )
+            .await
+        }
+        cli::Command::Serve { addr } => commands::serve(&addr).await,
+        cli::Command::Show { run_id, json } => commands::show(run_id, json).await,
+    }
+}
