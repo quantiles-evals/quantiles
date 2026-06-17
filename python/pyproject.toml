@@ -1,0 +1,62 @@
+[project]
+name = "quantiles"
+version = "0.1.0"
+description = "Python SDK for the Quantiles local AI workload observability server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["aiohttp~=3.11", "numpy~=2.4.4", "pydantic~=2.11", "scipy>=1.12.0,<2.0.0", "openai~=2.36.0"]
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+indent-width = 2
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# TODO: enable all of these
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # import sorting
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "SIM",    # simplify
+    "C4",     # comprehensions
+    "PIE",    # misc improvements
+    "RET",    # return style
+    "PTH",    # pathlib
+    "ERA",    # commented-out code
+    "RUF",    # Ruff-specific rules
+    "ANN",    # annotations
+    "ASYNC",  # async correctness
+    # "BLE",    # blind except
+    # "TRY",    # exception style
+]
+extend-select = ["ANN401", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Use a concrete type instead of typing.Any."
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+
+[tool.ty.rules]
+possibly-missing-attribute = "error"
+unknown-argument = "error"
+invalid-return-type = "error"
+
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2,<10.0.0",
+    "pytest-asyncio>=0.27.0",
+    "ruff>=0.15.12,<0.16.0",
+    "ty>=0.0.40,<0.0.50",
+]

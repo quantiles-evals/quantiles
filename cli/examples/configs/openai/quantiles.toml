@@ -1,0 +1,34 @@
+[benchmarks.pubmedqa]
+samples = 50
+
+# Use the OpenAI API, reading the API key
+# from the `OPENAI_API_KEY` environment variable
+#
+# The below model is good for demonstrating PubMedQA benchmarks without very high costs,
+# since it's relatively cheap, fast, and not a reasoning model. You will need to ensure the
+# project with which your API key is associated with has permissions to use this model.
+# Do so by going to the below page, and enabling the model:
+#
+# https://platform.openai.com/settings/$PROJECT_ID/limits
+#
+# Details on the model can be found at:
+#
+# https://developers.openai.com/api/docs/models/gpt-5.4-nano
+#
+# And a list of all models can be found at:
+#
+# https://developers.openai.com/api/docs/models/all
+model = "openai:gpt-5-nano"
+
+# If you run this or other benchmarks with more samples, you may also need to increase this
+# `max_workers` parameter to improve throughput. This might cause you to run into rate
+# limits, because the defaults are relatively low. To increase them, scroll down
+# on the same https://platform.openai.com/settings/$PROJECT_ID/limits page and adjust limits
+# for the model you're using.
+max_workers = 100
+
+[benchmarks.simpleqa-verified]
+samples = 100
+
+[benchmarks.financebench]
+samples = 50
