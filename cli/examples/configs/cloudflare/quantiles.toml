@@ -1,0 +1,32 @@
+[benchmarks.pubmedqa]
+samples = 50
+
+# Use Cloudflare AI Gateway, reading the account ID, gateway ID, and API key
+# from environment variables:
+# - CLOUDFLARE_ACCOUNT_ID
+# - CLOUDFLARE_GATEWAY_ID
+# - CLOUDFLARE_API_KEY
+#
+# This model is good for demonstrating PubMedQA benchmarks without very high costs,
+# since it's relatively cheap, fast, and not a reasoning model. Its details can be found at:
+#
+# https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/
+#
+# And a list of all models can be found at:
+#
+# https://developers.cloudflare.com/workers-ai/models/
+model = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+#
+# Or provide the account ID / gateway ID inline, and still read the API key from
+# the CLOUDFLARE_API_KEY env var
+# model = {
+#   type = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+#   account_id = "...",
+#   gateway_id = "..."
+# }
+
+[benchmarks.simpleqa-verified]
+samples = 100
+
+[benchmarks.financebench]
+samples = 50

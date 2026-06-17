@@ -1,0 +1,68 @@
+[tools]
+zig = "0.16.0"
+shellcheck = "latest"
+
+[tasks.build]
+run="cargo build"
+
+[tasks.check]
+run="cargo check"
+
+# run _all_ tests for the CLI (including integration tests)
+[tasks.test]
+run="cargo test"
+
+# run just integration tests for the CLI
+[tasks.test-integration]
+run="cargo test --test cli_golden_path"
+
+# format the CLI
+[tasks.fmt]
+run="cargo fmt"
+
+# check to make sure the CLI is formatted properly
+[tasks.fmt-check]
+run = "cargo fmt --check"
+
+# lint the CLI
+[tasks.lint]
+run="cargo clippy --all-targets --all-features -- -D warnings"
+
+# install the CLI to ~/.local/bin
+[tasks.install]
+run = [
+    "mkdir -p \"${HOME}/.local/bin\"",
+    "cargo build",
+    "cp ./target/debug/qt \"${HOME}/.quantiles/bin\""
+]
+
+# run a rust example that proves the raw rust HTTP client works
+[tasks.run-http-client-example]
+run="cargo run --example http_client"
+
+# build the CLI for ARM Mac, package the binaries, and publish the archives,
+# checksums, and install script to the quantiles-cli R2 bucket
+[tasks.publish-cli-r2]
+run="bash scripts/publish-cli-r2.sh"
+
+# upload only the install script to R2; use this when installer logic changes
+# but the already-published CLI release artifact does not need to be rebuilt
+[tasks.upload-install-script-r2]
+run="bash scripts/upload-install-script-r2.sh"
+
+# lint shell scripts
+[tasks.shellcheck]
+run="shellcheck scripts/*.sh"
+
+# run rust checks sequentially
+[tasks.ci-rust]
+run = [
+    "cargo fmt --check",
+    "cargo clippy --all-targets --all-features -- -D warnings",
+    "cargo test",
+]
+
+# run all CI checks (shellcheck in parallel with rust checks)
+[tasks.ci]
+depends = ["ci-rust", "shellcheck"]
+run="echo 'All CI checks passed'"
