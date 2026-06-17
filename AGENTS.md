@@ -91,7 +91,22 @@ Start with these files before making public-facing changes:
 - [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
 - [`LICENSE`](./LICENSE): Apache 2.0 license text.
-<!-- - (AARON: should we make this?)  -->[`CHANGELOG.md`](./CHANGELOG.md): notable public changes, when present.
+- `CHANGELOG.md`: notable public changes, when present.
+
+## Agent Instruction Boundaries
+
+Use `AGENTS.md` files for durable repository guidance: repo layout, safety constraints, coding conventions, validation commands, review expectations, and handoff requirements.
+
+Use `skill/SKILL.md` as the reusable Quantiles evaluation workflow: when to run the `qt` CLI, how to inspect and compare runs, how to resume failed work, and how to report evaluation results.
+
+This repository keeps the skill source in [`skill/SKILL.md`](./skill/SKILL.md). Coding agents do not necessarily auto-load that file from this path. For Codex-compatible skill discovery, install or copy the skill into an agent skill location such as `.agents/skills/quantiles/SKILL.md`, or invoke it through the agent's supported skill-install mechanism.
+
+When both files are relevant:
+
+1. Explicit user instructions win.
+2. The nearest applicable `AGENTS.md` controls repository-specific code, commands, package managers, tests, style, and public-safety rules.
+3. `skill/SKILL.md` controls reusable Quantiles eval operations, result inspection, comparison, resume, and reporting workflow.
+4. If the skill suggests a generic command but a local `AGENTS.md`, README, or package configuration provides a more specific command, use the local command and note the choice in handoff.
 
 ## Product Terminology
 
@@ -121,7 +136,7 @@ Prefer CLI output over manually reading `.quantiles/` files. Do not manually edi
 
 Run `qt init` before other `qt` commands if the repository has not been initialized.
 
-Use `--json` for `qt list`, `qt show`, and `qt compare` when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
+Use `--json` for `qt run`, `qt list`, `qt show`, and `qt compare` when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
 
 Common commands:
 
@@ -160,7 +175,7 @@ qt run simpleqa-verified --input '{"limit":10,"model":"openai:<model>"}' --json
 
 ## Root Validation
 
-<!-- (AARON: is this true?)  --> The root repository may not have a build or test suite that applies to every change.
+The root repository may not have a build or test suite that applies to every change.
 
 Before running checks, inspect the repository for configured tooling. Do not invent root commands.
 
@@ -228,8 +243,6 @@ When editing the skill subdirectory, keep instructions operational, command-driv
 Read [`skill/SKILL.md`](./skill/SKILL.md) for the reusable agent skill instructions.
 
 ### Benchmarks
-
-<!-- (AARON: do we have this?) -->
 
 The `benchmarks` subdirectory may contain built-in or example benchmark harnesses, datasets, fixtures, scoring logic, and benchmark documentation.
 
@@ -310,10 +323,16 @@ When resuming a run, use the same workflow name and input JSON. For custom evalu
 
 Start a new run instead of resuming when the model, prompt, dataset, rubric, workflow input, or scoring logic intentionally changed.
 
-<!-- (AARON: is this command right? or is run id suppose to be benchmark name?) -->
+<!-- AARON: review these -->
 
 ```bash
-qt run <run_id> --resume
+qt run <run_id> --resume --json
+```
+
+For custom evaluations, preserve the original command as well:
+
+```bash
+qt run <run_id> --resume --json -- <command>
 ```
 
 ### Handle security-related content
