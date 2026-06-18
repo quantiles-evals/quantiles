@@ -1,4 +1,4 @@
-name: standard ci checks
+name: cli
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: standard ci
+name: python-sdk
 
 on:
   push:
