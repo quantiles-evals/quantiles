@@ -1,20 +1,28 @@
-[tasks.check]
-run = "bun run check"
-
-[tasks.typecheck]
-run = "bunx tsc --noEmit"
-
-[tasks.lint]
-run = "bunx biome ci"
-
-[tasks.fmt]
-run = "bun run fmt"
-
-[tasks.example-prompt-eval]
-run = "qt run support-triage -- bun run examples/prompt_eval.ts"
+[tasks.install]
+run = "bun install"
 
 [tasks.install-frozen]
 run = "bun install --frozen-lockfile"
+
+[tasks.check]
+depends = ["install-frozen"]
+run = "bun run check"
+
+[tasks.typecheck]
+depends = ["install-frozen"]
+run = "bunx tsc --noEmit"
+
+[tasks.lint]
+depends = ["install-frozen"]
+run = "bunx biome ci"
+
+[tasks.fmt]
+depends = ["install-frozen"]
+run = "bun run fmt"
+
+[tasks.example-prompt-eval]
+depends = ["install-frozen"]
+run = "qt run support-triage -- bun run examples/prompt_eval.ts"
 
 [tasks.ci]
 run = [

@@ -1,4 +1,4 @@
-name: standard ci
+name: python-sdk
 
 on:
   push:
@@ -18,8 +18,13 @@ jobs:
         # https://docs.astral.sh/uv/guides/integration/github/
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
         with:
-          version: "0.11.17"
+          # this is the actual uv version
+          version: "0.11.21"
 
       - uses: jdx/mise-action@v2
+        with:
+          version: 2026.6.11
+          # TODO: consider cache: true
+          # https://github.com/marketplace/actions/mise-action#example-workflow
       - name: Run Python SDK CI
-        run: mise run ci
+        run: mise //python:ci
