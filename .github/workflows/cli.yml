@@ -28,5 +28,7 @@ jobs:
           version: 2026.6.11
           # TODO: consider cache: true
           # https://github.com/marketplace/actions/mise-action#example-workflow
+      - name: Ensure rustfmt and clippy are installed for pinned Rust version
+        run: mise x -- rustup component add rustfmt clippy --toolchain 1.96.0
       - name: Run CLI checks
         run: mise //cli:ci
