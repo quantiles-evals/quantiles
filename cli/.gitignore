@@ -22,7 +22,6 @@ target
 /.quantiles
 /.wrangler
 /dist
-/node_modules
 .fastembed_cache
 .envrc
 /qt-linux
