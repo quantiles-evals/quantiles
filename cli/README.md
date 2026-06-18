@@ -93,6 +93,8 @@ const modelOutput = await step("call-model", async () => {
 });
 ```
 
+See [quantiles.io/documentation/workflows-and-steps](https://quantiles.io/documentation/workflows-and-steps) for more details on how steps and step caching work.
+
 ### Compare two runs
 
 After iterating on an eval, compare two runs to see exactly what changed:
@@ -166,4 +168,4 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ## Command Reference
 
-See [COMMANDS.md](./COMMANDS.md)
+See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
