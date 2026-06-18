@@ -9,6 +9,9 @@ use clap::Parser;
 fn main() -> Result<()> {
     let process_start = Instant::now();
 
+    // TODO: allow number of total threads to be configurable, and possibly default
+    // to something other than the default of 61, which is specified in the implementation
+    // of new_multi_thread()
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
