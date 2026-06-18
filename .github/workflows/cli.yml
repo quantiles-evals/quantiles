@@ -24,5 +24,7 @@ jobs:
         with:
           workspaces: .
       - uses: jdx/mise-action@v2
+        with:
+          version: 2026.6.11
       - name: Run CLI checks
         run: mise //cli:ci
