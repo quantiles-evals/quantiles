@@ -67,6 +67,8 @@ qt compare <run_id_a> <run_id_b>
 
 >Note: you can pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
 
+To learn more detail about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
+
 ## Local-First and Offline by Default
 
 Quantiles is built as a local-first, offline system that keeps benchmark execution, metadata, metrics, and analysis on your computer by default.
