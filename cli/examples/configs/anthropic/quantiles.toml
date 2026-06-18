@@ -1,15 +1,20 @@
+# This config file sets up PubMedQA to use Anthropic's Claude model, and sets up the SimpleQA-verified
+# benchmark to use the internal demo model.
+#
+# The PubMedQA benchmark reads the API key from the `ANTHROPIC_API_KEY` environment
+# variable. To get an API key, go to https://platform.claude.com/settings/workspaces/default/keys
+
 [benchmarks.pubmedqa]
+# Since Anthropic charges per input and output token, we are limiting the number of samples
+# in this demo to keep costs low.
 samples = 50
 
-# Use the Anthropic Claude API, reading the API key from the `ANTHROPIC_API_KEY` environment
-# variable. To get an API key, go to https://platform.claude.com/settings/workspaces/default/keys
-#
 # The below model is good for demonstrating PubMedQA benchmarks without very high costs,
 # since it's relatively cheap and fast. Details on the model can be found at:
 #
 # https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison
 #
-# This page also has a list of other frontier and near-frontier models that you can use.
+# That page also has a list of other Anthropic models that you can use.
 model = "anthropic:claude-haiku-4-5-20251001"
 
 # If you run this or other benchmarks with more samples, you may also need to increase this
@@ -23,8 +28,8 @@ model = "anthropic:claude-haiku-4-5-20251001"
 # You can also see your usage at https://platform.claude.com/usage
 max_workers = 5
 
+# If you don't want to use a hosted/paid model, you can omit model configuration and
+# use the built-in demo model. Note, however, that this built-in model emits random text, and
+# should only be used for testing purposes.
 [benchmarks.simpleqa-verified]
 samples = 100
-
-[benchmarks.financebench]
-samples = 50
