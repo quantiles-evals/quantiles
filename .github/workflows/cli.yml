@@ -26,5 +26,7 @@ jobs:
       - uses: jdx/mise-action@v2
         with:
           version: 2026.6.11
+          # TODO: consider cache: true
+          # https://github.com/marketplace/actions/mise-action#example-workflow
       - name: Run CLI checks
         run: mise //cli:ci
