@@ -7,8 +7,10 @@ use super::LLMSampler;
 
 /// Fake sampler that returns one valid label from a list of candidates.
 ///
-/// Commonly used with QA-style benchmarks. For example, `PubMedQA` uses
-/// labels "yes", "no" and "maybe"
+/// Commonly used with QA-style benchmarks.
+///
+/// For example, `PubMedQA` uses labels "yes", "no" and "maybe". Other QA-style
+/// benchmarks can specify other labels dynamically.
 pub struct RandomLabelSampler {
     labels: Vec<String>,
 }
