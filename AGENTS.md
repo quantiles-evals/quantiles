@@ -1,6 +1,6 @@
-# Quantiles OS Agent Guide
+# Quantiles Agent Guide
 
-This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and similar tools. It gives agents a short, public-safe map of the Quantiles OS repository and the rules for making focused, reviewable changes.
+This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and similar tools. It gives agents a short, public-safe map of the Quantiles repository and the rules for making focused, reviewable changes.
 
 ## Scope
 
@@ -12,7 +12,7 @@ Explicit user instructions override this file. Do not use this root file as the 
 
 ## What This Repo Is
 
-Quantiles OS is the public open-source entry point for Quantiles: a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback.
+Quantiles is the public open-source entry point for Quantiles: a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback.
 
 Quantiles records evaluation runs, steps, metrics, events, inputs, outputs, and comparisons locally so teams can understand what improved, what regressed, and why.
 
@@ -69,7 +69,7 @@ Keep public docs customer-safe. Avoid internal-only planning, prioritization, un
 
 ## Repository Role
 
-This repository is the public open-source repository for Quantiles OS.
+This repository is the public open-source repository for Quantiles.
 
 Root-level files provide the public orientation, contribution, security, licensing, and agent guidance for the project. Implementation-specific work belongs in the relevant subdirectory.
 
@@ -112,7 +112,7 @@ When both files are relevant:
 
 Use these terms consistently in public docs:
 
-- `Quantiles OS`: the open-source Quantiles project.
+- `Quantiles`: the open-source Quantiles project.
 - `qt`: the Quantiles CLI.
 - `quantiles`: the Python SDK package.
 - `@quantiles/sdk`: the TypeScript SDK package.

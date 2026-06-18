@@ -1,12 +1,12 @@
 cff-version: 1
 
 message: >-
-  If you use Quantiles OS, please cite it as below.
+  If you use Quantiles, please cite it as below.
 
-title: "Quantiles OS: Local-first AI evaluation infrastructure"
+title: "Quantiles: Local-first AI evaluation infrastructure"
 
 abstract: >-
-  Quantiles OS is an open-source, local-first CLI and SDK toolchain for
+  Quantiles is an open-source, local-first CLI and SDK toolchain for
   running AI evaluation workflows, recording runs, inspecting sample-level
   results, comparing regressions, and supporting coding-agent evaluation
   workflows.
