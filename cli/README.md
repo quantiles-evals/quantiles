@@ -1,6 +1,6 @@
 # Quantiles CLI
 
-This directory holds the source code for the `qt` CLI. It is built with [Rust](https://rust-lang.org/) to help it efficiently use the resources of the local machine, to help ensure safety, and to provide strong lints and type-system invariants for Humans and Agents to work with.
+This directory holds the source code for the `qt` CLI. It is built with [Rust](https://rust-lang.org/) to help it efficiently use the resources of the local machine, to help ensure safety, and to provide strong lints and type-system invariants for humans and agents to work with.
 
 ## Install
 
@@ -24,6 +24,8 @@ qt run hello-world -- echo "hello from Quantiles"
 qt list
 qt show 1
 ```
+
+See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 ## Architecture
 
@@ -186,7 +188,3 @@ Quantiles is for the iteration loop before production orchestration.
 Run your code, then instantly see what changed across runs. No notebooks, no pipelines, and no manual comparisons.
 
 It doesn’t replace Temporal for production orchestration. It’s built for the 90% of iteration that happens before you ever think about production infrastructure.
-
-## Command Reference
-
-See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
