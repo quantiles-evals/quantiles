@@ -1,19 +1,12 @@
 # Quantiles CLI
 
-`qt` is a local-first CLI for running AI evals as experiments, so you can instantly see what improved, what regressed, and why.
+This directory holds the source code for the `qt` CLI. It is built with [Rust](https://rust-lang.org/) to help it efficiently use the resources of the local machine, to help ensure safety, and to provide strong lints and type-system invariants for Humans and Agents to work with.
 
 ## Install
 
 ```bash
 curl -fsSL https://cli.quantiles.io/install.sh | bash
 ```
-
-It's built for:
-
-- LLM evals
-- Prompt iteration
-- Agent workflows
-- Debugging AI systems
 
 ## Demo
 
@@ -36,7 +29,7 @@ qt show 1
 
 You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
 
-### Durable step caching + crash resume (TypeScript SDK)
+## Durable step caching + crash resume (TypeScript SDK)
 
 Use the high-level `workflow()`, `step()`, and `emit()` API for automatic
 caching and observability:
@@ -87,7 +80,7 @@ If the run fails partway through, resume it and only the failed samples rerun:
 qt run my-eval --resume 1 -- bun run sdk/typescript/examples/run_demo.ts
 ```
 
-### Step Caching
+## Step Caching
 
 You can also call `step()` without an input hash when caching by step name alone is fine:
 
@@ -99,7 +92,7 @@ const modelOutput = await step("call-model", async () => {
 
 See [quantiles.io/documentation/workflows-and-steps](https://quantiles.io/documentation/workflows-and-steps) for more details on how steps and step caching work.
 
-### Compare two runs
+## Comparing runs
 
 After iterating on an eval, compare two runs to see exactly what changed:
 
@@ -139,7 +132,7 @@ Runs differ.
 
 `qt compare` exits with code 1 if the runs differ, making it useful in CI scripts.
 
-## Why Quantiles?
+## Comparisons to other systems
 
 | | Temporal / Trigger.dev | Quantiles |
 |---|---|---|
