@@ -186,7 +186,10 @@ class Dataset[RowT: BaseModel]:
       # `list[JsonValue]` when resolving the recursive type alias.
       # The cast is a workaround for this limitation. The data is guaranteed
       # by `load_batch`'s return type.
-      return cast(JsonValue, await self._source.load_batch(self._offset, self._batch_size))
+      raw: list[dict[str, JsonValue]] = await self._source.load_batch(
+        self._offset, self._batch_size
+      )
+      return cast(JsonValue, raw)
 
     batch = await step(
       self._ctx,
@@ -194,8 +197,14 @@ class Dataset[RowT: BaseModel]:
       input_value=cast(JsonValue, batch_input),
       execute=_execute,
     )
+    # Note that _execute must return a `JsonValue`, per the contract in `step`,
+    # but in reality it returns a `list[dict[str, JsonValue]]` and casts to a
+    # `JsonValue`. The narrower list[dict...] type actually is a JsonValue, so
+    # that's just an up-cast. this is a(n admittedly weak) attempt at downcasting,
+    # but in reality, as long as the typing here matches with that above in
+    # _execute, we're fine.
     batch_list = batch if isinstance(batch, list) else []
-    self._buffer.extend(batch_list)
+    self._buffer.extend(cast(list[dict[str, JsonValue]], batch_list))
 
 
 async def dataset[RowT: BaseModel](
