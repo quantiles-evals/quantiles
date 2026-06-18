@@ -34,8 +34,6 @@ qt show 1
 
 ## Customization
 
-### Customization
-
 You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
 
 ### Durable step caching + crash resume (TypeScript SDK)
