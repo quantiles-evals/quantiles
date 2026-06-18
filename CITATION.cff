@@ -1,4 +1,4 @@
-cff-version: 1
+cff-version: "1.2.0"
 
 message: >-
   If you use Quantiles, please cite it as below.
@@ -16,7 +16,7 @@ type: software
 authors:
   - name: "Quantiles Contributors"
 
-repository-code: "https://github.com/quantiles-evals/quantiles-os"
+repository-code: "https://github.com/quantiles-evals/quantiles"
 
 url: "https://quantiles.io"
 
