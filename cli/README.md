@@ -25,6 +25,44 @@ qt list
 qt show 1
 ```
 
+## Architecture
+
+The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.
+
+```
++--------------------------------------+
+|            Your Script               |
+|   (TypeScript / Python / Shell)      |
++-------------------+------------------+
+                    │
+                    │  HTTP / JSON
+                    |
+                    ▼
++--------------------------------------+
+|            Quantiles Server          |
++-------------------+------------------+
+                    │
+                    │  SQLite
+                    |
+                    ▼
++------------------------------------------------+
+|     .quantiles/quantiles.sqlite (local DB)     |
++-------------------+----------------------------+
+                    │
+                    │
+                    │
+                    ▼
++--------------------------------------+
+|                 CLI                  |
+|        (list, show, compare)         |
++--------------------------------------+
+```
+
+- **Server** owns durability decisions: step caching, run state, metrics
+- **Client** (your script) owns code execution: the server never runs your logic
+  - Note that the CLI itself also has built-in benchmarks, which do not involve your code
+- **CLI** reads the same SQLite database the server writes to
+
 ## Customization
 
 You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
@@ -148,54 +186,6 @@ Quantiles is for the iteration loop before production orchestration.
 Run your code, then instantly see what changed across runs. No notebooks, no pipelines, and no manual comparisons.
 
 It doesn’t replace Temporal for production orchestration. It’s built for the 90% of iteration that happens before you ever think about production infrastructure.
-
-
-## What Quantiles does
-
-- Runs your evals locally with durability (step caching + resume)
-- Records every run, step, metric, and event
-- Lets you inspect and compare runs from the CLI
-- Stores everything in a local SQLite database
-
-Quantiles treats evals as experiments in which every run is tracked, comparable, and queryable with no extra work from you.
-
-## Architecture
-
-The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.
-
-```
-+--------------------------------------+
-|            Your Script               |
-|   (TypeScript / Python / Shell)      |
-+-------------------+------------------+
-                    │
-                    │  HTTP / JSON
-                    |
-                    ▼
-+--------------------------------------+
-|            Quantiles Server          |
-+-------------------+------------------+
-                    │
-                    │  SQLite
-                    |
-                    ▼
-+------------------------------------------------+
-|     .quantiles/quantiles.sqlite (local DB)     |
-+-------------------+----------------------------+
-                    │
-                    │
-                    │
-                    ▼
-+--------------------------------------+
-|                 CLI                  |
-|        (list, show, compare)         |
-+--------------------------------------+
-```
-
-- **Server** owns durability decisions: step caching, run state, metrics
-- **Client** (your script) owns code execution: the server never runs your logic
-  - Note that the CLI itself also has built-in benchmarks, which do not involve your code
-- **CLI** reads the same SQLite database the server writes to
 
 ## Command Reference
 
