@@ -4,7 +4,7 @@ This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Co
 
 ## Scope
 
-These instructions apply to the root `quantiles-os` repository.
+These instructions apply to the root `quantiles` repository.
 
 If working inside a subdirectory with its own `AGENTS.md`, follow the nearest `AGENTS.md` first. Subdirectory-specific instructions override this root guide for implementation details, commands, package managers, tests, and code style.
 

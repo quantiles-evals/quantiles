@@ -16,7 +16,7 @@ type: software
 authors:
   - name: "Quantiles Contributors"
 
-repository-code: "https://github.com/quantiles-evals/quantiles-os"
+repository-code: "https://github.com/quantiles-evals/quantiles"
 
 url: "https://quantiles.io"
 
