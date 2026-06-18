@@ -6,10 +6,9 @@ message: >-
 title: "Quantiles: Local-first AI evaluation infrastructure"
 
 abstract: >-
-  Quantiles is an open-source, local-first CLI and SDK toolchain for
-  running AI evaluation workflows, recording runs, inspecting sample-level
-  results, comparing regressions, and supporting coding-agent evaluation
-  workflows.
+  Quantiles is an agent-native CLI and SDKs for local-first AI evaluation workflows,
+  helping teams run benchmarks and evaluations, inspect sample-level outputs, and
+  compare eval runs.
 
 type: software
 
