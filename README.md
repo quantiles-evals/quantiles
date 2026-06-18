@@ -98,13 +98,7 @@ Built-in benchmarks are ready-to-run evaluation harnesses with predefined datase
 
 ## Custom Evaluations
 
-<!--TODO:
-
-- "Quantiles API" should link to docs for API reference
-
--->
-
-A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) or [TypeScript](https://quantiles.io/documentation/reference/typescript-sdk) program that is run by the `qt` CLI and uses the [Quantiles API](https://quantiles.io/documentation/reference/rest-api) to execute an eval. Your code owns the evaluation logic: loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles records the run, durable steps, emitted metrics, events, inputs, outputs, and comparisons.
+A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) or [TypeScript](https://quantiles.io/documentation/reference/typescript-sdk) program that is run by the `qt` CLI and uses the [Quantiles API](https://quantiles.io/documentation/reference/rest-api) to execute an eval. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
 
 Use custom evaluations when you need to measure behavior that is specific to your product, workflow, prompt, dataset, rubric, or release process.
 

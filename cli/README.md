@@ -69,69 +69,6 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 
 You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
 
-## Durable step caching + crash resume (TypeScript SDK)
-
-Use the high-level `workflow()`, `step()`, and `emit()` API for automatic
-caching and observability:
-
-```typescript
-import { workflow, step, emit, entrypoint } from "@quantiles/sdk";
-
-const runEval = workflow("eval", async (input, ctx) => {
-  console.log(`Run ${ctx.runId} (${ctx.workflowName})`);
-
-  const data = await step("fetch-data", { url: "https://example.com" }, async () => {
-    return { status: 200, body: "<html>...</html>" };
-  });
-
-  // Same step key + input hash means cached output, and no re-execution
-  const cached = await step("fetch-data", { url: "https://example.com" }, async () => {
-    return { status: 999, body: "this should not execute" };
-  });
-
-  emit("latency_ms", 120, "ms");
-  emit("tokens_used", 42);
-
-  return data;
-});
-
-entrypoint(runEval);
-```
-
-Register multiple evals and let `qt run <name>` dispatch to the right one
-automatically:
-
-```typescript
-const w1 = workflow("eval", async (input, ctx) => { ... });
-const w2 = workflow("benchmark", async (input, ctx) => { ... });
-
-entrypoint(w1, w2);
-```
-
-Then, when you're ready, run your eval with this command:
-
-```bash
-qt run eval -- bun run sdk/typescript/examples/run_demo.ts
-```
-
-If the run fails partway through, resume it and only the failed samples rerun:
-
-```bash
-qt run my-eval --resume 1 -- bun run sdk/typescript/examples/run_demo.ts
-```
-
-## Step Caching
-
-You can also call `step()` without an input hash when caching by step name alone is fine:
-
-```typescript
-const modelOutput = await step("call-model", async () => {
-  return callLLM(prompt);
-});
-```
-
-See [quantiles.io/documentation/workflows-and-steps](https://quantiles.io/documentation/workflows-and-steps) for more details on how steps and step caching work.
-
 ## Comparing runs
 
 After iterating on an eval, compare two runs to see exactly what changed:
