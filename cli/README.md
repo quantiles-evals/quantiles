@@ -1,4 +1,4 @@
-# Quantiles
+# Quantiles CLI
 
 `qt` is a local-first CLI for running AI evals as experiments, so you can instantly see what improved, what regressed, and why.
 
@@ -164,7 +164,41 @@ Quantiles treats evals as experiments in which every run is tracked, comparable,
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md)
+The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.
+
+```
++--------------------------------------+
+|            Your Script               |
+|   (TypeScript / Python / Shell)      |
++--------------------+-----------------+
+                     │
+                     │  HTTP / JSON
+                     |
+                     ▼
++--------------------------------------+
+|            Quantiles Server          |
++--------------------+-----------------+
+                     │
+                     │  SQLite
+                     |
+                     ▼
++------------------------------------------------+
+|     .quantiles/quantiles.sqlite (local DB)     |
++--------------------+---------------------------+
+                     │
+                     │
+                     │
+                     ▼
++--------------------------------------+
+|                 CLI                  |
+|        (list, show, compare)         |
++--------------------------------------+
+```
+
+- **Server** owns durability decisions: step caching, run state, metrics
+- **Client** (your script) owns code execution: the server never runs your logic
+  - Note that the CLI itself also has built-in benchmarks, which do not involve your code
+- **CLI** reads the same SQLite database the server writes to
 
 ## Command Reference
 
