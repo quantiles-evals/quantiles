@@ -1,17 +1,23 @@
-[benchmarks.pubmedqa]
-samples = 50
-
-# Use the Gemini API. The API key is read from the `GEMINI_API_KEY` environment
+# This config file sets up PubMedQA to use the Gemini API, and sets up the SimpleQA-verified
+# benchmark to use the internal demo model.
+#
+# The PubMedQA benchmark reads the Gemini API key from the `GEMINI_API_KEY` environment
 # variable. Learn more about the Gemini API in Google's Gemini AI Studio:
 #
 # https://aistudio.google.com/prompts/new_chat
-#
+
+
+[benchmarks.pubmedqa]
+# Since Google charges per input and output token, we are limiting the number of samples
+# in this demo to keep costs lower.
+samples = 50
+
 # The below model is good for demonstrating PubMedQA benchmarks without very high costs,
 # since it's relatively cheap and fast. Details on the model can be found at:
 #
 # https://ai.google.dev/gemini-api/docs/models/gemini#gemini-3.1-flash-lite
 #
-# This page also has a list of other models that you can use.
+# That page also lists other Google models you can use.
 model = "gemini:gemini-3.1-flash-lite"
 
 # If you run this or other benchmarks with more samples, you may also need to increase this
@@ -23,8 +29,8 @@ model = "gemini:gemini-3.1-flash-lite"
 # https://aistudio.google.com/rate-limit
 max_workers = 10
 
+# If you don't want to use a hosted/paid model, you can omit model configuration and
+# use the built-in demo model. Note, however, that this built-in model emits random text, and
+# should only be used for testing purposes.
 [benchmarks.simpleqa-verified]
 samples = 100
-
-[benchmarks.financebench]
-samples = 50
