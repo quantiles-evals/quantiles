@@ -91,7 +91,7 @@ Start with these files before making public-facing changes:
 - [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
 - [`LICENSE`](./LICENSE): Apache 2.0 license text.
-- `CHANGELOG.md`: notable public changes, when present.
+- [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
 
 ## Agent Instruction Boundaries
 
@@ -122,7 +122,7 @@ Use these terms consistently in public docs:
 - `step`: a durable recorded unit of an evaluation execution.
 - `metric`: a measured value emitted during a run.
 - `event`: recorded observability data from an evaluation.
-- `.quantiles/`: local Quantiles workspace state.
+- `.quantiles/`: local Quantiles workspace state, including SQLite database and metrics Parquet files.
 
 Prefer `local-first` and `offline by default` for open-source behavior.
 
@@ -134,14 +134,13 @@ Use the `qt` CLI as the source of truth for running, listing, inspecting, compar
 
 Prefer CLI output over manually reading `.quantiles/` files. Do not manually edit or delete `.quantiles/` files unless explicitly asked.
 
-Run `qt init` before other `qt` commands if the repository has not been initialized.
+Although `qt init` exists to initialize the local Quantiles database, `qt run` automatically does the same. `qt init` is thus often unnecessary to run explicitly.
 
 Use `--json` for `qt run`, `qt list`, `qt show`, and `qt compare` when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
 
 Common commands:
 
 ```bash
-qt init
 qt run <evaluation> --json
 qt list --json
 qt show <run_id> --json
@@ -209,7 +208,6 @@ The `qt` CLI is a local-first Rust CLI for running, recording, inspecting, and c
 It creates local SQLite state under `.quantiles/quantiles.sqlite` and provides commands such as:
 
 ```bash
-qt init
 qt run
 qt list
 qt show
@@ -228,7 +226,7 @@ When editing the Python subdirectory, preserve async behavior, stable JSON paylo
 
 ### TypeScript SDK
 
-The TypeScript SDK is an ESM SDK for authoring local AI workload workflows against the Quantiles local observability server at `http://127.0.0.1:8765` by default.
+The TypeScript SDK is an SDK for authoring local AI workload workflows against the Quantiles local observability server at `http://127.0.0.1:8765` by default.
 
 It exposes workflow primitives, `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
@@ -236,29 +234,17 @@ When editing the TypeScript subdirectory, preserve strict typing, JSON-serializa
 
 ### Agent Skill
 
-The [`skill`](./skill/) subdirectory contains reusable instructions for coding agents that use Quantiles to run, inspect, compare, and summarize evaluation workflows.
+The [`skill`](https://github.com/quantiles-evals/skill) repository contains reusable instructions for coding agents that use Quantiles to run, inspect, compare, and summarize evaluation workflows.
 
 When editing the skill subdirectory, keep instructions operational, command-driven, and safe for public use.
 
-Read [`skill/SKILL.md`](./skill/SKILL.md) for the reusable agent skill instructions.
-
-### Benchmarks
-
-The `benchmarks` subdirectory may contain built-in or example benchmark harnesses, datasets, fixtures, scoring logic, and benchmark documentation.
-
-When editing benchmark content:
-
-- Preserve dataset provenance, scoring behavior, and benchmark limitations.
-- Record benchmark source, version, commit, dataset revision, scoring configuration, and any local patches when relevant.
-- Do not present demo sampler results as model-quality benchmark evidence.
-- Avoid adding large datasets, generated outputs, or cached results unless explicitly required and appropriate for the repository.
-- If benchmark content changes, call out whether the change affects comparability with prior runs.
+Read [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for the reusable agent skill instructions.
 
 ## Working In This Repository
 
 Keep root-level changes focused on public orientation, documentation, contribution guidance, security guidance, licensing, and agent instructions.
 
-Update docs when any of the following change:
+Update documentation in this repository (e.g. `README.md`, etc...) when any of the following change:
 
 - CLI commands, flags, outputs, or setup steps.
 - SDK APIs, imports, examples, or package names.
@@ -280,7 +266,6 @@ Use the Quantiles CLI as the source of truth for local runs.
 Prefer this flow:
 
 ```bash
-qt init
 qt run <evaluation>
 qt show <run_id> --json
 ```
