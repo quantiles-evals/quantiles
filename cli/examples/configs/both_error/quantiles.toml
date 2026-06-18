@@ -1,0 +1,2 @@
+# The `qt` CLI will refuse to run if both a `quantiles.toml` and `.quantiles.toml` configuration
+# file exist in the current directory, even if one of the files is empty.
