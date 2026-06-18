@@ -11,6 +11,8 @@ pub(super) struct StepRefs<'a> {
 }
 
 /// Build user-facing step comparisons and borrowed step refs for detailed diffs.
+///
+/// TODO: have this return a `Vec<(StepComparison, StepRefs<'a>)>`
 pub(super) fn build_step_rows<'a>(
     left_steps: &'a [StepSummary],
     right_steps: &'a [StepSummary],
