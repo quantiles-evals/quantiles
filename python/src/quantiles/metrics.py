@@ -1,3 +1,9 @@
+"""
+Common, generic metrics utilities for use across benchmarks & evals
+
+TODO: move into `qt` CLI for use across languages.
+"""
+
 import math
 from collections.abc import Iterable
 from typing import SupportsFloat, final

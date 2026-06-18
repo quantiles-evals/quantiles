@@ -48,8 +48,9 @@ impl Sampler {
     ///
     /// # Errors
     ///
-    /// Returns an error if the required environment variables are missing (e.g.
-    /// `CLOUDFLARE_API_KEY` for the Cloudflare gateway variant).
+    /// Returns an error if the required environment variables are missing to convert `self`
+    /// to an actual `LLMSampler` (e.g. `self` is a `Sampler::CloudflareAIGateway` variant
+    /// and the `CLOUDFLARE_API_KEY` env var is missing).
     pub fn resolve(&self) -> Result<Arc<dyn LLMSampler>> {
         match self {
             Sampler::Random => Ok(Arc::new(random::RandomSampler::new(80))),

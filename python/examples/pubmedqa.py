@@ -262,5 +262,6 @@ async def _pubmedqa_handler(
   )
 
 
-pubmedqa_eval = workflow("pubmedqa", _pubmedqa_handler)
-entrypoint(pubmedqa_eval)
+if __name__ == "__main__":
+  pubmedqa_eval = workflow("pubmedqa", _pubmedqa_handler)
+  entrypoint(pubmedqa_eval)

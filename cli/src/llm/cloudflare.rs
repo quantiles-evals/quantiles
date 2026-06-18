@@ -63,6 +63,9 @@ struct WorkersAIMessage {
 /// tries the most common locations.
 fn extract_response(raw: &serde_json::Value) -> Option<String> {
     // Standard text-generation shape: {"result":{"response":"..."}}
+    //
+    // TODO: decode result into a strongly-typed struct with serde, rather
+    // than manual deserialization
     if let Some(result) = raw.get("result")
         && let Some(response) = result.get("response")
         && let Some(text) = response.as_str()
@@ -83,7 +86,7 @@ fn extract_response(raw: &serde_json::Value) -> Option<String> {
         return Some(text.to_string());
     }
 
-    // Fallback: raw result string
+    // Extract raw result string as a fallback
     if let Some(result) = raw.get("result")
         && let Some(text) = result.as_str()
     {

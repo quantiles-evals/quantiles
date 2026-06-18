@@ -9,7 +9,7 @@
 - Prefer focused changes that fit the current CLI and library structure.
 - Keep local-only behavior explicit; do not introduce network or cloud behavior unless the task specifically calls for it. If you do add such behavior, make sure to alert the user about it, and add comments in the code to draw attention to it.
 - Preserve existing SQLite data model assumptions unless the change includes a deliberate schema migration or initialization update.
-- Use idiomatic Rust and keep error handling clear. This project uses `anyhow` for application-level errors.
+- Use idiomatic Rust and keep error handling clear. This project uses the [`anyhow`](https://docs.rs/anyhow) to create and propagate application-level errors.
 - Avoid broad refactors while implementing narrow behavior changes.
 
 ## Validation and Testing

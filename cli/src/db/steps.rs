@@ -41,8 +41,8 @@ pub async fn begin_step(
             },
             StepStatus::Running => StepDecision::Run { step_id: step.id },
             StepStatus::Failed => {
-                // Allow retry: reset the step to running and emit a fresh
-                // started event so the retry is observable.
+                // Allow retry by resetting the step status to 'running', then emit a fresh
+                // 'started' event so the retry is apparent and auditable.
                 step::Entity::update_many()
                     .set(step::ActiveModel {
                         status: Set(StepStatus::Running),

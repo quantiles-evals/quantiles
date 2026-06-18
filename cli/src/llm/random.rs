@@ -6,6 +6,8 @@ use rand::{Rng, thread_rng};
 use super::LLMSampler;
 
 /// A dummy sampler that returns random alphanumeric characters.
+///
+/// Do not use this for actual testing
 pub struct RandomSampler {
     pub max_length: usize,
 }

@@ -15,7 +15,7 @@ impl CosineSimilarity {
     /// Build a new cosine similarity metric backed by the default fastembed model.
     ///
     /// Uses a **single** embedder session with all available CPU cores. This is
-    /// faster than a pool of sessions because ONNX Runtime already parallelises
+    /// faster than a pool of sessions because ONNX Runtime already parallelizes
     /// inference internally; multiple sessions just create thread-pool
     /// oversubscription.
     ///

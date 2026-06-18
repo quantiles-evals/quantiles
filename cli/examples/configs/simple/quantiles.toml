@@ -1,22 +1,14 @@
-# Example Quantiles workspace configuration.
+# This config file sets up the PubMedQA and SimpleQA-verified benchmarks to use the built-in
+# demo model. The `qt` CLI automatically detects this file in the current working directory.
 #
-# Place this file in your working directory as either:
-#   - quantiles.toml
-#   - .quantiles.toml
+# This built-in demo model generates random text and is generally only useful only for smoke
+# testing purposes. Do not use results from these runs to determine the quality of any model.
 #
-# If both files exist in the same directory, the CLI will error to avoid
-# ambiguity.
-#
-# Each section under [benchmarks.<name>] maps to a builtin eval.
-# The `samples` key limits the number of dataset rows processed.
-# The `model` key selects the LLM backend (defaults to the builtin's dummy
-# sampler when omitted).
+# Each section under [benchmarks.<name>] maps to a builtin eval. The `samples` key limits the
+# number of dataset rows processed.
 
 [benchmarks.pubmedqa]
 samples = 10
 
 [benchmarks.simpleqa-verified]
 samples = 100
-
-[benchmarks.financebench]
-samples = 50

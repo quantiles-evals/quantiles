@@ -298,7 +298,6 @@ pub async fn get_run(db: &DatabaseConnection, run_id: i64) -> Result<WorkflowRun
         .one(db)
         .await?
         .with_context(|| format!("eval run {run_id} not found"))?;
-    // TODO: parse 'model' and 'model_name' from input
     let model_name_extractor: Option<ModelNameExtractor> = match run.input {
         Some(ref input) => serde_json::from_str(input.clone().as_str()).ok(),
         None => None,

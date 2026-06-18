@@ -31,10 +31,17 @@ struct BufferedMetric {
 /// SQL over the per-run Parquet files.
 #[derive(Debug, Clone)]
 pub struct MetricsStore {
-    // TODO: use a concurrent queue rather than sequential hashmap,
-    //
-    // https://docs.rs/crossbeam-queue/latest/crossbeam_queue/struct.SegQueue.html
+    /// The buffer of not-yet-persisted metrics.
+    ///
+    /// TODO: use a concurrent queue rather than sequential hashmap,
+    ///
+    /// https://docs.rs/crossbeam-queue/latest/crossbeam_queue/struct.SegQueue.html
+    ///
+    /// This is a work in progress at:
+    ///
+    /// https://github.com/quantiles-evals/quantiles/pull/7
     buffer: Arc<Mutex<HashMap<i64, Vec<BufferedMetric>>>>,
+    /// The directory inside which metrics are saved.
     dir: PathBuf,
 }
 

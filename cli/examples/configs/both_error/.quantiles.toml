@@ -1,15 +1,3 @@
-# Example Quantiles workspace configuration.
-#
-# Place this file in your working directory as either:
-#   - quantiles.toml
-#   - .quantiles.toml
-#
-# If both files exist in the same directory, the CLI will error to avoid
-# ambiguity.
-#
-# Each section under [benchmarks.<name>] maps to a builtin eval.
-# The `samples` key limits the number of dataset rows processed.
-
 [benchmarks.pubmedqa]
 samples = 10
 

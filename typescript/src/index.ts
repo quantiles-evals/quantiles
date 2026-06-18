@@ -4,6 +4,7 @@
  * High-level, durable workflow primitives for the `qt` CLI.
  *
  * Quick start:
+ *
  * ```ts
  * import { workflow, step, emit, entrypoint } from "@quantiles/sdk";
  *
