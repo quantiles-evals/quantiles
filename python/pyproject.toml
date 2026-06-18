@@ -17,7 +17,6 @@ indent-width = 2
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-# TODO: enable all of these
 select = [
     "E",      # pycodestyle errors
     "F",      # pyflakes
@@ -33,6 +32,7 @@ select = [
     "RUF",    # Ruff-specific rules
     "ANN",    # annotations
     "ASYNC",  # async correctness
+    # TODO: enable these. will require code fixes
     # "BLE",    # blind except
     # "TRY",    # exception style
 ]
