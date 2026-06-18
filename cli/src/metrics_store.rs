@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -6,9 +5,11 @@ use anyhow::{Context, Result};
 use arrow::array::{Array, Float64Array, Int64Array, StringArray, StringViewArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use crossbeam_queue::SegQueue;
 use datafusion::prelude::*;
+use itertools::Itertools;
+use papaya::HashMap;
 use parquet::arrow::ArrowWriter;
-use tokio::sync::Mutex;
 
 use crate::db::MetricPointSummary;
 use crate::time::{format_utc, now_utc};
@@ -31,10 +32,8 @@ struct BufferedMetric {
 /// SQL over the per-run Parquet files.
 #[derive(Debug, Clone)]
 pub struct MetricsStore {
-    // TODO: use a concurrent queue rather than sequential hashmap,
-    //
-    // https://docs.rs/crossbeam-queue/latest/crossbeam_queue/struct.SegQueue.html
-    buffer: Arc<Mutex<HashMap<i64, Vec<BufferedMetric>>>>,
+    /// Mapping from `run_id` to queue of buffered metrics.
+    buffer: Arc<HashMap<i64, SegQueue<BufferedMetric>>>,
     dir: PathBuf,
 }
 
@@ -51,7 +50,7 @@ impl MetricsStore {
         std::fs::create_dir_all(&dir)
             .with_context(|| format!("failed to create metrics dir {}", dir.display()))?;
         Ok(Self {
-            buffer: Arc::new(Mutex::new(HashMap::new())),
+            buffer: Arc::new(HashMap::new()),
             dir,
         })
     }
@@ -65,8 +64,10 @@ impl MetricsStore {
         metric_value: f64,
         unit: Option<&str>,
     ) {
-        let mut buffer = self.buffer.lock().await;
-        buffer.entry(run_id).or_default().push(BufferedMetric {
+        let buffer = &self.buffer;
+        let buffer_guard = buffer.guard();
+        let run_queue = buffer.get_or_insert_with(run_id, || SegQueue::new(), &buffer_guard);
+        run_queue.push(BufferedMetric {
             run_id,
             step_id,
             metric_name: metric_name.to_owned(),
@@ -84,10 +85,16 @@ impl MetricsStore {
     ///
     /// Returns an error if the flush failed.
     pub async fn flush(&self, run_id: i64) -> Result<()> {
-        let metrics = {
-            let mut buffer = self.buffer.lock().await;
-            buffer.remove(&run_id).unwrap_or_default()
+        let buffer = &self.buffer;
+        let buffer_guard = buffer.guard();
+        let Some(metrics_q) = buffer.remove(&run_id, &buffer_guard) else {
+            return Ok(());
         };
+
+        let mut metrics = Vec::new();
+        while let Some(metric) = metrics_q.pop() {
+            metrics.push(metric);
+        }
 
         if metrics.is_empty() {
             return Ok(());
@@ -108,29 +115,43 @@ impl MetricsStore {
             // so that timestamps are stored natively in Parquet rather than as strings.
         ]));
 
-        let run_ids = Int64Array::from_iter_values(metrics.iter().map(|m| m.run_id));
-        let step_ids = Int64Array::from(metrics.iter().map(|m| m.step_id).collect::<Vec<_>>());
-        let metric_names = StringArray::from(
-            metrics
-                .iter()
-                .map(|m| m.metric_name.as_str())
-                .collect::<Vec<_>>(),
-        );
-        let metric_values = Float64Array::from_iter_values(metrics.iter().map(|m| m.metric_value));
-        let units = StringArray::from(
-            metrics
-                .iter()
-                .map(|m| m.unit.as_deref())
-                .collect::<Vec<_>>(),
-        );
-        let created_at_strings: Vec<String> =
-            metrics.iter().map(|m| format_utc(m.created_at)).collect();
-        let created_ats = StringArray::from(
-            created_at_strings
-                .iter()
-                .map(std::string::String::as_str)
-                .collect::<Vec<_>>(),
-        );
+        let (run_ids, step_ids, metric_names, metric_values, units, created_ats) = {
+            let metrics_iter = metrics.into_iter();
+
+            let vals_vec = metrics_iter.map(|m| {
+                (
+                    m.run_id,
+                    m.step_id,
+                    m.metric_name,
+                    m.metric_value,
+                    m.unit,
+                    format_utc(m.created_at),
+                )
+            });
+            let unzipped: (
+                Vec<i64>,
+                Vec<Option<i64>>,
+                Vec<String>,
+                Vec<f64>,
+                Vec<Option<String>>,
+                Vec<String>,
+            ) = vals_vec.into_iter().multiunzip();
+
+            let run_ids = Int64Array::from(unzipped.0);
+            let step_ids = Int64Array::from(unzipped.1);
+            let metric_names = StringArray::from(unzipped.2);
+            let metric_values = Float64Array::from(unzipped.3);
+            let units = StringArray::from(unzipped.4);
+            let created_ats = StringArray::from(unzipped.5);
+            (
+                run_ids,
+                step_ids,
+                metric_names,
+                metric_values,
+                units,
+                created_ats,
+            )
+        };
 
         let batch = RecordBatch::try_new(
             schema.clone(),
