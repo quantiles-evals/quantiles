@@ -106,9 +106,9 @@ Use custom evaluations when you need to measure behavior that is specific to you
 
 Read more about how to build and run custom evaluations at [quantiles.io/documentation/custom-evaluations](https://quantiles.io/documentation/custom-evaluations).
 
-## SDKs
+### SDKs
 
-Use the official Quantiles SDKs to build with higher-level workflow primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python and TypeScript. The SDKs integrate tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
+Use the official Quantiles SDKs to build your custom evaluations with higher-level workflow primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python and TypeScript. The SDKs integrate tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
 
 The Python SDK is located in this repository at [`python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk). The TypeScript SDK is located in this repository at [`typescript/`](./typescript). Read more about it at [quantiles.io/documentation/reference/typescript-sdk](https://quantiles.io/documentation/reference/typescript-sdk).
 
