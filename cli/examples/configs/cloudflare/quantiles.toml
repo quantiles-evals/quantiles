@@ -39,9 +39,3 @@ model = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 #
 # Note that if you do this, you will still need to provide the API key in the
 # CLOUDFLARE_API_KEY environment variable.
-
-# If you don't want to use a hosted/paid model, you can omit model configuration and
-# use the built-in demo model. Note, however, that this built-in model emits random text, and
-# should only be used for testing purposes.
-[benchmarks.simpleqa-verified]
-samples = 100

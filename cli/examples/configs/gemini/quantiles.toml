@@ -28,9 +28,3 @@ model = "gemini:gemini-3.1-flash-lite"
 #
 # https://aistudio.google.com/rate-limit
 max_workers = 10
-
-# If you don't want to use a hosted/paid model, you can omit model configuration and
-# use the built-in demo model. Note, however, that this built-in model emits random text, and
-# should only be used for testing purposes.
-[benchmarks.simpleqa-verified]
-samples = 100
