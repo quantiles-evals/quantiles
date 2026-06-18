@@ -108,20 +108,3 @@ Runs differ.
 ```
 
 `qt compare` exits with code 1 if the runs differ, making it useful in CI scripts.
-
-## Comparisons to other systems
-
-| | Temporal / Trigger.dev | Quantiles |
-|---|---|---|
-| **Goal** | Run evals reliably | Run evals and **quickly learn what improved, what regressed, and why** |
-| **Setup** | Cluster, workers, cloud infra | Single binary + SQLite |
-| **Programming Model** | Deterministic constraints | Normal async code |
-| **Local Dev** | Usually tied to a service/runtime | Fully offline |
-| **Observability** | Logs and traces | Automatically compare runs and surface changes |
-| **Iteration** | Run, then inspect | Run, then compare, then improve |
-
-Quantiles is for the iteration loop before production orchestration.
-
-Run your code, then instantly see what changed across runs. No notebooks, no pipelines, and no manual comparisons.
-
-It doesn’t replace Temporal for production orchestration. It’s built for the 90% of iteration that happens before you ever think about production infrastructure.

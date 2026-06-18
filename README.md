@@ -18,6 +18,8 @@ With Quantiles, teams can rely on built-in infrastructure:
 - Inspect and compare runs directly from the same `qt` CLI
 - Resilient execution by default with caching and restartable failed runs
 
+Quantiles borrows concepts from durable workflow execution systems to ensure evals are resilient to crashes and restarts, but also adds rich observability and metrics on top. You can use it to run your custom eval code or run built-in benchmarks, then instantly see what changed across runs, all without notebooks, pipelines, manual comparisons, or cloud services.
+
 ## Quickstart
 
 Install the CLI:
