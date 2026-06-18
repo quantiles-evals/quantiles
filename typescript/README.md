@@ -1,4 +1,4 @@
-# @quantiles/sdk
+# `@quantiles/sdk`
 
 TypeScript client for the local Quantiles eval runner.
 
