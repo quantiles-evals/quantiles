@@ -9,11 +9,14 @@ use crate::db::{DBUrl, SQLitePathURL, schema};
 const DB_DIR: &str = ".quantiles";
 const DB_FILE: &str = "quantiles.sqlite";
 
-/// Walk up from `cwd` looking for a `.quantiles` directory.
+/// Look for `.quantiles` directory under the current working directory, then
+/// if it's not found, walk up to parents looking for a `.quantiles` directory.
 ///
-/// If one is found, returns the directory that contains `.quantiles`.
-/// If `create` is true, ensures the discovered workspace is initialized.
-/// Otherwise initializes a new workspace in `cwd` and returns `cwd`.
+/// When the first such `.quantiles` directory is found, return its containing
+/// dir.
+///
+/// If `create` is `true`, ensure the discovered `.quantiles` workspace is initialized.
+/// Otherwise, initializes a new workspace in `cwd` and returns `cwd`.
 ///
 /// # Errors
 ///

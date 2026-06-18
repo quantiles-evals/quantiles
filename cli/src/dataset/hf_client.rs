@@ -16,6 +16,7 @@ struct SplitsResponse {
     splits: Vec<SplitItem>,
 }
 
+/// A single split in an splits response from the HF API
 #[derive(Debug, Deserialize)]
 struct SplitItem {
     #[serde(default)]
@@ -68,7 +69,7 @@ struct SplitSize {
 }
 
 impl HuggingFaceClient {
-    /// Build a new client, injecting `HF_TOKEN` when present.
+    /// Build a new client, using the `HF_TOKEN` env var when it's present.
     ///
     /// # Errors
     ///
