@@ -110,7 +110,6 @@ const promptEval = workflow<EvalInput, EvalSummary>(
     let tokensUsed = 0;
 
     for (const evalCase of evalCases) {
-      // TODO: change to `task` instead of `step`
       const result = await step(
         `case:${evalCase.id}`,
         {
