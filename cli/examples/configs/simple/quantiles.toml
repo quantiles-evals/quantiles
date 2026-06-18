@@ -1,6 +1,7 @@
 # Example Quantiles workspace configuration.
 #
 # Place this file in your working directory as either:
+#
 #   - quantiles.toml
 #   - .quantiles.toml
 #
