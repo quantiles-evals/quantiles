@@ -6,7 +6,7 @@
 
 [benchmarks.pubmedqa]
 # Since Anthropic charges per input and output token, we are limiting the number of samples
-# in this demo to keep costs low.
+# in this demo to keep costs lower.
 samples = 50
 
 # The below model is good for demonstrating PubMedQA benchmarks without very high costs,

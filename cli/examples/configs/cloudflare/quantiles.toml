@@ -1,13 +1,23 @@
-[benchmarks.pubmedqa]
-samples = 50
-
-# Use Cloudflare AI Gateway, reading the account ID, gateway ID, and API key
-# from environment variables:
+# This config file sets up PubMedQA to use the Cloudflare AI gateway, and sets up the SimpleQA-verified
+# benchmark to use the internal demo model.
+#
+# The PubMedQA benchmark reads the Cloudflare account ID, gateway ID, and API key
+# from the following environment variables:
+#
 # - CLOUDFLARE_ACCOUNT_ID
 # - CLOUDFLARE_GATEWAY_ID
 # - CLOUDFLARE_API_KEY
 #
-# This model is good for demonstrating PubMedQA benchmarks without very high costs,
+# To get your account ID, gateway ID and API key, go to your Cloudflare AI gateway dashboard at:
+#
+# https://dash.cloudflare.com/<account_id>/ai/ai-gateway
+
+[benchmarks.pubmedqa]
+# Since CLoudflare charges for usage, we are limiting the number of samples in this demo to
+# keep costs lower.
+samples = 50
+
+# The below model is good for demonstrating PubMedQA benchmarks without very high costs,
 # since it's relatively cheap, fast, and not a reasoning model. Its details can be found at:
 #
 # https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/
@@ -16,17 +26,22 @@ samples = 50
 #
 # https://developers.cloudflare.com/workers-ai/models/
 model = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+
+# If you don't want to specify your account ID and gateway ID in environment variables
+# (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_GATEWAY_ID, respectively), you can provide them
+# alongside the model in a dictionary as below:
 #
-# Or provide the account ID / gateway ID inline, and still read the API key from
-# the CLOUDFLARE_API_KEY env var
 # model = {
 #   type = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 #   account_id = "...",
 #   gateway_id = "..."
 # }
+#
+# Note that if you do this, you will still need to provide the API key in the
+# CLOUDFLARE_API_KEY environment variable.
 
+# If you don't want to use a hosted/paid model, you can omit model configuration and
+# use the built-in demo model. Note, however, that this built-in model emits random text, and
+# should only be used for testing purposes.
 [benchmarks.simpleqa-verified]
 samples = 100
-
-[benchmarks.financebench]
-samples = 50
