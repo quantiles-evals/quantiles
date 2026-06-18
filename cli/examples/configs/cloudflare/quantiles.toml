@@ -13,7 +13,7 @@
 # https://dash.cloudflare.com/<account_id>/ai/ai-gateway
 
 [benchmarks.pubmedqa]
-# Since CLoudflare charges for usage, we are limiting the number of samples in this demo to
+# Since Cloudflare charges for usage, we are limiting the number of samples in this demo to
 # keep costs lower.
 samples = 50
 
