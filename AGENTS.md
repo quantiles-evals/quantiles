@@ -69,21 +69,6 @@ Start with these files before making public-facing changes:
 - [`LICENSE`](./LICENSE): Apache 2.0 license text.
 - [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
 
-## Agent Instruction Boundaries
-
-Use `AGENTS.md` files for durable repository guidance: repo layout, safety constraints, coding conventions, validation commands, review expectations, and handoff requirements.
-
-Use `skill/SKILL.md` as the reusable Quantiles evaluation workflow: when to run the `qt` CLI, how to inspect and compare runs, how to resume failed work, and how to report evaluation results.
-
-This repository keeps the skill source in [`skill/SKILL.md`](./skill/SKILL.md). Coding agents do not necessarily auto-load that file from this path. For Codex-compatible skill discovery, install or copy the skill into an agent skill location such as `.agents/skills/quantiles/SKILL.md`, or invoke it through the agent's supported skill-install mechanism.
-
-When both files are relevant:
-
-1. Explicit user instructions win.
-2. The nearest applicable `AGENTS.md` controls repository-specific code, commands, package managers, tests, style, and public-safety rules.
-3. `skill/SKILL.md` controls reusable Quantiles eval operations, result inspection, comparison, resume, and reporting workflow.
-4. If the skill suggests a generic command but a local `AGENTS.md`, README, or package configuration provides a more specific command, use the local command and note the choice in handoff.
-
 ## Product Terminology
 
 Use these terms consistently in public docs:
@@ -91,7 +76,7 @@ Use these terms consistently in public docs:
 - `Quantiles`: the open-source Quantiles project.
 - `qt`: the Quantiles CLI.
 - `quantiles`: the Python SDK package.
-- `@quantiles/sdk`: the TypeScript SDK package.
+- `@quantiles`: the TypeScript SDK package.
 - `evaluation`: user-authored evaluation or agent-loop code.
 - `benchmark`: a repeatable evaluation harness with a defined dataset, scoring method, and result shape.
 - `run`: one recorded execution of an evaluation or benchmark.
@@ -121,7 +106,7 @@ qt run <evaluation> --json
 qt list --json
 qt show <run_id> --json
 qt compare <baseline_run_id> <candidate_run_id> --json
-qt run <evaluation> --resume <run_id> --json
+qt resume <run_id> --json
 ```
 
 Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
@@ -130,9 +115,7 @@ Start with the smallest useful sample limit before running a full benchmark. Ask
 
 Safe commands may include read-only inspection commands, local format checks, type checks, and unit tests. Small smoke tests are allowed only when they are local, cheap, relevant to the task, and do not call external providers.
 
-If no real model is specified, built-in evaluations may use the demo model. Treat demo model runs as workflow validation only, not model-quality benchmark evidence.
-
-Do not run provider-backed evaluations unless explicitly asked or given a provider-prefixed model. Before running provider-backed evaluations, verify that the required provider API key is configured without printing the key value.
+If no real model is specified, built-in evaluations may use the demo model. Treat demo model runs as workflow validation only, not model-quality benchmark evidence. Do not run provider-backed evaluations unless explicitly asked or given a provider-prefixed model. Before running provider-backed evaluations, verify that the required provider API key is configured without printing the key value.
 
 Provider-backed model inputs should use provider-prefixed model names, for example:
 
