@@ -6,9 +6,7 @@ It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-frien
 
 ## Why Quantiles
 
-Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives without slowing down iteration.
-
-With Quantiles, teams can rely on built-in infrastructure:
+Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to built them from scratch:
 
 - Write standard Python or TypeScript, with familiar developer patterns
 - Run workflows locally from the CLI
