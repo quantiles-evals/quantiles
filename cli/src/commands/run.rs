@@ -123,14 +123,11 @@ fn assemble_builtin_input(
 }
 
 fn merge_inputs(
-    config_input: Option<&serde_json::Value>,
+    config_input: Option<&HashMap<String, serde_json::Value>>,
     cli_input: Option<&str>,
 ) -> Result<(Option<String>, Vec<String>)> {
     let mut merged = match config_input {
-        Some(v) if v.is_object() => v.clone(),
-        Some(_) => {
-            bail!("config input is not a JSON object");
-        }
+        Some(v) => serde_json::Value::Object(v.clone().into_iter().collect()),
         None => serde_json::Value::Object(serde_json::Map::default()),
     };
 

@@ -25,13 +25,6 @@ impl BenchmarkConfig {
         match self {
             BenchmarkConfig::Builtin(_) => Ok(()),
             BenchmarkConfig::CustomCode(c) => {
-                if let Some(ref input) = c.input
-                    && !input.is_object()
-                {
-                    bail!(
-                        "custom_code benchmark config `input` must be a JSON object / TOML table"
-                    );
-                }
                 if c.command.is_empty() {
                     bail!("custom_code benchmark config must have a non-empty `command` field");
                 }
@@ -102,7 +95,7 @@ pub struct CustomCodeBenchmarkConfig {
     /// Command and arguments to execute.
     pub command: Vec<String>,
     /// Structured input object passed to the eval.
-    pub input: Option<serde_json::Value>,
+    pub input: Option<HashMap<String, serde_json::Value>>,
 }
 
 /// Top-level workspace configuration read from `quantiles.toml` or
