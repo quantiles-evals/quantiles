@@ -28,7 +28,7 @@ Install the CLI:
 curl -fsSL https://cli.quantiles.io/install.sh | bash
 ```
 
-Run a [built-in benchmark](https://arxiv.org/abs/2509.07968):
+Run the [SimpleQA-verified](https://arxiv.org/abs/2509.07968) built-in benchmark:
 
 ```bash
 qt run simpleqa-verified
