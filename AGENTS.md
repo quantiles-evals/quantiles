@@ -204,7 +204,7 @@ After running, inspecting, comparing, or resuming Quantiles evaluations, report:
 
 ## Validation And Handoff
 
-Before handing work back, summarize:
+Before handing work back to the user, summarize the following:
 
 - What changed.
 - Which files were reviewed.
