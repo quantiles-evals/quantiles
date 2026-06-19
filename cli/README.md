@@ -28,12 +28,26 @@ qt show 1
 
 ### Custom evaluations
 
-Custom evaluations are configured in `quantiles.toml`. See [`./examples/configs`](./examples/configs) for examples.
+Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is passed to your script as `QUANTILES_INPUT`.
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+dataset = "my_dataset.jsonl"
+```
 
 ```bash
-# Run a custom evaluation defined in quantiles.toml
+# Run the custom evaluation
 qt run my-eval
+
+# If it fails, resume with only the run ID
+qt resume <run_id>
 ```
+
+See [`./examples/configs`](./examples/configs) for examples, including a [complete custom code example](./examples/configs/custom_code/quantiles.toml).
 
 ### Comparing runs
 
@@ -92,6 +106,28 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 
 ## Customization
 
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
+You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file.
+
+For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
+
+```toml
+[benchmarks.pubmedqa]
+samples = 50
+model = "openai:gpt-5.4-nano"
+max_workers = 100
+```
+
+For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as `QUANTILES_INPUT`.
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+foo = "foo_val"
+```
+
+See [`./examples/configs`](./examples/configs) for complete examples.
 
 >Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
