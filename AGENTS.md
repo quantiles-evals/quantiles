@@ -145,7 +145,7 @@ qt run <evaluation> --json
 qt list --json
 qt show <run_id> --json
 qt compare <baseline_run_id> <candidate_run_id> --json
-qt run <evaluation> --resume <run_id> --json
+qt resume <run_id> --json
 ```
 
 Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
@@ -304,20 +304,10 @@ Resume only failed or interrupted runs caused by operational issues such as time
 
 Do not resume a completed run. Start a new run instead.
 
-When resuming a run, use the same workflow name and input JSON. For custom evaluations, also use the same command.
-
-Start a new run instead of resuming when the model, prompt, dataset, rubric, workflow input, or scoring logic intentionally changed.
-
-<!-- AARON: review these -->
+`qt resume` looks up the stored workflow name and input from the database, then reads the benchmark command and any remaining configuration from `quantiles.toml`. Start a new run instead of resuming when the model, prompt, dataset, rubric, workflow input, or scoring logic intentionally changed.
 
 ```bash
-qt run <run_id> --resume --json
-```
-
-For custom evaluations, preserve the original command as well:
-
-```bash
-qt run <run_id> --resume --json -- <command>
+qt resume <run_id> --json
 ```
 
 ### Handle security-related content

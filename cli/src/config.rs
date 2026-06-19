@@ -25,15 +25,15 @@ impl BenchmarkConfig {
         match self {
             BenchmarkConfig::Builtin(_) => Ok(()),
             BenchmarkConfig::CustomCode(c) => {
-                if let Some(ref input) = c.input && !input.is_object() {
+                if let Some(ref input) = c.input
+                    && !input.is_object()
+                {
                     bail!(
                         "custom_code benchmark config `input` must be a JSON object / TOML table"
                     );
                 }
                 if c.command.is_empty() {
-                    bail!(
-                        "custom_code benchmark config must have a non-empty `command` field"
-                    );
+                    bail!("custom_code benchmark config must have a non-empty `command` field");
                 }
                 Ok(())
             }

@@ -16,9 +16,8 @@ A few commands to see `qt` in action:
 # 1. Initialize a workspace
 qt init
 
-# 2. Run an eval — Quantiles auto-starts a local server, records the run, and tears the server
-# down when the command finishes.
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+# 2. Run a built-in eval
+qt run pubmedqa
 
 # 3. List and inspect what happened
 qt list
@@ -27,16 +26,25 @@ qt show 1
 
 >See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
+### Custom evaluations
+
+Custom evaluations are configured in `quantiles.toml`. See [`./examples/configs`](./examples/configs) for examples.
+
+```bash
+# Run a custom evaluation defined in quantiles.toml
+qt run my-eval
+```
+
 ### Comparing runs
 
 After iterating on an eval, you can compare two runs to see exactly what changed:
 
 ```bash
 # Run A — baseline
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+qt run my-eval
 
 # Run B — your latest iteration
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+qt run my-eval
 
 # See what changed between them
 qt compare 1 2
