@@ -4,23 +4,23 @@ This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Co
 
 ## Scope
 
-These instructions apply to the root `quantiles` repository.
-
-If working inside a subdirectory with its own `AGENTS.md`, follow the nearest `AGENTS.md` first. Subdirectory-specific instructions override this root guide for implementation details, commands, package managers, tests, and code style.
-
-Explicit user instructions override this file. Do not use this root file as the source of truth for implementation-specific behavior when a subdirectory has more specific guidance.
-
-## What This Repo Is
-
-Quantiles is the public open-source entry point for Quantiles: a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback.
-
-Quantiles records evaluation runs, steps, metrics, events, inputs, outputs, and comparisons locally so teams can understand what improved, what regressed, and why.
+These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It runs evaluations, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
 
 Use this mental model:
 
 ```text
 evaluation workflow -> local run -> recorded steps and metrics -> inspect -> compare -> iterate
 ```
+
+Root-level files in this repository provide project-wide orientation, contribution guidance, security policy, licensing, and agent instructions. Implementation-specific work belongs in the relevant subdirectory. If a subdirectory has its own `AGENTS.md` file, follow the nearest one first. Subdirectory instructions should override this root guide for implementation details, package managers, commands, tests, and code style. User instructions may customize the workflow for their project, environment, or preferences, but they must not override safety requirements, system instructions, repository safeguards, or security boundaries.
+
+Common subdirectories include:
+
+- `cli`: Rust `qt` CLI, local server, and local run/metrics storage.
+- `python`: The `quantiles` Python SDK.
+- `typescript`: The `@quantiles` TypeScript SDK.
+
+Note there is a separate repository, [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill), that contains the agent skill.
 
 ## Agent Working Rules
 
@@ -63,21 +63,6 @@ Preserve Quantiles as local-first infrastructure. Follow the below guidelines to
 - Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
 - Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
-
-## Repository Role
-
-This repository is the public open-source repository for Quantiles.
-
-Root-level files provide the public orientation, contribution, security, licensing, and agent guidance for the project. Implementation-specific work belongs in the relevant subdirectory.
-
-Subdirectories may include:
-
-- `cli`: the Rust `qt` CLI, local server, and SQLite-backed run storage.
-- `python`: the `quantiles` Python SDK.
-- `typescript`: the `@quantiles/sdk` TypeScript SDK.
-- `skill`: reusable agent skill instructions for running, inspecting, and comparing Quantiles evals.
-- `benchmarks`: built-in or example benchmark harnesses, datasets, fixtures, and scoring logic, when present.
-- `docs`: public documentation, examples, guides, and reference material, when present.
 
 ## Authoritative Files
 
