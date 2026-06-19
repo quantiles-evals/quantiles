@@ -89,12 +89,14 @@ The CLI and SDKs (TypeScript or Python) support offline benchmark workflows, inc
 
 ## Built-in Benchmarks
 
-Built-in benchmarks are ready-to-run evaluation harnesses with predefined datasets, scoring methodology, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
+Built-in benchmarks are ready-to-run evalulations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
-| Code                                                  | When to use |
+| Code | When to use |
 | --- | --- |
 | `qt run $BENCHMARK` | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
 | `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'` | Run a built-in benchmark against your model |
+
+Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
 
 ## Custom Evaluations
 
