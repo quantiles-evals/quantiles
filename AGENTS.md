@@ -93,33 +93,6 @@ Prefer `local-first` and `offline by default` for open-source behavior.
 
 When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
-## Root Validation
-
-The root repository may not have a build or test suite that applies to every change.
-
-Before running checks, inspect the repository for configured tooling. Do not invent root commands.
-
-When discovering validation commands, check files such as:
-
-- `mise.toml`
-- `justfile`
-- `Makefile`
-- `package.json`
-- `pyproject.toml`
-- `Cargo.toml`
-- `README.md`
-- the nearest subdirectory `AGENTS.md`
-
-For documentation-only changes, at minimum:
-
-- Review edited Markdown for broken relative links.
-- Check headings, lists, code fences, and command examples for Markdown validity.
-- Verify public commands against the relevant subdirectory before documenting them.
-- Check terminology against this file.
-- Confirm that examples do not include secrets, private data, local database contents, or generated artifacts.
-
-If subdirectory checks are needed, use the commands from that subdirectory's nearest `AGENTS.md`, README, or package configuration.
-
 ## Subdirectory Guidance
 
 ### CLI
@@ -194,12 +167,17 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 
 ## Output Style For Coding Agents
 
+When adding documentation to files in this repository, follow the below guidelines:
+
 - Be concise, technical, and action-oriented.
 - Prefer runnable commands, real file paths, concrete inputs, and expected outputs.
-- When reporting evaluation results, include run IDs, compared runs, key metrics, regressions, failures, caveats, and recommended next steps.
 - If a command needs credentials, name the required environment variables but do not inspect or print their values.
+- Review edited Markdown for broken relative links.
+- Check headings, lists, code fences, and command examples for Markdown validity.
+- Verify public commands against the relevant subdirectory before documenting them.
+- Confirm that examples do not include secrets, private data, local database contents, or generated artifacts.
 
-## Evaluation Reporting
+### Evaluation Reporting
 
 After running, inspecting, comparing, or resuming Quantiles evaluations, report:
 
