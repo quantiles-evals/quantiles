@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 
 run_id = os.environ.get("QUANTILES_RUN_ID", "unknown")
 workflow = os.environ.get("QUANTILES_WORKFLOW_NAME", "unknown")
@@ -21,3 +22,7 @@ print(
         "parsed_input": parsed,
     }
 )
+
+if parsed.get("should_fail"):
+    print("Simulated failure triggered by input.", file=sys.stderr)
+    sys.exit(1)
