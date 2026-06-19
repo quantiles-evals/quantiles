@@ -44,51 +44,7 @@ Conversely, never do the following in this repository:
 - Make broad refactors, formatting-only churn, or unrelated edits unless explicitly asked.
 - Report or discuss security vulnerabilities in public issues, discussions, pull requests, examples, or documentation. Always follow guidance in [`SECURITY.md`](./SECURITY.md).
 
-## Safety, Security And Privacy
-
-Preserve Quantiles as local-first infrastructure. Follow the below guidelines to ensure the project maintains safety, security and privacy:
-
-- The CLI and local server should store Quantiles state locally by default
-- Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
-- Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
-- Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
-- Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
-- Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
-
-Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
-
-## Authoritative Files
-
-Start with these files before making public-facing changes:
-
-- [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md): contributor expectations, development workflow, and review norms.
-- [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
-- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
-- [`LICENSE`](./LICENSE): Apache 2.0 license text.
-- [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
-
-## Product Terminology
-
-Use these terms consistently in public docs:
-
-- `Quantiles`: the open-source Quantiles project.
-- `qt`: the Quantiles CLI.
-- `quantiles`: the Python SDK package.
-- `@quantiles`: the TypeScript SDK package.
-- `evaluation`: user-authored evaluation or agent-loop code.
-- `benchmark`: a repeatable evaluation harness with a defined dataset, scoring method, and result shape.
-- `run`: one recorded execution of an evaluation or benchmark.
-- `step`: a durable recorded unit of an evaluation execution.
-- `metric`: a measured value emitted during a run.
-- `event`: recorded observability data from an evaluation.
-- `.quantiles/`: local Quantiles workspace state, including SQLite database and metrics Parquet files.
-
-Prefer `local-first` and `offline by default` for open-source behavior.
-
-When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
-
-## Working In This Repository
+### Working In This Repository
 
 Keep root-level changes focused on public orientation, documentation, contribution guidance, security guidance, licensing, and agent instructions.
 
@@ -136,6 +92,50 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 - `openai:<model>`
 - `anthropic:<model>`
 - `gemini:<model>`
+
+## Safety, Security And Privacy
+
+Preserve Quantiles as local-first infrastructure. Follow the below guidelines to ensure the project maintains safety, security and privacy:
+
+- The CLI and local server should store Quantiles state locally by default
+- Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
+- Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
+- Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
+- Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
+- Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
+
+Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
+
+## Authoritative Files
+
+Start with these files before making public-facing changes:
+
+- [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): contributor expectations, development workflow, and review norms.
+- [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
+- [`LICENSE`](./LICENSE): Apache 2.0 license text.
+- [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
+
+## Product Terminology
+
+Use these terms consistently in public docs:
+
+- `Quantiles`: the open-source Quantiles project.
+- `qt`: the Quantiles CLI.
+- `quantiles`: the Python SDK package.
+- `@quantiles`: the TypeScript SDK package.
+- `evaluation`: user-authored evaluation or agent-loop code.
+- `benchmark`: a repeatable evaluation harness with a defined dataset, scoring method, and result shape.
+- `run`: one recorded execution of an evaluation or benchmark.
+- `step`: a durable recorded unit of an evaluation execution.
+- `metric`: a measured value emitted during a run.
+- `event`: recorded observability data from an evaluation.
+- `.quantiles/`: local Quantiles workspace state, including SQLite database and metrics Parquet files.
+
+Prefer `local-first` and `offline by default` for open-source behavior.
+
+When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
 ## Output Style For Coding Agents
 
