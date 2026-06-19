@@ -149,3 +149,142 @@ pub fn load() -> Result<WorkspaceConfig> {
         toml::from_str(&contents).with_context(|| format!("failed to parse {filename}"))?;
     Ok(config)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_builtin_without_type() {
+        let toml = r#"
+            [benchmarks.demo]
+            samples = 10
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("demo").unwrap();
+        assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
+        if let BenchmarkConfig::Builtin(b) = bench {
+            assert_eq!(b.type_, "builtin");
+            assert_eq!(b.samples, Some(10));
+            assert!(b.model.is_none());
+        }
+    }
+
+    #[test]
+    fn deserialize_builtin_with_explicit_type() {
+        let toml = r#"
+            [benchmarks.demo]
+            type = "builtin"
+            samples = 5
+            model = "openai:gpt-4"
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("demo").unwrap();
+        assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
+    }
+
+    #[test]
+    fn deserialize_custom_code() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+            command = ["python", "eval.py"]
+
+            [benchmarks.my-eval.input]
+            foo = "bar"
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("my-eval").unwrap();
+        assert!(matches!(bench, BenchmarkConfig::CustomCode(_)));
+        if let BenchmarkConfig::CustomCode(c) = bench {
+            assert_eq!(c.command, vec!["python", "eval.py"]);
+            assert!(c.input.is_some());
+            assert_eq!(
+                c.input.as_ref().unwrap().get("foo").unwrap().as_str(),
+                Some("bar")
+            );
+        }
+    }
+
+    #[test]
+    fn deserialize_custom_code_without_input() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+            command = ["sh", "-c", "echo hello"]
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("my-eval").unwrap();
+        assert!(matches!(bench, BenchmarkConfig::CustomCode(_)));
+        if let BenchmarkConfig::CustomCode(c) = bench {
+            assert!(c.input.is_none());
+        }
+    }
+
+    #[test]
+    fn builtin_rejects_command_field() {
+        let toml = r#"
+            [benchmarks.demo]
+            type = "builtin"
+            command = ["echo", "hello"]
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err(), "builtin should reject command field");
+    }
+
+    #[test]
+    fn builtin_rejects_input_field() {
+        let toml = r#"
+            [benchmarks.demo]
+            type = "builtin"
+
+            [benchmarks.demo.input]
+            foo = "bar"
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err(), "builtin should reject input field");
+    }
+
+    #[test]
+    fn custom_code_rejects_samples_field() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+            command = ["echo"]
+            samples = 10
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err(), "custom_code should reject samples field");
+    }
+
+    #[test]
+    fn validate_rejects_empty_command() {
+        let bench = BenchmarkConfig::CustomCode(CustomCodeBenchmarkConfig {
+            type_: "custom_code".to_owned(),
+            command: vec![],
+            input: None,
+        });
+        let err = bench.validate().unwrap_err();
+        assert!(err.to_string().contains("non-empty `command`"));
+    }
+
+    #[test]
+    fn validate_accepts_nonempty_command() {
+        let bench = BenchmarkConfig::CustomCode(CustomCodeBenchmarkConfig {
+            type_: "custom_code".to_owned(),
+            command: vec!["python".to_owned(), "eval.py".to_owned()],
+            input: None,
+        });
+        bench.validate().unwrap();
+    }
+
+    #[test]
+    fn invalid_type_errors() {
+        let toml = r#"
+            [benchmarks.demo]
+            type = "unknown"
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err());
+    }
+}
