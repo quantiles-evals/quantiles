@@ -2,6 +2,8 @@
 
 This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and similar tools. It gives agents a short, public-safe map of the Quantiles repository and the rules for making focused, reviewable changes.
 
+Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) at [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for guidance and details on common Quantiles workflows, including running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs.
+
 ## Scope
 
 These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It runs evaluations, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
@@ -58,6 +60,8 @@ Preserve Quantiles as local-first infrastructure. Follow the below guidelines to
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
 - Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
 
+Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
+
 ## Authoritative Files
 
 Start with these files before making public-facing changes:
@@ -97,7 +101,7 @@ Prefer CLI output over manually reading `.quantiles/` files. Do not manually edi
 
 Although `qt init` exists to initialize the local Quantiles database, `qt run` automatically does the same. `qt init` is thus often unnecessary to run explicitly.
 
-Use `--json` for `qt run`, `qt list`, `qt show`, and `qt compare` when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
+Pass the `--json` flag to `qt run`, `qt list`, `qt show`, and `qt compare` commands when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
 
 Common commands:
 
@@ -215,83 +219,6 @@ Update documentation in this repository (e.g. `README.md`, etc...) when any of t
 Avoid adding implementation-specific claims to the root repository unless they are verified against the relevant subdirectory.
 
 Use forward slashes in public docs unless a block is explicitly Windows or PowerShell-specific.
-
-## Common Tasks
-
-### Run or inspect an evaluation
-
-Use the Quantiles CLI as the source of truth for local runs.
-
-Prefer this flow:
-
-```bash
-qt run <evaluation>
-qt show <run_id> --json
-```
-
-When summarizing results, include the command, run ID, workflow or benchmark name, model, input JSON, status, key metrics, failures, and recommended next command.
-
-### Compare evaluation runs
-
-Use `qt compare` to compare a baseline run against a candidate run:
-
-```bash
-qt compare <baseline_run_id> <candidate_run_id> --json
-```
-
-Before saying one run is better, verify that the comparison is apples-to-apples.
-
-Keep benchmark or workflow name, dataset, dataset split, sample count, scorer, metric definitions, model-vs-demo setup, workflow input, and provider settings stable unless the user intentionally changed one variable.
-
-Treat exit code `1` from `qt compare` as a signal that runs differ, not necessarily as a command failure.
-
-For small sample counts, describe comparison results as directional or smoke-test evidence.
-
-### Debug a regression
-
-When debugging a regression:
-
-1. Identify the baseline and candidate runs.
-2. Run `qt compare <baseline_run_id> <candidate_run_id> --json`.
-3. Inspect failing or changed samples with `qt show <run_id> --json`.
-4. Look for changed inputs, outputs, metrics, step status, model configuration, prompt version, dataset row IDs, judge configuration, and sampling parameters.
-5. Summarize the highest-impact fixes for reliability, cost, and latency.
-
-### Resume a run
-
-Resume only failed or interrupted runs caused by operational issues such as timeouts, rate limits, process exits, or network errors.
-
-Do not resume a completed run. Start a new run instead.
-
-When resuming a run, use the same workflow name and input JSON. For custom evaluations, also use the same command.
-
-Start a new run instead of resuming when the model, prompt, dataset, rubric, workflow input, or scoring logic intentionally changed.
-
-<!-- AARON: review these -->
-
-```bash
-qt run <run_id> --resume --json
-```
-
-For custom evaluations, preserve the original command as well:
-
-```bash
-qt run <run_id> --resume --json -- <command>
-```
-
-### Handle security-related content
-
-Read [`SECURITY.md`](./SECURITY.md).
-
-Do not include real secrets, PHI, customer data, private datasets, access tokens, or full `.quantiles/` databases in examples.
-
-Public vulnerability reports should be redirected to the private reporting process described in [`SECURITY.md`](./SECURITY.md).
-
-### Work on implementation
-
-Open the relevant subdirectory and follow its nearest `AGENTS.md`.
-
-Do not use this root file as the source of truth for implementation-specific commands, tests, package managers, release steps, or code style when a subdirectory has more specific guidance.
 
 ## Output Style For Coding Agents
 
