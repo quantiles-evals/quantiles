@@ -93,47 +93,6 @@ Prefer `local-first` and `offline by default` for open-source behavior.
 
 When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
-## Subdirectory Guidance
-
-### CLI
-
-The `qt` CLI is a local-first Rust CLI for running, recording, inspecting, and comparing AI evaluation workflows.
-
-It creates local SQLite state under `.quantiles/quantiles.sqlite` and provides commands such as:
-
-```bash
-qt run
-qt list
-qt show
-qt compare
-```
-
-When editing the CLI subdirectory, preserve local-first behavior, SQLite data model assumptions, clear Rust error handling, and stable command behavior.
-
-### Python SDK
-
-The Python SDK is a Python 3.12 SDK for authoring local AI workload workflows against the Quantiles local observability server at `http://127.0.0.1:8765` by default.
-
-It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, dataset iteration, async helpers, metrics, and LLM helpers.
-
-When editing the Python subdirectory, preserve async behavior, stable JSON payloads, replay semantics, and public API exports.
-
-### TypeScript SDK
-
-The TypeScript SDK is an SDK for authoring local AI workload workflows against the Quantiles local observability server at `http://127.0.0.1:8765` by default.
-
-It exposes workflow primitives, `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
-
-When editing the TypeScript subdirectory, preserve strict typing, JSON-serializable public surfaces, ESM behavior, and documented package exports.
-
-### Agent Skill
-
-The [`skill`](https://github.com/quantiles-evals/skill) repository contains reusable instructions for coding agents that use Quantiles to run, inspect, compare, and summarize evaluation workflows.
-
-When editing the skill subdirectory, keep instructions operational, command-driven, and safe for public use.
-
-Read [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for the reusable agent skill instructions.
-
 ## Working In This Repository
 
 Keep root-level changes focused on public orientation, documentation, contribution guidance, security guidance, licensing, and agent instructions.
@@ -150,6 +109,24 @@ Update documentation in this repository (e.g. `README.md`, etc...) when any of t
 - Security, privacy, telemetry, or data-handling expectations.
 
 Avoid adding implementation-specific claims to the root repository unless they are verified against the relevant subdirectory. Use forward slashes in public docs unless a block is explicitly Windows or PowerShell-specific.
+
+### `cli/` directory
+
+The `cli/` directory contains the source code for the `qt` CLI. It creates local SQLite and metrics database state under the `.quantiles/` directory, and provides core CLI commands for running and inspecting evals.
+
+When editing the CLI, preserve local-first behavior, SQLite data model assumptions, clear Rust error handling, and stable command behavior.
+
+### `python/` directory
+
+The `python/` directory contains the Quantiles Python SDK, which allows users to author custom local AI evals using the local Quantiles server and Python 3.12+. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, dataset iteration, async helpers, metrics, and LLM helpers.
+
+When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON payloads, replay semantics, and public API exports.
+
+### `typescript/` directory
+
+The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals using the local Quantiles server and Typescript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
+
+When editing the TypeScript SDK subdirectory, preserve strict typing, JSON-serializable public surfaces, ESM behavior, and documented package exports.
 
 ### Using provider-backed models
 
