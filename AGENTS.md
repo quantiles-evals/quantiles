@@ -20,23 +20,23 @@ Note there is a separate repository, [github.com/quantiles-evals/skill](https://
 
 ## Agent Working Rules
 
-Do:
+When performing tasks in this repository, always do the following:
 
 - Keep changes small, public-safe, and reviewable.
-- Preserve Quantiles as local-first and offline by default.
-- Verify commands, links, package names, benchmark names, and release status before documenting them.
+- Preserve Quantiles as local-first, offline system by default.
+- Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
 - Update public docs when CLI behavior, SDK APIs, workflows, benchmarks, schemas, setup steps, or agent guidance changes.
 - Prefer concrete examples with commands, file paths, inputs, outputs, and expected behavior.
 - Leave clear notes when something could not be verified.
 
-Do not:
+Conversely, never do the following in this repository:
 
 - Add telemetry, analytics, hosted behavior, background uploads, or external network calls without explicit approval.
 - Add new production dependencies without explicit approval.
-- Commit generated artifacts, local traces, `.quantiles/`, SQLite databases, virtual environments, `node_modules/`, build output, coverage output, caches, or temporary benchmark results.
-- Invent links, package names, commands, benchmarks, features, roadmap claims, or release status.
+- Commit generated artifacts, local traces, the `.quantiles/` directory, SQLite databases, virtual environments, the `node_modules/` directory, build output, coverage output, caches, or temporary benchmark results.
+- Invent links, package names, commands, benchmarks, evals, features, or release status.
 - Make broad refactors, formatting-only churn, or unrelated edits unless explicitly asked.
-- Report or discuss security vulnerabilities in public issues, discussions, pull requests, examples, or documentation. Follow [`SECURITY.md`](./SECURITY.md).
+- Report or discuss security vulnerabilities in public issues, discussions, pull requests, examples, or documentation. Always follow guidance in [`SECURITY.md`](./SECURITY.md).
 
 ## Before Editing
 
