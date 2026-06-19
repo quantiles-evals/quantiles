@@ -116,7 +116,9 @@ The Python SDK is located in this repository at [`python/`](./python). Read more
 
 Quantiles is designed to work well with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
 
-The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the below prompt:
+### Quantiles Skill
+
+The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) file that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the below prompt:
 
 ```text
 Install the Quantiles eval skill at github.com/quantiles-evals/skill
@@ -128,11 +130,15 @@ If you want your agent to run an eval, use the below prompt:
  Use the Quantiles eval skill to run the SimpleQA Verified benchmark and summarize the results.
  ```
 
+ ### `AGENTS.md`
+
+ The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to Quantiles open source systems.
+
+ A [sample `AGENTS.md` file](http://quantiles.io/documentation/agent-md) is also provided for users to add to their repositories, to give their agents specific instructions on how to take advantage of the skill to run evals, inspect and compare runs, and report results for their codebase.
+
 ## Documentation
 
-Full documentation is available at:
-
-[Quantiles Documentation](https://quantiles.io/documentation/)
+Full documentation is available at [quantiles.io/documentation](https://quantiles.io/documentation/).
 
 Start here:
 
