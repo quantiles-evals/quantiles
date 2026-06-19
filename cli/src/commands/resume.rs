@@ -20,6 +20,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
 
     let run = db::get_run(&db, run_id).await?;
     if run.status == db::RunStatus::Completed {
+        // TODO: json flag here
         bail!(
             "run {run_id} is already completed; \
              create a new run or resume a running/failed one"
