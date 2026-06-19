@@ -30,9 +30,9 @@ pub async fn run(
     match bench_config {
         Some(bench) => {
             bench.validate()?;
-            match bench.type_ {
-                qt::config::BenchmarkType::Builtin => {
-                    let (effective_input, _) = assemble_builtin_input(Some(bench), cli_input);
+            match bench {
+                qt::config::BenchmarkConfig::Builtin(b) => {
+                    let (effective_input, _) = assemble_builtin_input(Some(b), cli_input);
                     run_builtin_workflow(
                         workflow_name,
                         effective_input.as_deref(),
@@ -41,9 +41,9 @@ pub async fn run(
                     )
                     .await
                 }
-                qt::config::BenchmarkType::CustomCode => {
+                qt::config::BenchmarkConfig::CustomCode(c) => {
                     let (merged_input, overridden_keys) =
-                        merge_inputs(bench.input.as_ref(), cli_input)?;
+                        merge_inputs(c.input.as_ref(), cli_input)?;
                     let warning = if overridden_keys.is_empty() {
                         None
                     } else {
@@ -52,7 +52,7 @@ pub async fn run(
                             overridden_keys.join(", ")
                         ))
                     };
-                    let command = bench.command.as_ref().unwrap();
+                    let command = &c.command;
 
                     let cwd = std::env::current_dir()?;
                     let root = db::resolve_workspace_root(&cwd, true).await?;
@@ -95,7 +95,7 @@ pub async fn run(
 }
 
 fn assemble_builtin_input(
-    bench: Option<&qt::config::BenchmarkConfig>,
+    bench: Option<&qt::config::BuiltinBenchmarkConfig>,
     cli_input: Option<&str>,
 ) -> (Option<String>, Vec<String>) {
     if let Some(cli_str) = cli_input {

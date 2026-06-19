@@ -1,72 +1,108 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::llm::Sampler;
 
-/// Type of benchmark execution.
-#[derive(Debug, Default, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum BenchmarkType {
-    /// Native builtin eval implemented in the CLI.
-    #[default]
-    Builtin,
-    /// External custom eval run as a child process.
-    CustomCode,
-}
-
 /// Configuration for a single benchmark.
-#[derive(Debug, Deserialize, Default)]
-pub struct BenchmarkConfig {
-    /// Execution type. Defaults to `builtin`.
-    #[serde(default, rename = "type")]
-    pub type_: BenchmarkType,
-    /// Number of samples (rows) to evaluate. (builtin only)
-    pub samples: Option<usize>,
-    /// Which model sampler to use for this benchmark. (builtin only)
-    pub model: Option<Sampler>,
-    /// Maximum concurrent workers for this benchmark. (builtin only)
-    pub max_workers: Option<usize>,
-    /// Command and arguments to execute. (`custom_code` only)
-    pub command: Option<Vec<String>>,
-    /// Structured input object passed to the eval. (`custom_code` only)
-    pub input: Option<serde_json::Value>,
+///
+/// Exactly one of the two variants is deserialized based on the `type` field:
+/// `builtin` (default when absent) or `custom_code`.
+#[derive(Debug, Clone)]
+pub enum BenchmarkConfig {
+    Builtin(BuiltinBenchmarkConfig),
+    CustomCode(CustomCodeBenchmarkConfig),
 }
 
 impl BenchmarkConfig {
-    /// Validate that the benchmark config fields are consistent with its `type`.
+    /// Validate post-deserialization constraints.
     ///
     /// # Errors
     ///
-    /// Returns an error when a required field is missing or a disallowed field is present.
+    /// Returns an error when a field has an invalid value.
     pub fn validate(&self) -> Result<()> {
-        match self.type_ {
-            BenchmarkType::Builtin => {
-                if self.command.is_some() {
-                    bail!("builtin benchmark config cannot have a `command` field");
-                }
-                if self.input.is_some() {
-                    bail!("builtin benchmark config cannot have an `input` field");
-                }
-            }
-            BenchmarkType::CustomCode => {
-                if self.command.as_ref().is_none_or(Vec::is_empty) {
-                    bail!(
-                        "custom_code benchmark config must have a non-empty `command` field"
-                    );
-                }
-                if let Some(ref input) = self.input
-                    && !input.is_object()
-                {
+        match self {
+            BenchmarkConfig::Builtin(_) => Ok(()),
+            BenchmarkConfig::CustomCode(c) => {
+                if let Some(ref input) = c.input && !input.is_object() {
                     bail!(
                         "custom_code benchmark config `input` must be a JSON object / TOML table"
                     );
                 }
+                if c.command.is_empty() {
+                    bail!(
+                        "custom_code benchmark config must have a non-empty `command` field"
+                    );
+                }
+                Ok(())
             }
         }
-        Ok(())
     }
+}
+
+impl<'de> Deserialize<'de> for BenchmarkConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value =
+            serde_json::Value::deserialize(deserializer).map_err(serde::de::Error::custom)?;
+
+        let type_str = value.get("type").and_then(|v| v.as_str());
+
+        match type_str {
+            Some("custom_code") => {
+                let config = CustomCodeBenchmarkConfig::deserialize(value).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "failed to deserialize custom_code benchmark config: {e}"
+                    ))
+                })?;
+                Ok(BenchmarkConfig::CustomCode(config))
+            }
+            Some("builtin") | None => {
+                let config = BuiltinBenchmarkConfig::deserialize(value).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "failed to deserialize builtin benchmark config: {e}"
+                    ))
+                })?;
+                Ok(BenchmarkConfig::Builtin(config))
+            }
+            Some(other) => Err(serde::de::Error::custom(format!(
+                "invalid benchmark type `{other}`; expected `builtin` or `custom_code`",
+            ))),
+        }
+    }
+}
+
+/// Built-in benchmark configuration.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct BuiltinBenchmarkConfig {
+    #[serde(default = "default_type_builtin", rename = "type")]
+    pub type_: String,
+    /// Number of samples (rows) to evaluate.
+    pub samples: Option<usize>,
+    /// Which model sampler to use for this benchmark.
+    pub model: Option<Sampler>,
+    /// Maximum concurrent workers for this benchmark.
+    pub max_workers: Option<usize>,
+}
+
+fn default_type_builtin() -> String {
+    "builtin".to_owned()
+}
+
+/// Custom-code benchmark configuration.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct CustomCodeBenchmarkConfig {
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// Command and arguments to execute.
+    pub command: Vec<String>,
+    /// Structured input object passed to the eval.
+    pub input: Option<serde_json::Value>,
 }
 
 /// Top-level workspace configuration read from `quantiles.toml` or

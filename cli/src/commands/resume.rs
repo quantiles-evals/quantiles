@@ -42,8 +42,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
     match bench_config {
         Some(bench) => {
             bench.validate()?;
-            match bench.type_ {
-                qt::config::BenchmarkType::Builtin => {
+            match bench {
+                qt::config::BenchmarkConfig::Builtin(_) => {
                     super::run::execute_builtin(
                         &db,
                         &metrics_store,
@@ -55,8 +55,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                     )
                     .await
                 }
-                qt::config::BenchmarkType::CustomCode => {
-                    let command = bench.command.as_ref().unwrap();
+                qt::config::BenchmarkConfig::CustomCode(c) => {
+                    let command = &c.command;
                     super::run::execute_custom(
                         run_id,
                         workflow_name,
