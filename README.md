@@ -116,7 +116,7 @@ The Python SDK is located in this repository at [`python/`](./python). Read more
 
 Quantiles is designed to work well with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
 
-### Quantiles Skill
+### `SKILL.md`
 
 The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) file that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the below prompt:
 
