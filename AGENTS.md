@@ -53,19 +53,16 @@ Before making changes:
 5. Prefer the smallest change that satisfies the task.
 6. Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 
-## Safety And Privacy
+## Safety, Security And Privacy
 
-Preserve Quantiles as local-first infrastructure. The CLI and local server should store Quantiles state locally by default.
+Preserve Quantiles as local-first infrastructure. Follow the below guidelines to ensure the project maintains safety, security and privacy:
 
-User-authored workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user.
-
-Do not inspect, print, summarize, commit, or infer values from `.env`, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
-
-Never commit `.quantiles/`, SQLite databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
-
-Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
-
-Keep public docs customer-safe. Avoid internal-only planning, prioritization, unreleased roadmap claims, private operational details, or non-public security information.
+- The CLI and local server should store Quantiles state locally by default
+- Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
+- Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
+- Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
+- Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
+- Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
 
 ## Repository Role
 
