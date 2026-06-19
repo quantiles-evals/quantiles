@@ -93,48 +93,6 @@ Prefer `local-first` and `offline by default` for open-source behavior.
 
 When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
-## Quantiles Evaluation Workflow
-
-Use the `qt` CLI as the source of truth for running, listing, inspecting, comparing, and resuming Quantiles evaluations.
-
-Prefer CLI output over manually reading `.quantiles/` files. Do not manually edit or delete `.quantiles/` files unless explicitly asked.
-
-Although `qt init` exists to initialize the local Quantiles database, `qt run` automatically does the same. `qt init` is thus often unnecessary to run explicitly.
-
-Pass the `--json` flag to `qt run`, `qt list`, `qt show`, and `qt compare` commands when producing agent summaries. Inspect selected runs with `qt show <run_id> --json`.
-
-Common commands:
-
-```bash
-qt run <evaluation> --json
-qt list --json
-qt show <run_id> --json
-qt compare <baseline_run_id> <candidate_run_id> --json
-qt resume <run_id> --json
-```
-
-Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
-
-Start with the smallest useful sample limit before running a full benchmark. Ask before running any evaluation that is expected to be slow, expensive, provider-backed, network-dependent, destructive, or likely to modify local run state in a meaningful way.
-
-Safe commands may include read-only inspection commands, local format checks, type checks, and unit tests. Small smoke tests are allowed only when they are local, cheap, relevant to the task, and do not call external providers.
-
-If no real model is specified, built-in evaluations may use the demo model. Treat demo model runs as workflow validation only, not model-quality benchmark evidence. Do not run provider-backed evaluations unless explicitly asked or given a provider-prefixed model. Before running provider-backed evaluations, verify that the required provider API key is configured without printing the key value.
-
-Provider-backed model inputs should use provider-prefixed model names, for example:
-
-```json
-{"model":"openai:<model>"}
-{"model":"anthropic:<model>"}
-{"model":"gemini:<model>"}
-```
-
-Example provider-backed run:
-
-```bash
-qt run simpleqa-verified --input '{"limit":10,"model":"openai:<model>"}' --json
-```
-
 ## Root Validation
 
 The root repository may not have a build or test suite that applies to every change.
@@ -207,18 +165,32 @@ Read [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill
 
 Keep root-level changes focused on public orientation, documentation, contribution guidance, security guidance, licensing, and agent instructions.
 
+Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, metrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
+
 Update documentation in this repository (e.g. `README.md`, etc...) when any of the following change:
 
 - CLI commands, flags, outputs, or setup steps.
-- SDK APIs, imports, examples, or package names.
+- APIs, SDKs, imports, examples, or package names.
 - Benchmark names, datasets, scoring methods, or limitations.
-- Run schemas, step semantics, metrics, events, or comparison behavior.
+- DB schemas, step semantics, metrics, events, or comparison behavior.
 - Agent workflows, skills, prompts, or recommended commands.
 - Security, privacy, telemetry, or data-handling expectations.
 
-Avoid adding implementation-specific claims to the root repository unless they are verified against the relevant subdirectory.
+Avoid adding implementation-specific claims to the root repository unless they are verified against the relevant subdirectory. Use forward slashes in public docs unless a block is explicitly Windows or PowerShell-specific.
 
-Use forward slashes in public docs unless a block is explicitly Windows or PowerShell-specific.
+### Using provider-backed models
+
+Start with the smallest useful sample limit before running a full benchmark with either a demo model or a provider-backed model to validate configuration, catch setup issues early, and avoid unnecessary cost.
+
+Ask before running any evaluation that is expected to be slow, expensive, provider-backed, network-dependent, destructive, or likely to meaningfully modify local run state. Note that demo model runs are for workflow validation only. Do not treat them as model-quality benchmark evidence.
+
+Do not run provider-backed evaluations unless the user explicitly asks for them or provides a provider-prefixed model name. Configure providers in the `quantiles.toml` config file. Follow configuration examples in the [`cli/examples/configs`](./cli/examples/configs) directory. Before running a provider-backed evaluation, verify that the required provider API key is configured, but never print or expose the key value.
+
+Provider-backed model inputs should use provider-prefixed model names, for example:
+
+- `openai:<model>`
+- `anthropic:<model>`
+- `gemini:<model>`
 
 ## Output Style For Coding Agents
 
