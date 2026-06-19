@@ -4,6 +4,15 @@ This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Co
 
 Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) at [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for guidance and details on common Quantiles workflows, including running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs.
 
+To become familiar with this repository, and before attempting to complete tasks, read these files:
+
+- [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): contributor expectations, development workflow, and review norms.
+- [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
+- [`LICENSE`](./LICENSE): Apache 2.0 license text.
+- [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
+
 ## Scope
 
 These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It runs evaluations, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
@@ -105,17 +114,6 @@ Preserve Quantiles as local-first infrastructure. Follow the below guidelines to
 - Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
 
 Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
-
-## Authoritative Files
-
-Start with these files before making public-facing changes:
-
-- [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md): contributor expectations, development workflow, and review norms.
-- [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
-- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
-- [`LICENSE`](./LICENSE): Apache 2.0 license text.
-- [`mise.toml`](./mise.toml): task definitions for building, formatting, type-checking, linting, and more, all using the [mise](https://mise.en.dev/) task runner.
 
 ## Product Terminology
 
