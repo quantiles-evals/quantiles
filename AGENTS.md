@@ -22,6 +22,12 @@ Note there is a separate repository, [github.com/quantiles-evals/skill](https://
 
 When performing tasks in this repository, always do the following:
 
+- Read this file.
+- Identify the affected subdirectory.
+- Read the nearest subdirectory `AGENTS.md` if present.
+- Inspect the relevant README, package configuration, and existing tests before changing behavior.
+- Prefer the smallest change that satisfies the task.
+- Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 - Keep changes small, public-safe, and reviewable.
 - Preserve Quantiles as local-first, offline system by default.
 - Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
@@ -37,17 +43,6 @@ Conversely, never do the following in this repository:
 - Invent links, package names, commands, benchmarks, evals, features, or release status.
 - Make broad refactors, formatting-only churn, or unrelated edits unless explicitly asked.
 - Report or discuss security vulnerabilities in public issues, discussions, pull requests, examples, or documentation. Always follow guidance in [`SECURITY.md`](./SECURITY.md).
-
-## Before Editing
-
-Before making changes:
-
-1. Read this file.
-2. Identify the affected subdirectory.
-3. Read the nearest subdirectory `AGENTS.md` if present.
-4. Inspect the relevant README, package configuration, and existing tests before changing behavior.
-5. Prefer the smallest change that satisfies the task.
-6. Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 
 ## Safety, Security And Privacy
 
