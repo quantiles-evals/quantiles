@@ -2,7 +2,7 @@
 
 Quantiles is a local-first CLI and SDK for running durable AI evaluation workflows with fast, continuous feedback. Teams can iterate on model behavior, prompts, agent workflows, and debugging scripts while preserving the metrics and run histories needed to understand what improved, what regressed, and why.
 
-It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools.
+It includes a CLI, SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools. This monorepo centralizes all the pieces of Quantiles, making it easier for engineers and coding agents to inspect, change, test, and extend the system.
 
 ## Why Quantiles
 
