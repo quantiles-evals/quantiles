@@ -6,12 +6,6 @@ This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Co
 
 These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It runs evaluations, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
 
-Use this mental model:
-
-```text
-evaluation workflow -> local run -> recorded steps and metrics -> inspect -> compare -> iterate
-```
-
 Root-level files in this repository provide project-wide orientation, contribution guidance, security policy, licensing, and agent instructions. Implementation-specific work belongs in the relevant subdirectory. If a subdirectory has its own `AGENTS.md` file, follow the nearest one first. Subdirectory instructions should override this root guide for implementation details, package managers, commands, tests, and code style. User instructions may customize the workflow for their project, environment, or preferences, but they must not override safety requirements, system instructions, repository safeguards, or security boundaries.
 
 Common subdirectories include:
