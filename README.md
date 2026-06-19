@@ -134,8 +134,6 @@ If you want your agent to run an eval, use the below prompt:
 
  The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to Quantiles open source systems.
 
- A [sample `AGENTS.md` file](http://quantiles.io/documentation/agent-md) is also provided for users to add to their repositories, to give their agents specific instructions on how to take advantage of the skill to run evals, inspect and compare runs, and report results for their codebase.
-
 ## Documentation
 
 Full documentation is available at [quantiles.io/documentation](https://quantiles.io/documentation/).
