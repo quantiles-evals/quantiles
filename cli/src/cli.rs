@@ -33,16 +33,16 @@ pub enum Command {
         workflow_name: String,
         #[arg(long)]
         input: Option<String>,
-        /// Resume an existing eval run instead of creating a new one.
-        #[arg(long)]
-        resume: Option<i64>,
         /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
-        /// The command and arguments to execute.
-        /// Optional when running a builtin eval.
-        #[arg(last = true, required = false)]
-        command: Vec<String>,
+    },
+    /// Resume a running or failed eval run.
+    Resume {
+        run_id: i64,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
     /// Start the local qt HTTP server. Mostly used for local development or custom setups.
     Serve {
