@@ -38,6 +38,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
         println!("Resuming eval run {run_id} ({workflow_name})");
     }
 
+    // TODO: on resume, should we look up the command from the DB, not the config file?
     match bench_config {
         Some(bench) => {
             bench.validate()?;
