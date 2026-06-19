@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A minimal custom eval script for the Quantiles CLI example."""
 
 import json
