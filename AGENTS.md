@@ -7,6 +7,7 @@ Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKI
 To become familiar with this repository, and before attempting to complete tasks, read these files:
 
 - [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
+- [`CONFIG.md`](./CONFIG.md): how to write configuration files for the `qt` CLI.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md): contributor expectations, development workflow, and review norms.
 - [`SECURITY.md`](./SECURITY.md): supported components and vulnerability reporting process.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md): community participation rules.
