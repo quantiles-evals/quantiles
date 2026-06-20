@@ -631,7 +631,7 @@ mod tests {
     }
 
     /// When no `--input` is given but the config has builtin fields, they should be
-     assembled into a `BuiltinConfigInput` JSON object with the correct key names.
+    /// assembled into a `BuiltinConfigInput` JSON object with the correct key names.
     #[test]
     fn assemble_builtin_input_from_config() {
         let bench = qt::config::BuiltinBenchmarkConfig {
