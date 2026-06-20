@@ -38,7 +38,10 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
         println!("Resuming eval run {run_id} ({workflow_name})");
     }
 
-    // TODO: on resume, should we look up the command from the DB, not the config file?
+    // TODO: we always re-read the command from the config file on resume.
+    // This behavior implies that, if the config file is edited between
+    // `qt run` and `qt resume` invocations, the resumed run will use the
+    // updated command, not the original one. We should revisit this decision
     match bench_config {
         Some(bench) => {
             bench.validate()?;
