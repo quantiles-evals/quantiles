@@ -669,4 +669,3 @@ mod tests {
         assert!(input.is_none());
     }
 }
-
