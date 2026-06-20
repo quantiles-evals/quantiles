@@ -53,9 +53,14 @@ See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_co
 
 ## Configuration files and customization
 
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file.
+You can customize how the CLI executes built-in benchmarks and custom evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
-For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
+- [`../CONFIG.md`](../CONFIG.md): for a guide and reference.
+- [`./examples/configs`](./examples/configs) for complete working examples.
+
+### Built-in benchmarks
+
+For built-in benchmarks, configure settings like `samples`, `model`, and `max_workers`:
 
 ```toml
 [benchmarks.pubmedqa]
@@ -64,21 +69,18 @@ model = "openai:gpt-5.4-nano"
 max_workers = 100
 ```
 
-For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as `QUANTILES_INPUT`.
+>Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+
+### Custom code evals
+
+For custom evaluations, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as a JSON dictionary.
 
 ```toml
 [benchmarks.my-eval]
 type = "custom_code"
 command = ["python", "my_eval.py"]
-
-[benchmarks.my-eval.input]
-foo = "foo_val"
+input = { foo = "foo_val" }
 ```
-
-See [`./examples/configs`](./examples/configs) for complete working examples.
-
->Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
-
 
 ### Comparing runs
 
