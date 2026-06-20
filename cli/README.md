@@ -17,6 +17,10 @@ A few commands to see `qt` in action:
 qt init
 
 # 2. Run a built-in eval
+# 
+# Note that you can also build and run your own custom evals
+# with the `qt` CLI. See the below "Custom evaluations" section
+# for details.
 qt run pubmedqa
 
 # 3. List and inspect what happened
@@ -28,15 +32,13 @@ qt show 1
 
 ### Custom evaluations
 
-Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is passed to your script as `QUANTILES_INPUT`.
+Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed in the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below
 
 ```toml
 [benchmarks.my-eval]
 type = "custom_code"
 command = ["python", "my_eval.py"]
-
-[benchmarks.my-eval.input]
-dataset = "my_dataset.jsonl"
+input = {dataset = "my_dataset.jsonl"}
 ```
 
 ```bash
