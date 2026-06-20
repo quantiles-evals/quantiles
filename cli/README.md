@@ -49,7 +49,7 @@ qt run my-eval
 qt resume <run_id>
 ```
 
-See [`./examples/configs`](./examples/configs) for examples, including a [complete custom code example](./examples/configs/custom_code/quantiles.toml).
+See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_code/quantiles.toml) for a complete working example.
 
 ### Comparing runs
 
