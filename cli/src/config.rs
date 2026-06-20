@@ -288,4 +288,60 @@ pub fn load() -> Result<WorkspaceConfig> {
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn custom_code_missing_command_errors() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err(), "custom_code should require command field");
+    }
+
+    #[test]
+    fn custom_code_nested_input_values() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+            command = ["python", "eval.py"]
+
+            [benchmarks.my-eval.input]
+            dataset = "foo.jsonl"
+
+            [benchmarks.my-eval.input.nested]
+            a = 1
+            b = true
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("my-eval").unwrap();
+        if let BenchmarkConfig::CustomCode(c) = bench {
+            let input = c.input.as_ref().unwrap();
+            assert_eq!(input.get("dataset").unwrap().as_str(), Some("foo.jsonl"));
+            let nested = input.get("nested").unwrap().as_object().unwrap();
+            assert_eq!(nested.get("a").unwrap().as_i64(), Some(1));
+            assert_eq!(nested.get("b").unwrap().as_bool(), Some(true));
+        } else {
+            panic!("expected custom_code config");
+        }
+    }
+
+    #[test]
+    fn custom_code_empty_input_table() {
+        let toml = r#"
+            [benchmarks.my-eval]
+            type = "custom_code"
+            command = ["echo"]
+
+            [benchmarks.my-eval.input]
+        "#;
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let bench = config.benchmarks.get("my-eval").unwrap();
+        if let BenchmarkConfig::CustomCode(c) = bench {
+            assert!(c.input.is_some());
+            assert!(c.input.as_ref().unwrap().is_empty());
+        } else {
+            panic!("expected custom_code config");
+        }
+    }
 }
