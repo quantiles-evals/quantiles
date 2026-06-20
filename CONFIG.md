@@ -17,7 +17,7 @@ The CLI looks for a configuration file in the current working directory, in this
 1. `./quantiles.toml`
 2. `./.quantiles.toml`
 
-Only one may exist in a given directory.
+At most one of these files can exist in a given directory. If both are present, `qt` will refuse to run benchmarks.
 
 ## Top-level structure
 
