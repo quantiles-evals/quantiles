@@ -82,7 +82,7 @@ command = ["python", "my_eval.py"]
 input = { foo = "foo_val" }
 ```
 
-### Comparing runs
+## Comparing runs
 
 After iterating on an eval, you can compare two runs to see exactly what changed:
 
