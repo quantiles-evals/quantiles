@@ -51,6 +51,35 @@ qt resume <run_id>
 
 See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_code/quantiles.toml) for a complete working example.
 
+## Configuration files and customization
+
+You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file.
+
+For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
+
+```toml
+[benchmarks.pubmedqa]
+samples = 50
+model = "openai:gpt-5.4-nano"
+max_workers = 100
+```
+
+For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as `QUANTILES_INPUT`.
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+foo = "foo_val"
+```
+
+See [`./examples/configs`](./examples/configs) for complete working examples.
+
+>Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+
+
 ### Comparing runs
 
 After iterating on an eval, you can compare two runs to see exactly what changed:
@@ -105,31 +134,3 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 - **Client** (your script) owns code execution: the server never runs your logic
   - Note that the CLI itself also has built-in benchmarks, which do not involve your code
 - **CLI** reads the same SQLite database the server writes to
-
-## Customization
-
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file.
-
-For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
-
-```toml
-[benchmarks.pubmedqa]
-samples = 50
-model = "openai:gpt-5.4-nano"
-max_workers = 100
-```
-
-For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as `QUANTILES_INPUT`.
-
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-
-[benchmarks.my-eval.input]
-foo = "foo_val"
-```
-
-See [`./examples/configs`](./examples/configs) for complete examples.
-
->Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
