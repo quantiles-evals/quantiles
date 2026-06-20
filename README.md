@@ -69,7 +69,7 @@ qt compare <run_id_a> <run_id_b>
 
 To learn more detail about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
 
-### Customization
+### Configuration file and customization
 
 You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory.
 
@@ -96,7 +96,10 @@ bar = "bar_val"
 
 The CLI will execute the command with `QUANTILES_RUN_ID`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT` environment variables injected. If the run fails, you can resume it later with `qt resume <run_id>`.
 
-See [`./cli/examples/configs`](./cli/examples/configs) for complete examples, including a [custom code benchmark example](./cli/examples/configs/custom_code/quantiles.toml).
+See the following resources for more details:
+
+- [`CONFIG.md`](./CONFIG.md) - in-depth guides to configuration and reference
+- [`./cli/examples/configs`](./cli/examples/configs) - complete examples, including a [custom code benchmark example](./cli/examples/configs/custom_code/quantiles.toml)
 
 ## Local-First and Offline by Default
 
