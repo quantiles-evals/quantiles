@@ -563,6 +563,8 @@ mod tests {
 
     use serde_json::json;
 
+    /// When only config input is present and no `--input` CLI flag is given, the result
+    /// should be the exact config object with no overridden keys.
     #[test]
     fn merge_inputs_config_only() {
         let mut config = HashMap::new();
@@ -572,6 +574,8 @@ mod tests {
         assert!(overridden.is_empty());
     }
 
+    /// When only a `--input` CLI flag is given with no config input, the result should be
+    /// the parsed CLI JSON object with no overridden keys.
     #[test]
     fn merge_inputs_cli_only() {
         let (result, overridden) = super::merge_inputs(None, Some(r#"{"x":1}"#)).unwrap();
@@ -579,6 +583,8 @@ mod tests {
         assert!(overridden.is_empty());
     }
 
+    /// When both config and CLI inputs specify the same key, the CLI value should win and
+    /// the key should be recorded in the overridden list for the warning.
     #[test]
     fn merge_inputs_both_with_overlap() {
         let mut config = HashMap::new();
@@ -593,12 +599,16 @@ mod tests {
         assert_eq!(overridden, vec!["foo"]);
     }
 
+    /// Passing a non-JSON string to `--input` should produce a clear error so the user
+    /// knows their CLI argument is malformed.
     #[test]
     fn merge_inputs_cli_invalid_json() {
         let err = super::merge_inputs(None, Some("not json")).unwrap_err();
         assert!(err.to_string().contains("failed to parse --input as JSON"));
     }
 
+    /// When neither config nor CLI provides any input keys, the merged result should be
+    /// `None` so the run stores no input JSON.
     #[test]
     fn merge_inputs_both_empty() {
         let (result, overridden) = super::merge_inputs(None, None).unwrap();
@@ -606,6 +616,8 @@ mod tests {
         assert!(overridden.is_empty());
     }
 
+    /// A `--input` CLI flag should take precedence over any config fields, returning the
+    /// raw CLI string directly without assembling a config-based JSON object.
     #[test]
     fn assemble_builtin_input_with_cli_override() {
         let bench = qt::config::BuiltinBenchmarkConfig {
@@ -618,6 +630,8 @@ mod tests {
         assert_eq!(input, Some(r#"{"model":"x"}"#.to_owned()));
     }
 
+    /// When no `--input` is given but the config has builtin fields, they should be
+     assembled into a `BuiltinConfigInput` JSON object with the correct key names.
     #[test]
     fn assemble_builtin_input_from_config() {
         let bench = qt::config::BuiltinBenchmarkConfig {
@@ -633,6 +647,8 @@ mod tests {
         assert_eq!(parsed["max_workers"], 8);
     }
 
+    /// When the builtin config section exists but has no runtime-relevant fields, the
+    /// input should be `None` rather than an empty JSON object.
     #[test]
     fn assemble_builtin_input_none_when_no_config_fields() {
         let bench = qt::config::BuiltinBenchmarkConfig {
@@ -645,6 +661,8 @@ mod tests {
         assert!(input.is_none());
     }
 
+    /// When there is no config section at all and no CLI `--input`, builtin runs should
+    /// proceed with no input JSON stored in the database.
     #[test]
     fn assemble_builtin_input_none_when_no_bench() {
         let (input, _) = super::assemble_builtin_input(None, None);

@@ -289,6 +289,8 @@ pub fn load() -> Result<WorkspaceConfig> {
         assert!(result.is_err());
     }
 
+    /// `custom_code` benchmarks must have a `command` field; omitting it should fail at
+    /// parse time because the struct requires it.
     #[test]
     fn custom_code_missing_command_errors() {
         let toml = r#"
@@ -299,6 +301,8 @@ pub fn load() -> Result<WorkspaceConfig> {
         assert!(result.is_err(), "custom_code should require command field");
     }
 
+    /// Nested TOML tables inside `input` should deserialize into nested JSON objects within
+    /// the `HashMap<String, serde_json::Value>`.
     #[test]
     fn custom_code_nested_input_values() {
         let toml = r#"
@@ -326,6 +330,8 @@ pub fn load() -> Result<WorkspaceConfig> {
         }
     }
 
+    /// An empty `[benchmarks.x.input]` TOML section should deserialize as an empty
+    /// `HashMap`, not fail or become `None`.
     #[test]
     fn custom_code_empty_input_table() {
         let toml = r#"

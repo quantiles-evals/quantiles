@@ -125,6 +125,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
 mod tests {
     use super::*;
 
+    /// Resuming a run whose status is `completed` must be rejected before any execution
+    /// begins, because a completed run cannot be meaningfully resumed.
     #[test]
     fn plan_resume_completed_run_errors() {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
@@ -137,6 +139,8 @@ mod tests {
         assert!(err.to_string().contains("already completed"));
     }
 
+    /// A builtin benchmark with a valid config section should plan to resume as a builtin,
+    /// using the stored input from the database.
     #[test]
     fn plan_resume_builtin_with_config() {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
@@ -149,12 +153,16 @@ mod tests {
         assert!(matches!(plan, ResumePlan::Builtin));
     }
 
+    /// A builtin benchmark that has no config section can still be resumed by name lookup,
+    /// falling back to the hardcoded builtin registry.
     #[test]
     fn plan_resume_builtin_without_config() {
         let plan = plan_resume("pubmedqa", &RunStatus::Failed, None).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
     }
 
+    /// A `custom_code` benchmark with a config section should plan to resume by re-running
+    /// the command array from the config file with the stored DB input.
     #[test]
     fn plan_resume_custom_code_with_config() {
         let bench =
@@ -167,18 +175,24 @@ mod tests {
         assert!(matches!(&plan, ResumePlan::CustomCode(cmd) if cmd == &["python", "eval.py"]));
     }
 
+    /// A `custom_code` benchmark without a config section cannot be resumed because the
+    /// CLI has no source of truth for what command to execute.
     #[test]
     fn plan_resume_custom_code_without_config_errors() {
         let err = plan_resume("my-eval", &RunStatus::Failed, None).unwrap_err();
         assert!(err.to_string().contains("no config section found"));
     }
 
+    /// An unknown workflow name with neither a config section nor a builtin match must
+    /// fail immediately with a clear "no config section found" message.
     #[test]
     fn plan_resume_unknown_without_config_errors() {
         let err = plan_resume("unknown-eval", &RunStatus::Failed, None).unwrap_err();
         assert!(err.to_string().contains("no config section found"));
     }
 
+    /// Even when a config section is present, it must pass `validate()` before resume
+    /// proceeds, so invalid configs (e.g. empty command) are caught early.
     #[test]
     fn plan_resume_validates_config() {
         let bench =
