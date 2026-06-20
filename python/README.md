@@ -5,10 +5,12 @@ Python SDK for the [quantiles](https://quantiles.io) local AI workload observabi
 ## Installation
 
 ```bash
-uv pip install -e ".[dev]"
+uv pip install quantiles
 ```
 
 ## Usage
+
+To build a custom eval with Python, use the below code. To ensure this eval is runnable with `qt run`, set up a `quantiles.toml` configuration file. See [`../CONFIG.md`](../CONFIG.md) for details.
 
 ```python
 import asyncio
@@ -28,6 +30,8 @@ my_workflow = workflow("demo", handler)
 if __name__ == "__main__":
     entrypoint(my_workflow)
 ```
+
+In local development, the SDK executes user code locally. The `qt` server deduplicates steps, triggers workflows, owns durable state, stored outputs, observability records, and metrics.
 
 ## Development
 

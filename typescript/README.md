@@ -2,6 +2,16 @@
 
 TypeScript client for the local Quantiles eval runner.
 
+## Installation
+
+```bash
+bun install quantiles
+```
+
+## Usage
+
+To build a custom eval with TypeScript, use the below code. To ensure this eval is runnable with `qt run`, set up a `quantiles.toml` configuration file. See [`../CONFIG.md`](../CONFIG.md) for details.
+
 ```ts
 import { QuantilesClient } from "@quantiles/sdk";
 
