@@ -151,13 +151,13 @@ pub fn load() -> Result<WorkspaceConfig> {
 }
 
 #[cfg(test)]
-    #[expect(clippy::needless_raw_string_hashes)]
-    mod tests {
+#[expect(clippy::needless_raw_string_hashes)]
+mod tests {
     use super::*;
 
     #[test]
     fn deserialize_builtin_without_type() {
-         let toml = r#"
+        let toml = r#"
             [benchmarks.demo]
             samples = 10
         "#;
