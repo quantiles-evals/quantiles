@@ -28,19 +28,10 @@ async fn async_main(process_start: Instant) -> Result<()> {
         cli::Command::Run {
             workflow_name,
             input,
-            resume,
             json,
-            command,
-        } => {
-            commands::run(
-                &workflow_name,
-                input.as_deref(),
-                resume,
-                json,
-                &command,
-                process_start,
-            )
-            .await
+        } => commands::run(&workflow_name, input.as_deref(), json, process_start).await,
+        cli::Command::Resume { run_id, json } => {
+            commands::resume(run_id, json, process_start).await
         }
         cli::Command::Serve { addr } => commands::serve(&addr).await,
         cli::Command::Show { run_id, json } => commands::show(run_id, json).await,

@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use comfy_table::{Cell, ContentArrangement, Table, presets::NOTHING};
+use sea_orm::DatabaseConnection;
 use serde::Serialize;
 
 use qt::builtins;
@@ -16,25 +17,247 @@ use qt::db::MetricPointSummary;
 use qt::metrics_store::MetricsStore;
 use qt::server::{self, ServerConfig};
 
-#[expect(clippy::too_many_lines)]
 pub async fn run(
     workflow_name: &str,
-    input: Option<&str>,
-    resume: Option<i64>,
+    cli_input: Option<&str>,
     json: bool,
-    command: &[String],
     process_start: Instant,
 ) -> Result<()> {
-    if command.is_empty() {
-        if builtins::resolve(workflow_name).is_some() {
-            return run_builtin(workflow_name, input, resume, json, process_start).await;
+    let config = qt::config::load()?;
+
+    let bench_config = config.benchmarks.get(workflow_name);
+
+    match bench_config {
+        Some(bench) => {
+            bench.validate()?;
+            match bench {
+                qt::config::BenchmarkConfig::Builtin(b) => {
+                    let (effective_input, _) = assemble_builtin_input(Some(b), cli_input);
+                    run_builtin_workflow(
+                        workflow_name,
+                        effective_input.as_deref(),
+                        json,
+                        process_start,
+                    )
+                    .await
+                }
+                qt::config::BenchmarkConfig::CustomCode(c) => {
+                    let (merged_input, overridden_keys) =
+                        merge_inputs(c.input.as_ref(), cli_input)?;
+                    let warning = if overridden_keys.is_empty() {
+                        None
+                    } else {
+                        Some(format!(
+                            "--input overrides config input for keys: {}",
+                            overridden_keys.join(", ")
+                        ))
+                    };
+                    let command = &c.command;
+
+                    let cwd = std::env::current_dir()?;
+                    let root = db::resolve_workspace_root(&cwd, true).await?;
+                    let db = db::open_workspace(&root).await?;
+                    let run_id =
+                        db::create_run(&db, workflow_name, merged_input.as_deref()).await?;
+
+                    if !json {
+                        println!("Created run {run_id}");
+                    }
+
+                    execute_custom(
+                        run_id,
+                        workflow_name,
+                        merged_input.as_deref(),
+                        command,
+                        json,
+                        process_start,
+                        warning.as_deref(),
+                    )
+                    .await
+                }
+            }
         }
-        bail!("no command provided and `{workflow_name}` is not a builtin eval");
+        None => {
+            if builtins::resolve(workflow_name).is_some() {
+                let (effective_input, _) = assemble_builtin_input(None, cli_input);
+                run_builtin_workflow(
+                    workflow_name,
+                    effective_input.as_deref(),
+                    json,
+                    process_start,
+                )
+                .await
+            } else {
+                bail!("no config section found for benchmark `{workflow_name}`");
+            }
+        }
+    }
+}
+
+fn assemble_builtin_input(
+    bench: Option<&qt::config::BuiltinBenchmarkConfig>,
+    cli_input: Option<&str>,
+) -> (Option<String>, Vec<String>) {
+    if let Some(cli_str) = cli_input {
+        return (Some(cli_str.to_owned()), Vec::new());
     }
 
+    if let Some(bench) = bench {
+        if bench.samples.is_none() && bench.model.is_none() && bench.max_workers.is_none() {
+            return (None, Vec::new());
+        }
+
+        let input = BuiltinConfigInput {
+            limit: bench.samples,
+            model: bench.model.clone(),
+            max_workers: bench.max_workers,
+        };
+
+        let json =
+            serde_json::to_string(&input).expect("infallible serialization of BuiltinConfigInput");
+
+        (Some(json), Vec::new())
+    } else {
+        (None, Vec::new())
+    }
+}
+
+fn merge_inputs(
+    config_input: Option<&HashMap<String, serde_json::Value>>,
+    cli_input: Option<&str>,
+) -> Result<(Option<String>, Vec<String>)> {
+    let mut merged = match config_input {
+        Some(v) => serde_json::Value::Object(v.clone().into_iter().collect()),
+        None => serde_json::Value::Object(serde_json::Map::default()),
+    };
+
+    let mut overridden = Vec::new();
+
+    if let Some(cli_str) = cli_input {
+        let cli_json: serde_json::Value =
+            serde_json::from_str(cli_str).with_context(|| "failed to parse --input as JSON")?;
+
+        if let Some(cli_obj) = cli_json.as_object()
+            && let Some(merged_obj) = merged.as_object_mut()
+        {
+            for (key, value) in cli_obj {
+                if merged_obj.contains_key(key) {
+                    overridden.push(key.clone());
+                }
+                merged_obj.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    if merged.as_object().is_some_and(serde_json::Map::is_empty) {
+        Ok((None, overridden))
+    } else {
+        Ok((Some(serde_json::to_string(&merged)?), overridden))
+    }
+}
+
+async fn run_builtin_workflow(
+    workflow_name: &str,
+    input: Option<&str>,
+    json: bool,
+    process_start: Instant,
+) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = db::resolve_workspace_root(&cwd, true).await?;
+    let db = db::open_workspace(&root).await?;
+    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
 
+    let run_id = db::create_run(&db, workflow_name, input).await?;
+    if !json {
+        println!("Created run {run_id}");
+    }
+
+    execute_builtin(
+        &db,
+        &metrics_store,
+        run_id,
+        workflow_name,
+        input,
+        json,
+        process_start,
+    )
+    .await
+}
+
+pub async fn execute_builtin(
+    db: &DatabaseConnection,
+    metrics_store: &MetricsStore,
+    run_id: i64,
+    workflow_name: &str,
+    input: Option<&str>,
+    json: bool,
+    process_start: Instant,
+) -> Result<()> {
+    let builtin = builtins::resolve(workflow_name)
+        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
+
+    let builtin_result = builtin
+        .execute(builtins::BuiltinContext {
+            db,
+            metrics_store,
+            run_id,
+            workflow_name,
+            input,
+            quiet: json,
+        })
+        .await;
+
+    let duration = process_start.elapsed();
+
+    match &builtin_result {
+        Ok(()) => {
+            db::complete_run(db, metrics_store, run_id).await?;
+            if !json {
+                println!(
+                    "Run {run_id} completed successfully in {:.2}s",
+                    duration.as_secs_f64()
+                );
+            }
+        }
+        Err(err) => {
+            let msg = format!("{err:#}");
+            db::fail_run(db, metrics_store, run_id, &msg).await?;
+            if !json {
+                println!("Run {run_id} failed: {msg}");
+            }
+        }
+    }
+
+    let aggregate = metrics_store.list_aggregate_for_run(run_id).await?;
+
+    if json {
+        let metrics_map: HashMap<String, f64> = aggregate
+            .iter()
+            .map(|m| (m.metric_name.clone(), m.metric_value))
+            .collect();
+        let output = BuiltinRunJsonOutput {
+            aggregate_metrics: metrics_map,
+            run_id,
+            warning: None,
+        };
+        println!("{}", serde_json::to_string(&output)?);
+    } else {
+        print_aggregate_metrics_table(&aggregate);
+        println!("\nRun `qt show {run_id} --verbose` for sample-level details.");
+    }
+
+    builtin_result
+}
+
+pub async fn execute_custom(
+    run_id: i64,
+    workflow_name: &str,
+    input: Option<&str>,
+    command: &[String],
+    json: bool,
+    process_start: Instant,
+    warning: Option<&str>,
+) -> Result<()> {
     let base_url =
         std::env::var("QUANTILES_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8765".to_owned());
     let addr = base_url
@@ -43,6 +266,8 @@ pub async fn run(
 
     let server_started_by_us = !is_server_reachable(addr);
     let server_handle = if server_started_by_us {
+        let cwd = std::env::current_dir()?;
+        let root = db::resolve_workspace_root(&cwd, true).await?;
         let db_path = db::workspace_db_path(&root);
         Some(start_background_server(addr, json, db_path)?)
     } else {
@@ -50,29 +275,6 @@ pub async fn run(
     };
 
     wait_for_health(&base_url)?;
-
-    let db = db::open_workspace(&root).await?;
-
-    let run_id = if let Some(existing_run_id) = resume {
-        let run = db::get_run(&db, existing_run_id).await?;
-        if run.status == db::RunStatus::Completed {
-            bail!(
-                "run {existing_run_id} is already completed; \
-                 create a new run or resume a running/failed one"
-            );
-        }
-        db::resume_run(&db, existing_run_id).await?;
-        if !json {
-            println!("Resuming eval run {existing_run_id} ({workflow_name})");
-        }
-        existing_run_id
-    } else {
-        let new_run_id = db::create_run(&db, workflow_name, input).await?;
-        if !json {
-            println!("Created run {new_run_id}");
-        }
-        new_run_id
-    };
 
     if !json {
         println!("Executing: {}", command.join(" "));
@@ -123,7 +325,7 @@ pub async fn run(
             run_id,
             workflow_name,
             input,
-            resumed: resume.is_some(),
+            warning,
             command,
             base_url: &base_url,
             server_started_by_us,
@@ -139,121 +341,6 @@ pub async fn run(
     }
 
     Ok(())
-}
-
-async fn run_builtin(
-    workflow_name: &str,
-    input: Option<&str>,
-    resume: Option<i64>,
-    json: bool,
-    process_start: Instant,
-) -> Result<()> {
-    let cwd = std::env::current_dir()?;
-    let root = db::resolve_workspace_root(&cwd, true).await?;
-
-    let config = qt::config::load()?;
-    let config_input: Option<String> = if input.is_none() {
-        config.benchmarks.get(workflow_name).and_then(|bench| {
-            if bench.samples.is_none() && bench.model.is_none() && bench.max_workers.is_none() {
-                return None;
-            }
-            let input = BuiltinConfigInput {
-                limit: bench.samples,
-                model: bench.model.clone(),
-                max_workers: bench.max_workers,
-            };
-            Some(
-                serde_json::to_string(&input)
-                    .expect("infallible serialization of BuiltinConfigInput"),
-            )
-        })
-    } else {
-        None
-    };
-
-    let effective_input: Option<&str> = if input.is_some() {
-        input
-    } else {
-        config_input.as_deref()
-    };
-
-    let db = db::open_workspace(&root).await?;
-    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
-
-    let run_id = if let Some(existing_run_id) = resume {
-        let run = db::get_run(&db, existing_run_id).await?;
-        if run.status == db::RunStatus::Completed {
-            bail!(
-                "run {existing_run_id} is already completed; \
-                 create a new run or resume a running/failed one"
-            );
-        }
-        db::resume_run(&db, existing_run_id).await?;
-        if !json {
-            println!("Resuming eval run {existing_run_id} ({workflow_name})");
-        }
-        existing_run_id
-    } else {
-        let new_run_id = db::create_run(&db, workflow_name, effective_input).await?;
-        if !json {
-            println!("Created run {new_run_id}");
-        }
-        new_run_id
-    };
-
-    let builtin = builtins::resolve(workflow_name)
-        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
-
-    let builtin_result = builtin
-        .execute(builtins::BuiltinContext {
-            db: &db,
-            metrics_store: &metrics_store,
-            run_id,
-            workflow_name,
-            input: effective_input,
-            quiet: json,
-        })
-        .await;
-
-    let duration = process_start.elapsed();
-
-    match &builtin_result {
-        Ok(()) => {
-            db::complete_run(&db, &metrics_store, run_id).await?;
-            if !json {
-                println!(
-                    "Run {run_id} completed successfully in {:.2}s",
-                    duration.as_secs_f64()
-                );
-            }
-        }
-        Err(err) => {
-            let msg = format!("{err:#}");
-            db::fail_run(&db, &metrics_store, run_id, &msg).await?;
-            if !json {
-                println!("Run {run_id} failed: {msg}");
-            }
-        }
-    }
-
-    let aggregate = metrics_store.list_aggregate_for_run(run_id).await?;
-
-    if json {
-        let metrics_map: HashMap<String, f64> = aggregate
-            .iter()
-            .map(|m| (m.metric_name.clone(), m.metric_value))
-            .collect();
-        let output = BuiltinRunJsonOutput {
-            aggregate_metrics: metrics_map,
-            run_id,
-        };
-        println!("{}", serde_json::to_string(&output)?);
-    } else {
-        print_aggregate_metrics_table(&aggregate);
-        println!("\nRun `qt show {run_id} --verbose` for sample-level details.");
-    }
-
-    builtin_result
 }
 
 fn print_aggregate_metrics_table(metrics: &[MetricPointSummary]) {
@@ -286,6 +373,8 @@ fn print_aggregate_metrics_table(metrics: &[MetricPointSummary]) {
 struct BuiltinRunJsonOutput {
     aggregate_metrics: HashMap<String, f64>,
     run_id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<String>,
 }
 
 /// Config input shape auto-generated from `quantiles.toml` `[benchmarks.*]`.
@@ -318,8 +407,9 @@ struct RunJsonOutput<'a> {
     workflow_name: &'a str,
     /// Structured run input, if one was provided.
     input: Option<&'a str>,
-    /// Whether this command resumed an existing run.
-    resumed: bool,
+    /// Warning about overridden config input keys.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<&'a str>,
     /// User command and arguments that were executed.
     command: &'a [String],
     /// Local qt API base URL injected into the child process.
@@ -465,4 +555,117 @@ fn start_background_server(
     });
 
     Ok((handle, shutdown_tx))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::json;
+
+    /// When only config input is present and no `--input` CLI flag is given, the result
+    /// should be the exact config object with no overridden keys.
+    #[test]
+    fn merge_inputs_config_only() {
+        let mut config = HashMap::new();
+        config.insert("foo".to_owned(), json!("bar"));
+        let (result, overridden) = super::merge_inputs(Some(&config), None).unwrap();
+        assert_eq!(result, Some(r#"{"foo":"bar"}"#.to_owned()));
+        assert!(overridden.is_empty());
+    }
+
+    /// When only a `--input` CLI flag is given with no config input, the result should be
+    /// the parsed CLI JSON object with no overridden keys.
+    #[test]
+    fn merge_inputs_cli_only() {
+        let (result, overridden) = super::merge_inputs(None, Some(r#"{"x":1}"#)).unwrap();
+        assert_eq!(result, Some(r#"{"x":1}"#.to_owned()));
+        assert!(overridden.is_empty());
+    }
+
+    /// When both config and CLI inputs specify the same key, the CLI value should win and
+    /// the key should be recorded in the overridden list for the warning.
+    #[test]
+    fn merge_inputs_both_with_overlap() {
+        let mut config = HashMap::new();
+        config.insert("foo".to_owned(), json!("old"));
+        config.insert("bar".to_owned(), json!("baz"));
+
+        let (result, overridden) =
+            super::merge_inputs(Some(&config), Some(r#"{"foo":"new"}"#)).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(result.as_ref().unwrap()).unwrap();
+        assert_eq!(parsed["foo"], "new");
+        assert_eq!(parsed["bar"], "baz");
+        assert_eq!(overridden, vec!["foo"]);
+    }
+
+    /// Passing a non-JSON string to `--input` should produce a clear error so the user
+    /// knows their CLI argument is malformed.
+    #[test]
+    fn merge_inputs_cli_invalid_json() {
+        let err = super::merge_inputs(None, Some("not json")).unwrap_err();
+        assert!(err.to_string().contains("failed to parse --input as JSON"));
+    }
+
+    /// When neither config nor CLI provides any input keys, the merged result should be
+    /// `None` so the run stores no input JSON.
+    #[test]
+    fn merge_inputs_both_empty() {
+        let (result, overridden) = super::merge_inputs(None, None).unwrap();
+        assert!(result.is_none());
+        assert!(overridden.is_empty());
+    }
+
+    /// A `--input` CLI flag should take precedence over any config fields, returning the
+    /// raw CLI string directly without assembling a config-based JSON object.
+    #[test]
+    fn assemble_builtin_input_with_cli_override() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: Some(10),
+            model: None,
+            max_workers: None,
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), Some(r#"{"model":"x"}"#));
+        assert_eq!(input, Some(r#"{"model":"x"}"#.to_owned()));
+    }
+
+    /// When no `--input` is given but the config has builtin fields, they should be
+    /// assembled into a `BuiltinConfigInput` JSON object with the correct key names.
+    #[test]
+    fn assemble_builtin_input_from_config() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: Some(5),
+            model: Some(qt::llm::Sampler::Random {}),
+            max_workers: Some(8),
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
+        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
+        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["model"], "random");
+        assert_eq!(parsed["max_workers"], 8);
+    }
+
+    /// When the builtin config section exists but has no runtime-relevant fields, the
+    /// input should be `None` rather than an empty JSON object.
+    #[test]
+    fn assemble_builtin_input_none_when_no_config_fields() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: None,
+            model: None,
+            max_workers: None,
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
+        assert!(input.is_none());
+    }
+
+    /// When there is no config section at all and no CLI `--input`, builtin runs should
+    /// proceed with no input JSON stored in the database.
+    #[test]
+    fn assemble_builtin_input_none_when_no_bench() {
+        let (input, _) = super::assemble_builtin_input(None, None);
+        assert!(input.is_none());
+    }
 }

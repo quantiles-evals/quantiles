@@ -69,9 +69,37 @@ qt compare <run_id_a> <run_id_b>
 
 To learn more detail about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
 
-### Customization
+### Configuration file and customization
 
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
+You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory.
+
+For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
+
+```toml
+[benchmarks.pubmedqa]
+samples = 50
+model = "openai:gpt-5.4-nano"
+max_workers = 100
+```
+
+For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run:
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+foo = "foo_val"
+bar = "bar_val"
+```
+
+The CLI will execute the command with `QUANTILES_RUN_ID`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT` environment variables injected. If the run fails, you can resume it later with `qt resume <run_id>`.
+
+See the following resources for more details:
+
+- [`CONFIG.md`](./CONFIG.md) - in-depth guides to configuration and reference
+- [`./cli/examples/configs`](./cli/examples/configs) - complete examples, including a [custom code benchmark example](./cli/examples/configs/custom_code/quantiles.toml)
 
 ## Local-First and Offline by Default
 
@@ -101,6 +129,19 @@ Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) fo
 ## Custom Evaluations
 
 A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) or [TypeScript](https://quantiles.io/documentation/reference/typescript-sdk) program that is run by the `qt` CLI and uses the [Quantiles API](https://quantiles.io/documentation/reference/rest-api) to execute an eval. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
+
+Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+dataset = "my_dataset.jsonl"
+```
+
+Run the evaluation with `qt run my-eval`. If it fails, resume it later with `qt resume <run_id>` — the CLI re-reads the command and stored input automatically.
 
 Use custom evaluations when you need to measure behavior that is specific to your product, workflow, prompt, dataset, rubric, or release process.
 

@@ -1,0 +1,26 @@
+# This config file demonstrates running a custom evaluation with `qt run`.
+#
+# Custom benchmarks use `type = "custom_code"` and must specify a `command`
+# that the CLI will execute. The `input` table is optional and its keys are
+# passed to the child process via the `QUANTILES_INPUT` environment variable
+# as a JSON object.
+#
+# Usage from this directory:
+#
+#   qt run my-eval
+#
+# This will run the command below, injecting `QUANTILES_RUN_ID`,
+# `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT`
+# into the child environment.
+#
+# If the run fails, you can resume it later with only the run ID:
+#
+#   qt resume <run_id>
+#
+# The CLI will look up the stored workflow name and input from the database,
+# then re-read the command from this config file.
+
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+input = {foo = "foo_val", bar = "bar_val"}

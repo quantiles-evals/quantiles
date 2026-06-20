@@ -16,9 +16,12 @@ A few commands to see `qt` in action:
 # 1. Initialize a workspace
 qt init
 
-# 2. Run an eval — Quantiles auto-starts a local server, records the run, and tears the server
-# down when the command finishes.
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+# 2. Run a built-in eval
+# 
+# Note that you can also build and run your own custom evals
+# with the `qt` CLI. See the below "Custom evaluations" section
+# for details.
+qt run pubmedqa
 
 # 3. List and inspect what happened
 qt list
@@ -27,16 +30,66 @@ qt show 1
 
 >See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
+### Custom evaluations
+
+Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed in the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+input = {dataset = "my_dataset.jsonl"}
+```
+
+```bash
+# Run the custom evaluation
+qt run my-eval
+
+# If it fails, resume with only the run ID
+qt resume <run_id>
+```
+
+See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_code/quantiles.toml) for a complete working example.
+
+## Configuration files and customization
+
+You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file.
+
+For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
+
+```toml
+[benchmarks.pubmedqa]
+samples = 50
+model = "openai:gpt-5.4-nano"
+max_workers = 100
+```
+
+For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as `QUANTILES_INPUT`.
+
+```toml
+[benchmarks.my-eval]
+type = "custom_code"
+command = ["python", "my_eval.py"]
+
+[benchmarks.my-eval.input]
+foo = "foo_val"
+```
+
+See [`./examples/configs`](./examples/configs) for complete working examples.
+
+>Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+
+
 ### Comparing runs
 
 After iterating on an eval, you can compare two runs to see exactly what changed:
 
 ```bash
 # Run A — baseline
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+qt run my-eval
 
 # Run B — your latest iteration
-qt run my-eval -- bun run sdk/typescript/examples/run_demo.ts
+qt run my-eval
 
 # See what changed between them
 qt compare 1 2
@@ -81,9 +134,3 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 - **Client** (your script) owns code execution: the server never runs your logic
   - Note that the CLI itself also has built-in benchmarks, which do not involve your code
 - **CLI** reads the same SQLite database the server writes to
-
-## Customization
-
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. This file can be used to control benchmark execution behavior as well as customize the models, providers, and other settings used during eval runs. See [`./cli/examples/configs`](./cli/examples/configs) for examples and more details.
-
->Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
