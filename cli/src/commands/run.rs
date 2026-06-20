@@ -556,3 +556,99 @@ fn start_background_server(
 
     Ok((handle, shutdown_tx))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::json;
+
+    #[test]
+    fn merge_inputs_config_only() {
+        let mut config = HashMap::new();
+        config.insert("foo".to_owned(), json!("bar"));
+        let (result, overridden) = super::merge_inputs(Some(&config), None).unwrap();
+        assert_eq!(result, Some(r#"{"foo":"bar"}"#.to_owned()));
+        assert!(overridden.is_empty());
+    }
+
+    #[test]
+    fn merge_inputs_cli_only() {
+        let (result, overridden) = super::merge_inputs(None, Some(r#"{"x":1}"#)).unwrap();
+        assert_eq!(result, Some(r#"{"x":1}"#.to_owned()));
+        assert!(overridden.is_empty());
+    }
+
+    #[test]
+    fn merge_inputs_both_with_overlap() {
+        let mut config = HashMap::new();
+        config.insert("foo".to_owned(), json!("old"));
+        config.insert("bar".to_owned(), json!("baz"));
+
+        let (result, overridden) =
+            super::merge_inputs(Some(&config), Some(r#"{"foo":"new"}"#)).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(result.as_ref().unwrap()).unwrap();
+        assert_eq!(parsed["foo"], "new");
+        assert_eq!(parsed["bar"], "baz");
+        assert_eq!(overridden, vec!["foo"]);
+    }
+
+    #[test]
+    fn merge_inputs_cli_invalid_json() {
+        let err = super::merge_inputs(None, Some("not json")).unwrap_err();
+        assert!(err.to_string().contains("failed to parse --input as JSON"));
+    }
+
+    #[test]
+    fn merge_inputs_both_empty() {
+        let (result, overridden) = super::merge_inputs(None, None).unwrap();
+        assert!(result.is_none());
+        assert!(overridden.is_empty());
+    }
+
+    #[test]
+    fn assemble_builtin_input_with_cli_override() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: Some(10),
+            model: None,
+            max_workers: None,
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), Some(r#"{"model":"x"}"#));
+        assert_eq!(input, Some(r#"{"model":"x"}"#.to_owned()));
+    }
+
+    #[test]
+    fn assemble_builtin_input_from_config() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: Some(5),
+            model: Some(qt::llm::Sampler::Random {}),
+            max_workers: Some(8),
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
+        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
+        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["model"], "random");
+        assert_eq!(parsed["max_workers"], 8);
+    }
+
+    #[test]
+    fn assemble_builtin_input_none_when_no_config_fields() {
+        let bench = qt::config::BuiltinBenchmarkConfig {
+            type_: "builtin".to_owned(),
+            samples: None,
+            model: None,
+            max_workers: None,
+        };
+        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
+        assert!(input.is_none());
+    }
+
+    #[test]
+    fn assemble_builtin_input_none_when_no_bench() {
+        let (input, _) = super::assemble_builtin_input(None, None);
+        assert!(input.is_none());
+    }
+}
+
