@@ -1,3 +1,10 @@
+"""
+This file demonstrates how to implement a custom Quantiles eval using PubMedQA.
+
+Although PubMedQA is available as a built-in benchmark in the `qt` CLI, this example is not used by
+the built-in implementation.
+"""
+
 import hashlib
 import re
 from collections.abc import Awaitable, Callable
