@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
-from quantiles.datasets import Dataset, _HttpCliSource
+from quantiles.datasets import Dataset, _HttpCliSource, dataset
 from quantiles.types import JsonValue, QuantilesError
 from quantiles.workflow_context import WorkflowContext
 
@@ -135,6 +135,39 @@ class TestHttpCliSource:
 
     assert len(rows) == 2
     assert rows[0]["name"] == "a"
+
+
+class TestDatasetHelper:
+  @pytest.mark.asyncio
+  async def test_accepts_custom_source(self) -> None:
+    rows = [{"id": 1, "name": "alice"}]
+    ctx = _make_mock_ctx()
+    ds = await dataset(
+      ctx,
+      source=_FakeSource(rows),
+      row_type=_SampleRow,
+      batch_size=10,
+    )
+
+    collected = []
+    async for row in ds.iter_rows():
+      collected.append(row)
+
+    assert len(collected) == 1
+    assert collected[0].id == 1
+    assert collected[0].name == "alice"
+
+  @pytest.mark.asyncio
+  async def test_rejects_huggingface_options_for_custom_source(self) -> None:
+    ctx = _make_mock_ctx()
+
+    with pytest.raises(QuantilesError, match="only supported for Hugging Face"):
+      await dataset(
+        ctx,
+        source=_FakeSource([]),
+        row_type=_SampleRow,
+        config="cfg",
+      )
 
 
 class TestDatasetIterator:

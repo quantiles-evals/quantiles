@@ -209,7 +209,7 @@ class Dataset[RowT: BaseModel]:
 
 async def dataset[RowT: BaseModel](
   ctx: WorkflowContext,
-  source: str,
+  source: str | DatasetSource,
   row_type: type[RowT],
   *,
   batch_size: int = 100,
@@ -221,13 +221,28 @@ async def dataset[RowT: BaseModel](
   max_rows: int | None = None,
   # **kwargs: JsonValue,
 ) -> Dataset[RowT]:
-  ds_source: DatasetSource = _HttpCliSource(
-    base_url=ctx.client.base_url,
-    source=source,
-    config=config,
-    split=split,
-    revision=revision,
-  )
+  if isinstance(source, str):
+    ds_source: DatasetSource = _HttpCliSource(
+      base_url=ctx.client.base_url,
+      source=source,
+      config=config,
+      split=split,
+      revision=revision,
+    )
+    init_input: dict[str, JsonValue] = {
+      "source": source,
+      "batch_size": batch_size,
+    }
+  else:
+    if config is not None or split is not None or revision is not None:
+      raise QuantilesError(
+        "config, split, and revision are only supported for Hugging Face dataset URI sources"
+      )
+    ds_source = source
+    init_input = {
+      "source": ds_source.source_id,
+      "batch_size": batch_size,
+    }
 
   ds = Dataset(
     ctx,
@@ -239,10 +254,6 @@ async def dataset[RowT: BaseModel](
     max_rows,
   )
 
-  init_input: dict[str, JsonValue] = {
-    "source": source,
-    "batch_size": batch_size,
-  }
   await step(
     ctx,
     step_key="dataset-init",
