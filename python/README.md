@@ -33,6 +33,24 @@ if __name__ == "__main__":
 
 In local development, the SDK executes user code locally. The `qt` server deduplicates steps, triggers workflows, owns durable state, stored outputs, observability records, and metrics.
 
+## Datasets
+
+Use `quantiles.toml` input for configuration, then construct dataset loading behavior in code. For example, pass `dataset_path = "my_data.jsonl"` in config, read `input_value["dataset_path"]` in the workflow handler, and either open that file directly or pass it into a custom `DatasetSource`.
+
+Hugging Face datasets can be loaded by passing a URI string to `dataset(...)`:
+
+```python
+ds = await dataset(
+    ctx,
+    source="huggingface://quantiles/PubMedQA",
+    row_type=Row,
+    config="pqa_labeled",
+    split="train",
+)
+```
+
+For non-Hugging Face public or private sources, implement `DatasetSource` and pass an instance as `source`. Custom sources run inside the Python workflow process, while batch loading is still recorded through Quantiles steps.
+
 ## Development
 
 Run tests:

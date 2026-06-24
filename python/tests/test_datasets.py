@@ -22,12 +22,14 @@ class _FakeSource:
 
   def __init__(self, rows: Sequence[Mapping[str, object]]) -> None:
     self._rows: list[dict[str, JsonValue]] = [cast(dict[str, JsonValue], dict(row)) for row in rows]
+    self.initialize_calls = 0
 
   @property
   def source_id(self) -> str:
     return "fake:source"
 
   async def initialize(self) -> JsonValue:
+    self.initialize_calls += 1
     return cast(JsonValue, {"total_rows": len(self._rows)})
 
   async def load_batch(self, offset: int, batch_size: int) -> list[dict[str, JsonValue]]:
@@ -52,6 +54,32 @@ def _make_mock_ctx() -> WorkflowContext:
 
   mock_client.run_step = fake_run_step
   return WorkflowContext(run_id=1, workflow_name="test", client=mock_client)
+
+
+def _make_cached_init_ctx(
+  init_metadata: JsonValue,
+) -> tuple[WorkflowContext, list[tuple[str, JsonValue | None]]]:
+  """Create a mock context that reuses dataset-init and executes other steps."""
+  mock_client = AsyncMock()
+  mock_client.base_url = "http://test:8765"
+  step_inputs: list[tuple[str, JsonValue | None]] = []
+
+  async def fake_run_step(
+    *,
+    run_id: int,
+    step_key: str,
+    input_value: JsonValue | None = None,
+    execute: Callable[[], Awaitable[JsonValue]] | None = None,
+  ) -> JsonValue:
+    step_inputs.append((step_key, input_value))
+    if step_key == "dataset-init":
+      return init_metadata
+    if execute is not None:
+      return await execute()
+    return cast(JsonValue, [])
+
+  mock_client.run_step = fake_run_step
+  return WorkflowContext(run_id=1, workflow_name="test", client=mock_client), step_inputs
 
 
 def _make_mock_aiohttp(resp: AsyncMock) -> MagicMock:
@@ -99,6 +127,31 @@ class TestHttpCliSource:
     assert src._resolved_split == "test"
     assert src.source_id == "hf:huggingface://quantiles/PubMedQA:pqa_labeled:test"
 
+  def test_apply_init_metadata_parses_cached_response(self) -> None:
+    src = _HttpCliSource("http://test:8765", "huggingface://quantiles/PubMedQA")
+
+    src._apply_init_metadata(
+      cast(
+        JsonValue,
+        {
+          "total_rows": 1000,
+          "available_splits": ["train", "test"],
+          "selected_split": "test",
+          "config": "pqa_labeled",
+        },
+      )
+    )
+
+    assert src._resolved_config == "pqa_labeled"
+    assert src._resolved_split == "test"
+    assert src.source_id == "hf:huggingface://quantiles/PubMedQA:pqa_labeled:test"
+
+  def test_apply_init_metadata_rejects_invalid_response(self) -> None:
+    src = _HttpCliSource("http://test:8765", "huggingface://quantiles/PubMedQA")
+
+    with pytest.raises(QuantilesError, match="invalid config metadata"):
+      src._apply_init_metadata(cast(JsonValue, {"config": 123, "selected_split": "test"}))
+
   @pytest.mark.asyncio
   async def test_initialize_raises_on_error(self) -> None:
     src = _HttpCliSource("http://test:8765", "huggingface://bad")
@@ -138,6 +191,93 @@ class TestHttpCliSource:
 
 
 class TestDatasetHelper:
+  @pytest.mark.asyncio
+  async def test_hydrates_huggingface_source_from_cached_init(self) -> None:
+    ctx, _step_inputs = _make_cached_init_ctx(
+      cast(
+        JsonValue,
+        {
+          "total_rows": 1000,
+          "available_splits": ["train", "test"],
+          "selected_split": "test",
+          "config": "pqa_labeled",
+        },
+      )
+    )
+    ds = await dataset(
+      ctx,
+      source="huggingface://quantiles/PubMedQA",
+      row_type=_SampleRow,
+      batch_size=10,
+    )
+
+    assert isinstance(ds._source, _HttpCliSource)
+    assert ds._source._resolved_config == "pqa_labeled"
+    assert ds._source._resolved_split == "test"
+
+  @pytest.mark.asyncio
+  async def test_huggingface_init_input_includes_source_options(self) -> None:
+    ctx, step_inputs = _make_cached_init_ctx(
+      cast(
+        JsonValue,
+        {
+          "total_rows": 1000,
+          "available_splits": ["train", "test"],
+          "selected_split": "test",
+          "config": "pqa_labeled",
+        },
+      )
+    )
+
+    _ds = await dataset(
+      ctx,
+      source="huggingface://quantiles/PubMedQA",
+      row_type=_SampleRow,
+      batch_size=10,
+      config="pqa_labeled",
+      split="test",
+      revision="abc123",
+      max_rows=20,
+    )
+
+    assert step_inputs[0] == (
+      "dataset-init",
+      cast(
+        JsonValue,
+        {
+          "source": "huggingface://quantiles/PubMedQA",
+          "config": "pqa_labeled",
+          "split": "test",
+          "revision": "abc123",
+        },
+      ),
+    )
+
+  @pytest.mark.asyncio
+  async def test_custom_source_initialize_runs_when_init_step_is_cached(self) -> None:
+    source = _FakeSource([{"id": 1, "name": "alice"}])
+    ctx, step_inputs = _make_cached_init_ctx(cast(JsonValue, {"total_rows": 1}))
+
+    ds = await dataset(
+      ctx,
+      source=source,
+      row_type=_SampleRow,
+      batch_size=10,
+    )
+
+    assert source.initialize_calls == 1
+    assert step_inputs[0] == (
+      "dataset-init",
+      cast(JsonValue, {"source": "fake:source"}),
+    )
+
+    collected = []
+    async for row in ds.iter_rows():
+      collected.append(row)
+
+    assert len(collected) == 1
+    assert collected[0].name == "alice"
+
   @pytest.mark.asyncio
   async def test_accepts_custom_source(self) -> None:
     rows = [{"id": 1, "name": "alice"}]

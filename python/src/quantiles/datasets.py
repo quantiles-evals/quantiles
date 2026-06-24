@@ -81,9 +81,24 @@ class _HttpCliSource(DatasetSource):
         raise QuantilesError(f"dataset init failed ({resp.status}): {text}")
       data = await resp.json()
 
-    self._resolved_config = data.get("config")
-    self._resolved_split = data.get("selected_split")
-    return cast(JsonValue, data)
+    metadata = cast(JsonValue, data)
+    self._apply_init_metadata(metadata)
+    return metadata
+
+  def _apply_init_metadata(self, metadata: JsonValue) -> None:
+    if not isinstance(metadata, dict):
+      raise QuantilesError("dataset init returned invalid metadata")
+
+    config = metadata.get("config")
+    if config is not None and not isinstance(config, str):
+      raise QuantilesError("dataset init returned invalid config metadata")
+
+    selected_split = metadata.get("selected_split")
+    if selected_split is not None and not isinstance(selected_split, str):
+      raise QuantilesError("dataset init returned invalid split metadata")
+
+    self._resolved_config = config
+    self._resolved_split = selected_split
 
   async def load_batch(self, offset: int, batch_size: int) -> list[dict[str, JsonValue]]:
     config = self._resolved_config or self.config
@@ -231,20 +246,39 @@ async def dataset[RowT: BaseModel](
     )
     init_input: dict[str, JsonValue] = {
       "source": source,
-      "batch_size": batch_size,
+      "config": config,
+      "split": split,
+      "revision": revision,
     }
+    init_metadata = await step(
+      ctx,
+      step_key="dataset-init",
+      input_value=cast(JsonValue, init_input),
+      execute=ds_source.initialize,
+    )
+    ds_source._apply_init_metadata(init_metadata)
   else:
     if config is not None or split is not None or revision is not None:
       raise QuantilesError(
         "config, split, and revision are only supported for Hugging Face dataset URI sources"
       )
     ds_source = source
+    init_metadata = await ds_source.initialize()
     init_input = {
       "source": ds_source.source_id,
-      "batch_size": batch_size,
     }
 
-  ds = Dataset(
+    async def _record_init_metadata() -> JsonValue:
+      return init_metadata
+
+    await step(
+      ctx,
+      step_key="dataset-init",
+      input_value=cast(JsonValue, init_input),
+      execute=_record_init_metadata,
+    )
+
+  return Dataset(
     ctx,
     ds_source,
     row_type,
@@ -253,12 +287,3 @@ async def dataset[RowT: BaseModel](
     transform,
     max_rows,
   )
-
-  await step(
-    ctx,
-    step_key="dataset-init",
-    input_value=cast(JsonValue, init_input),
-    execute=ds_source.initialize,
-  )
-
-  return ds
