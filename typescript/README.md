@@ -1,6 +1,6 @@
 # `@quantiles/sdk`
 
-TypeScript client for the local Quantiles eval runner. Note that this SDK is currently in development and is unsupported and unreleased.
+TypeScript client for the local Quantiles eval runner. Note that this SDK is currently unsupported and unreleased.
 
 ## Installation
 

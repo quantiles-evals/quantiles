@@ -85,7 +85,7 @@ When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON
 
 ### `typescript/` directory
 
->**Not released**. The TypeScript SDK is currently in development and is unsupported and unreleased.
+>**Not released**. The TypeScript SDK is currently unsupported and unreleased.
 
 The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals with the Quantiles stack using TypeScript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
