@@ -34,7 +34,7 @@ model = "openai:gpt-5.4-nano"
 # see below for the full reference
 ```
 
-Alternatively, if you want to build your own custom evaluation using the Quantiles Python define that custom eval as follows:
+Alternatively, if you want to build your own custom evaluation using the Quantiles Python SDK, define that custom eval as follows:
 
 ```toml
 # This is configuration for a custom code benchmark called my-eval.
