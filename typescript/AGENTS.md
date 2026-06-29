@@ -1,8 +1,10 @@
 # AGENTS.md
 
+>**Note**: This SDK is currently unreleased and unsupported.
+
 ## Scope
 
-These instructions apply to the Quantiles TypeScript SDK. For changes outside the SDK, follow the nearest applicable `AGENTS.md` file. Note that this SDK is currently unreleased and unsupported.
+These instructions apply to the Quantiles TypeScript SDK. For changes outside the SDK, follow the nearest applicable `AGENTS.md` file.
 
 ## Project Overview
 
