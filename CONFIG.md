@@ -99,7 +99,7 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_code`
 
-Custom evaluations are external programs built with one of the Quantiles SDKs. Their config sections contain the following fields:
+Custom evaluations are external programs built with the Quantiles Python SDK. Their config sections contain the following fields:
 
 | Field | Type | Required | Description |
 |--|--|--|--|
