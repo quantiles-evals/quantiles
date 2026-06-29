@@ -8,7 +8,7 @@ It includes a CLI (called `qt`), SDKs, built-in benchmarks, local run history, a
 
 Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to built them from scratch:
 
-- Write standard Python or TypeScript, with familiar developer patterns
+- Write standard Python, with familiar developer patterns
 - Run workflows locally from the CLI
 - Automatically record runs, steps, metrics, events, inputs, and final outputs
 - Store execution history locally in open data formats
@@ -107,7 +107,7 @@ Quantiles is built as a local-first, offline system that keeps benchmark executi
 
 The Quantiles toolchain, including the `qt` CLI, SDKs, on-disk data formats, and REST API, is optimized to use your local computing power by default instead of relying on cloud or other non-local resources.
 
-The CLI and SDKs (TypeScript or Python) support offline benchmark workflows, including the following local execution and analysis features:
+Both the CLI and Python SDK support offline benchmark workflows, including the following local execution and analysis features:
 
 - Benchmark code runs locally on your machine
 - Measurements are computed locally, except for remote model calls, hosted judges, external tools, and LLM-as-judge evaluations that may call remote providers (e.g. OpenAI, Anthropic, cloud providers, etc.)
@@ -128,7 +128,7 @@ Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) fo
 
 ## Custom Evaluations
 
-A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) or [TypeScript](https://quantiles.io/documentation/reference/typescript-sdk) program that is run by the `qt` CLI and uses the [Quantiles API](https://quantiles.io/documentation/reference/rest-api) to execute an eval. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
+A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses the [Quantiles API](https://quantiles.io/documentation/reference/rest-api) to execute an eval. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
 
 Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
 
@@ -147,11 +147,11 @@ Use custom evaluations when you need to measure behavior that is specific to you
 
 Read more about how to build and run custom evaluations at [quantiles.io/documentation/custom-evaluations](https://quantiles.io/documentation/custom-evaluations).
 
-### SDKs
+### Python SDK
 
-Use the official Quantiles SDKs to build your custom evaluations with higher-level workflow primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python and TypeScript. The SDKs integrate tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
+Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
 
-The Python SDK is located in this repository at [`python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk). The TypeScript SDK is located in this repository at [`typescript/`](./typescript). Read more about it at [quantiles.io/documentation/reference/typescript-sdk](https://quantiles.io/documentation/reference/typescript-sdk).
+The code for the Python SDK is located in this repository at [`./python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk)
 
 ## Coding Agents
 
@@ -184,7 +184,6 @@ Start here:
 - [Quickstart](https://quantiles.io/documentation/quickstart)
 - [Agent Overview](https://quantiles.io/documentation/evals-with-agents)
 - [Python SDK](https://quantiles.io/documentation/reference/python-sdk)
-- [TypeScript SDK](https://quantiles.io/documentation/reference/typescript-sdk)
 
 ## Contributing
 

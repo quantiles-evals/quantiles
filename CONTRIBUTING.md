@@ -31,9 +31,7 @@ git clone https://github.com/quantiles-evals/quantiles.git
 cd quantiles
 ```
 
-<!--
-TODO: describe different setups for python, typescript and CLI
--->
+For the [`./cli`](./cli) directory, ensure you have Rust installed and use the `mise.toml` file in that directory to run common build/lint/check/test commands. For the [`./python`](./python) directory, use the [`uv`](https://docs.astral.sh/uv/) tool for similar commands. The [`typescript/`](./typescript) directory holds the yet-unreleased and in-development Typescript SDK.
 
 ## Security
 

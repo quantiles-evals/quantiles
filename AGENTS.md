@@ -24,7 +24,7 @@ Common subdirectories include:
 
 - `cli`: Rust `qt` CLI, local server, and local run/metrics storage.
 - `python`: The `quantiles` Python SDK.
-- `typescript`: The `@quantiles` TypeScript SDK.
+- `typescript`: The `@quantiles` TypeScript SDK. (not currently released)
 
 Note there is a separate repository, [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill), that contains the agent skill.
 
@@ -84,6 +84,8 @@ The `python/` directory contains the Quantiles Python SDK, which allows users to
 When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON payloads, replay semantics, and public API exports.
 
 ### `typescript/` directory
+
+>Note: the Typescript SDK has not been released. The code should be considered in-develpoment.
 
 The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals using the local Quantiles server and Typescript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
