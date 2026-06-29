@@ -34,7 +34,7 @@ model = "openai:gpt-5.4-nano"
 # see below for the full reference
 ```
 
-Alternatively, if you want to build your own custom evaluation, using the Quantiles Python or TypeScript SDK, define that custom eval as follows:
+Alternatively, if you want to build your own custom evaluation using the Quantiles Python SDK, define that custom eval as follows:
 
 ```toml
 # This is configuration for a custom code benchmark called my-eval.
@@ -45,8 +45,10 @@ Alternatively, if you want to build your own custom evaluation, using the Quanti
 # This `type` parameter defaults to "builtin". for custom evals, be sure to override
 # the default with "custom_code" here.
 type = "custom_code"
-# This is the command that the CLI will execute to run your custom eval code.
-command = ["python", "my_eval.py"]
+# This is the command that the CLI will execute to run your custom eval code. We recommend
+# using the `uv` tool to configure and manage your Python evals, but this field can be any
+# command, so you're free to use any tools you want.
+command = ["uv", "run", "my_eval.py"]
 # see below for the full reference
 ```
 
@@ -97,7 +99,7 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_code`
 
-Custom evaluations are external programs built with one of the Quantiles SDKs. Their config sections contain the following fields:
+Custom evaluations are external programs built with the Quantiles Python SDK. Their config sections contain the following fields:
 
 | Field | Type | Required | Description |
 |--|--|--|--|
@@ -109,7 +111,7 @@ Note that custom code evaluations can customize the model in code. See the [PubM
 
 #### The `input` table
 
-For `custom_code` benchmarks, `input` is an arbitrary TOML table that becomes a JSON object in the custom eval (e.g. a `dict` in Python and a `Map` in TypeScript):
+For `custom_code` benchmarks, `input` is an arbitrary TOML table that becomes a Python `dict` in your custom eval:
 
 ```toml
 [benchmarks.my-eval]

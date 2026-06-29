@@ -105,8 +105,7 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 
 ```
 +--------------------------------------+
-|            Your Script               |
-|   (TypeScript / Python / Shell)      |
+|   Benchmark / Custom Eval (Python)   |
 +-------------------+------------------+
                     │
                     │  HTTP / JSON
