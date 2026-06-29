@@ -14,7 +14,7 @@ Quantiles provides security fixes for the latest released versions of actively m
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, pull requests, or other public forums.**
 
-Instead, please send them to help@quantiles.io.
+Instead, please send them to security@quantiles.io.
 
 Please include as much of the information below as you can. This will help us understand the nature and scope of the potential issue.
 
