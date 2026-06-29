@@ -2,7 +2,7 @@
 
 ## Scope
 
-These instructions apply to the Quantiles TypeScript SDK. For changes outside the SDK, follow the nearest applicable `AGENTS.md` file. Note that this SDK is currently unreleased and should be treated as in development. No guarantees are made about the stability of this API or anything else.
+These instructions apply to the Quantiles TypeScript SDK. For changes outside the SDK, follow the nearest applicable `AGENTS.md` file. Note that this SDK is currently unsupported, unreleased and should be treated as in development.
 
 ## Project Overview
 
