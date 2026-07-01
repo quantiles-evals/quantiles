@@ -5,7 +5,7 @@ already exist in the `qt` CLI.
 It uses PubMedQA as an illustrative example, implementing the benchmark from scratch even though PubMedQA
 is already available as a built-in benchmark and can be run directly with `qt run pubmedqa`.
 
-The same patterns show here also apply to adding new built-in benchmarks or custom evaluation workflows.
+The same patterns shown here also apply to adding new built-in benchmarks or custom evaluation workflows.
 """
 
 import hashlib
