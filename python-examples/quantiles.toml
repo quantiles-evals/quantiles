@@ -2,10 +2,7 @@
 [benchmarks.custom_pubmedqa]
 type = "custom_code"
 command = ["uv", "run", "src/pubmedqa.py"]
-input = {
-    model_name = "openai:gpt_5_nano"
-    num_examples = "500"
-}
+input = { model_name = "openai:gpt_5_nano", num_examples = "500" }
 
 # PubMedQA built with the Python SDK (not using the built-in benchmark)
 [benchmarks.custom_prompt_eval]
