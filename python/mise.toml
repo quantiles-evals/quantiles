@@ -16,8 +16,6 @@ run = [
 [tasks.typecheck]
 run = "uv run ty check"
 
-[tasks.example-pubmedqa]
-run = "qt run --input '{\"model_name\": \"openai:gpt_5_nano\", \"num_examples\": 500}' pubmedqa -- uv run python examples/pubmedqa.py"
 
 [tasks.all]
 depends = ["fmt", "lint", "typecheck", "test"]
@@ -36,10 +34,8 @@ depends = [
     "test",
 ]
 
-# requires that the CLI is installed already
-[tasks.e2e]
-run = [
-    "qt run --input '{\"iterations\":3}' e2e-smoke-py -- uv run python tests/e2e/smoke.py",
-    "python_output=$(sqlite3 .quantiles/quantiles.sqlite \"SELECT output FROM workflow_runs WHERE workflow_name = 'e2e-smoke-py'\")"
-    # TODO: check output
-]
+[tasks.wheel-build]
+run = "uv build"
+
+[tasks.wheel-publish]
+run = "uv publish --token $PYPI_TOKEN"

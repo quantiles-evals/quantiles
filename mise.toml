@@ -1,7 +1,7 @@
 monorepo_root = true
 
 [monorepo]
-config_roots = [".", "cli", "typescript", "python"]
+config_roots = [".", "cli", "typescript", "python", "python-examples"]
 
 [tools]
 # keep this version inline with the version declared in .github/workflows/typescript

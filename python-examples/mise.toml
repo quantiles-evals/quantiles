@@ -1,0 +1,5 @@
+[tasks.run-pubmedqa]
+run = "qt run custom_pubmedqa"
+
+[tasks.run_prompt_eval]
+run = "qt run custom_prompt_eval"

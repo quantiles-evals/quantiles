@@ -5,7 +5,7 @@ Python SDK for the [quantiles](https://quantiles.io) local AI workload observabi
 ## Installation
 
 ```bash
-uv pip install quantiles
+uv add quantiles
 ```
 
 ## Usage

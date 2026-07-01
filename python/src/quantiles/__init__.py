@@ -13,6 +13,8 @@ from .util import error_message, hash_json, stable_stringify
 from .workflow import emit, entrypoint, step, workflow
 from .workflow_context import WorkflowContext
 
+__version__ = "0.1.0"
+
 __all__ = [
   "Classification",
   "Dataset",
