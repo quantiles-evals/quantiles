@@ -1,0 +1,10 @@
+[project]
+name = "python-examples"
+version = "0.1.0"
+description = "Example custom evals using the Quantiles Python SDK"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.13.4",
+    "quantiles>=0.1.0,<1.0.0",
+]
