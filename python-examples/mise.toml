@@ -1,11 +1,3 @@
-# requires that the CLI is installed already
-# [tasks.e2e]
-# run = [
-#     "qt run --input '{\"iterations\":3}' e2e-smoke-py -- uv run python tests/e2e/smoke.py",
-#     "python_output=$(sqlite3 .quantiles/quantiles.sqlite \"SELECT output FROM workflow_runs WHERE workflow_name = 'e2e-smoke-py'\")"
-#     # TODO: check output
-# ]
-
 [tasks.run-pubmedqa]
 run = "qt run custom_pubmedqa"
 
