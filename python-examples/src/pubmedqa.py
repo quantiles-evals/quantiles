@@ -1,8 +1,11 @@
 """
-This file demonstrates how to implement a custom Quantiles eval using PubMedQA.
+This file demonstrates how to use the Quantiles Python SDK to implement a new benchmark that doesn't
+already exist in the `qt` CLI.
 
-Although PubMedQA is available as a built-in benchmark in the `qt` CLI, this example is not used by
-the built-in implementation.
+It uses PubMedQA as an illustrative example, implementing the benchmark from scratch even though PubMedQA
+is already available as a built-in benchmark and can be run directly with `qt run pubmedqa`.
+
+The same patterns show here also apply to adding new built-in benchmarks or custom evaluation workflows.
 """
 
 import hashlib
