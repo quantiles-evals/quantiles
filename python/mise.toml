@@ -43,3 +43,9 @@ run = [
     "python_output=$(sqlite3 .quantiles/quantiles.sqlite \"SELECT output FROM workflow_runs WHERE workflow_name = 'e2e-smoke-py'\")"
     # TODO: check output
 ]
+
+[tasks.wheel-build]
+run = "uv build"
+
+[tasks.wheel-publish]
+run = "uv publish"
