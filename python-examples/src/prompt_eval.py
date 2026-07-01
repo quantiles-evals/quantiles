@@ -116,5 +116,5 @@ async def call_model(ticket: str) -> Label:
 
 
 if __name__ == "__main__":
-    support_triage = workflow("support-triage", handler)
+    support_triage = workflow("custom_prompt_eval", handler)
     entrypoint(support_triage)
