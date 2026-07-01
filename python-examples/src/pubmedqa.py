@@ -2,7 +2,7 @@
 This file demonstrates how to use the Quantiles Python SDK to implement a new benchmark for the `qt` CLI.
 
 It uses PubMedQA as an illustrative example, implementing the benchmark from scratch even though PubMedQA is
-already available as a built-in benchmark and can be run directly with qt run pubmedqa.
+already available as a built-in benchmark and can be run directly with `qt run pubmedqa`.
 
 The steps shown in this example can be used to add new benchmarks or build custom evaluation workflows in Quantiles.
 """
