@@ -72,8 +72,9 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
         let model = config.base.model.clone();
         let run_id = ctx.run_id;
 
+        let name = self.name();
         let results = DatasetRunner::new(&manager, dataset_id, &info, limit)
-            .desc(self.name())
+            .desc(&name)
             .set_quiet(ctx.quiet)
             .for_each_concurrent(max_workers, move |i, row| {
                 let llm = Arc::clone(&llm);

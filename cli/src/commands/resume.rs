@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 use qt::builtins;
 use qt::db;
@@ -40,6 +40,7 @@ pub(crate) fn plan_resume(
                 qt::config::BenchmarkConfig::CustomCode(c) => {
                     Ok(ResumePlan::CustomCode(c.command.clone()))
                 }
+                qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::Builtin),
             }
         }
         None => {
@@ -95,11 +96,21 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
     // wise to revisit this policy.
     match plan {
         ResumePlan::Builtin => {
+            let builtin: Box<dyn builtins::BuiltinWorkflow> = match bench_config {
+                Some(qt::config::BenchmarkConfig::CustomNoCode(_)) => {
+                    Box::new(builtins::CustomNoCodeBuiltin::new(
+                        workflow_name.to_owned(),
+                    ))
+                }
+                _ => builtins::resolve(workflow_name)
+                    .with_context(|| format!("builtin `{workflow_name}` not found"))?,
+            };
             super::run::execute_builtin(
                 &db,
                 &metrics_store,
                 run_id,
                 workflow_name,
+                builtin,
                 stored_input,
                 json,
                 process_start,

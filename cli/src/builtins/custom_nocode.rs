@@ -13,7 +13,7 @@ use crate::llm::LLMSampler;
 use crate::llm::random::RandomSampler;
 
 /// Input deserialized from the JSON assembled by `commands::run`.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct CustomNoCodeInput {
     style: String,
     dataset: String,
@@ -126,8 +126,9 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let golden_column = config.golden_column.clone();
         let template_str = Arc::new(template_str);
 
+        let name = self.name();
         let results = DatasetRunner::new(&manager, &dataset, &info, limit)
-            .desc(&self.name())
+            .desc(&name)
             .set_quiet(ctx.quiet)
             .for_each_concurrent(max_workers, move |i, row| {
                 let llm = Arc::clone(&llm);
@@ -136,6 +137,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let template_str = Arc::clone(&template_str);
                 let prompt_column = prompt_column.clone();
                 let golden_column = golden_column.clone();
+                let env = env.clone();
                 async move {
                     let prompt = extract_text(&row, &prompt_column)
                         .with_context(|| {
@@ -174,8 +176,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                                     format!("failed to sample LLM for row {i}")
                                 })?;
 
-                            let is_correct =
-                                model_response.trim() == golden.trim();
+                            let is_correct = is_exact_match(&model_response, &golden);
 
                             Ok(RowOutput {
                                 input: rendered.clone(),
