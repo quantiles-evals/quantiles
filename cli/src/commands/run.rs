@@ -738,4 +738,78 @@ mod tests {
         let (input, _) = super::assemble_builtin_input(None, None);
         assert!(input.is_none());
     }
+
+    /// A `custom_nocode` benchmark config with all fields should serialize into the
+    /// expected JSON shape, converting field names faithfully.
+    #[test]
+    fn assemble_custom_nocode_input_from_config() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            style: qt::config::CustomNoCodeStyle::Qa,
+            dataset: "quantiles/simpleqa-verified".to_owned(),
+            model: Some(qt::llm::Sampler::Random {}),
+            qa: qt::config::CustomNoCodeQaConfig {
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                prompt_column: "problem".to_owned(),
+                golden_column: "answer".to_owned(),
+                limit: Some(10),
+                max_workers: Some(4),
+            },
+        };
+        let input = super::assemble_custom_nocode_input(&bench, None);
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(parsed["style"], "qa");
+        assert_eq!(parsed["dataset"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["model"], "random");
+        assert_eq!(parsed["prompt_template_file"], "prompts/qa.txt");
+        assert_eq!(parsed["prompt_column"], "problem");
+        assert_eq!(parsed["golden_column"], "answer");
+        assert_eq!(parsed["limit"], 10);
+        assert_eq!(parsed["max_workers"], 4);
+    }
+
+    /// When `model`, `limit`, and `max_workers` are absent from the config, the assembled
+    /// JSON should omit those keys entirely rather than emit null values.
+    #[test]
+    fn assemble_custom_nocode_input_omits_none_fields() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            style: qt::config::CustomNoCodeStyle::Qa,
+            dataset: "quantiles/simpleqa-verified".to_owned(),
+            model: None,
+            qa: qt::config::CustomNoCodeQaConfig {
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                prompt_column: "problem".to_owned(),
+                golden_column: "answer".to_owned(),
+                limit: None,
+                max_workers: None,
+            },
+        };
+        let input = super::assemble_custom_nocode_input(&bench, None);
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert!(parsed.get("model").is_none());
+        assert!(parsed.get("limit").is_none());
+        assert!(parsed.get("max_workers").is_none());
+    }
+
+    /// A `--input` CLI flag should take precedence over the assembled config object,
+    /// returning the raw CLI string directly.
+    #[test]
+    fn assemble_custom_nocode_input_with_cli_override() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            style: qt::config::CustomNoCodeStyle::Qa,
+            dataset: "quantiles/simpleqa-verified".to_owned(),
+            model: None,
+            qa: qt::config::CustomNoCodeQaConfig {
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                prompt_column: "problem".to_owned(),
+                golden_column: "answer".to_owned(),
+                limit: None,
+                max_workers: None,
+            },
+        };
+        let input = super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":5}"#));
+        assert_eq!(input, r#"{"limit":5}"#);
+    }
 }

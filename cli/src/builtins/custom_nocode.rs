@@ -242,6 +242,15 @@ fn is_exact_match(response: &str, golden: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn builtin_name_returns_configured_name() {
+        let builtin = CustomNoCodeBuiltin::new("my-benchmark".to_owned());
+        assert_eq!(builtin.name(), "my-benchmark");
+    }
 
     #[test]
     fn render_template_with_prompt_variable() {
@@ -273,5 +282,201 @@ mod tests {
     fn exact_match_trims_whitespace() {
         assert!(is_exact_match("  hello  ", "hello"));
         assert!(is_exact_match("hello", "  hello  "));
+    }
+
+    #[tokio::test]
+    async fn execute_rejects_invalid_jinja_template() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        crate::db::init_workspace(root).await.unwrap();
+        let db = crate::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(root)).unwrap();
+
+        let template_path = root.join("bad.txt");
+        std::fs::write(&template_path, "{{ unclosed").unwrap();
+
+        let input_json = serde_json::to_string(&json!({
+            "style": "qa",
+            "dataset": "fixture/qa",
+            "prompt_template_file": template_path.to_str().unwrap(),
+            "prompt_column": "q",
+            "golden_column": "a",
+        }))
+        .unwrap();
+
+        let run_id = crate::db::create_run(&db, "test", Some(&input_json))
+            .await
+            .unwrap();
+
+        let workflow_name = "test".to_owned();
+        let builtin = CustomNoCodeBuiltin::new(workflow_name.clone());
+        let result = builtin
+            .execute(super::BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+                workflow_name: &workflow_name,
+                input: Some(&input_json),
+                quiet: true,
+            })
+            .await;
+
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("invalid jinja syntax"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::cast_possible_truncation)]
+    #[tokio::test]
+    async fn execute_records_metrics_and_steps_with_fixture() {
+        let server = MockServer::start().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let cache_dir = root.join("cache");
+
+        // Save original env var values so we can restore them later.
+        let orig_hf = std::env::var("HF_DATASETS_SERVER").ok();
+        let orig_cache = std::env::var("QUANTILES_DATASET_CACHE_DIR").ok();
+        unsafe {
+            std::env::set_var("HF_DATASETS_SERVER", server.uri());
+            std::env::set_var("QUANTILES_DATASET_CACHE_DIR", cache_dir.as_os_str());
+        }
+
+        // Mock HF dataset server endpoints used by DatasetManager::init().
+        Mock::given(method("GET"))
+            .and(path("/splits"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "splits": [{"config": "default", "split": "train"}]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/size"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "size": {"splits": [{"num_rows": 2}]}
+            })))
+            .mount(&server)
+            .await;
+
+        // Initialize workspace with SQLite DB and metrics dir.
+        crate::db::init_workspace(root).await.unwrap();
+        let db = crate::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(root)).unwrap();
+
+        // Write a Jinja template file.
+        let template_path = root.join("template.txt");
+        std::fs::write(&template_path, "{{ prompt }}\nAnswer:").unwrap();
+
+        // Pre-populate the dataset cache so no network fetch is needed for rows.
+        let cache = crate::dataset::cache::DatasetCache::new(cache_dir);
+        let rows = vec![
+            json!({"question": "what is 2+2", "answer": "4"}),
+            json!({"question": "what is 3+3", "answer": "6"}),
+        ];
+        let key = crate::dataset::cache::cache_key("fixture/qa", "default", "train", None);
+        let batch_path = cache.batch_path(&key, 0, 2);
+        cache.write_batch(&batch_path, &rows).await.unwrap();
+
+        // Assemble the input JSON that execute() expects.
+        let input_json = serde_json::to_string(&json!({
+            "style": "qa",
+            "dataset": "fixture/qa",
+            "model": "random",
+            "prompt_template_file": template_path.to_str().unwrap(),
+            "prompt_column": "question",
+            "golden_column": "answer",
+            "limit": 2,
+        }))
+        .unwrap();
+
+        let run_id = crate::db::create_run(&db, "test_nocode", Some(&input_json))
+            .await
+            .unwrap();
+
+        let workflow_name = "test_nocode".to_owned();
+        let builtin = CustomNoCodeBuiltin::new(workflow_name.clone());
+        builtin
+            .execute(super::BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+                workflow_name: &workflow_name,
+                input: Some(&input_json),
+                quiet: true,
+            })
+            .await
+            .unwrap();
+
+        // Flush buffered metrics to Parquet so we can read them back.
+        metrics_store.flush(run_id).await.unwrap();
+
+        // Verify aggregate metrics were written.
+        let agg = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        let names: Vec<&str> = agg.iter().map(|m| m.metric_name.as_str()).collect();
+        assert!(names.contains(&"accuracy"));
+        assert!(names.contains(&"correct_count"));
+        assert!(names.contains(&"total_count"));
+
+        let total_metric = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
+        assert_eq!(total_metric.metric_value as i64, 2);
+
+        // Random sampler responses won't match "4" or "6", so correctness is 0.
+        let correct_metric = agg
+            .iter()
+            .find(|m| m.metric_name == "correct_count")
+            .unwrap();
+        assert_eq!(correct_metric.metric_value as i64, 0);
+
+        // Verify per-step metrics were recorded for both rows.
+        let all_metrics = metrics_store.list_for_run(run_id).await.unwrap();
+        let is_correct_count = all_metrics
+            .iter()
+            .filter(|m| m.metric_name == "is_correct")
+            .count();
+        assert_eq!(is_correct_count, 2);
+
+        // Verify steps were persisted in SQLite.
+        let steps = crate::db::list_steps_for_run(&db, run_id).await.unwrap();
+        assert_eq!(steps.len(), 2);
+
+        // Execute a second time to verify step caching reuses existing records.
+        let builtin2 = CustomNoCodeBuiltin::new(workflow_name.clone());
+        builtin2
+            .execute(super::BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+                workflow_name: &workflow_name,
+                input: Some(&input_json),
+                quiet: true,
+            })
+            .await
+            .unwrap();
+
+        let steps2 = crate::db::list_steps_for_run(&db, run_id).await.unwrap();
+        assert_eq!(
+            steps2.len(),
+            2,
+            "second execution should reuse cached steps instead of creating new ones"
+        );
+
+        // Restore environment variables.
+        unsafe {
+            match &orig_hf {
+                Some(v) => std::env::set_var("HF_DATASETS_SERVER", v),
+                None => std::env::remove_var("HF_DATASETS_SERVER"),
+            }
+            match &orig_cache {
+                Some(v) => std::env::set_var("QUANTILES_DATASET_CACHE_DIR", v),
+                None => std::env::remove_var("QUANTILES_DATASET_CACHE_DIR"),
+            }
+        }
     }
 }

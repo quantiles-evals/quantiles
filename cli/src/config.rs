@@ -364,6 +364,25 @@ mod tests {
     }
 
     #[test]
+    fn validate_accepts_existing_template_file() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let bench = BenchmarkConfig::CustomNoCode(CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            style: CustomNoCodeStyle::Qa,
+            dataset: "quantiles/simpleqa-verified".to_owned(),
+            model: Some(Sampler::Random),
+            qa: CustomNoCodeQaConfig {
+                prompt_template_file: file.path().to_str().unwrap().to_owned(),
+                prompt_column: "problem".to_owned(),
+                golden_column: "answer".to_owned(),
+                limit: None,
+                max_workers: None,
+            },
+        });
+        bench.validate().unwrap();
+    }
+
+    #[test]
     fn validate_accepts_nonempty_command() {
         let bench = BenchmarkConfig::CustomCode(CustomCodeBenchmarkConfig {
             type_: "custom_code".to_owned(),

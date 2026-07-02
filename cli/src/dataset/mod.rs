@@ -29,11 +29,15 @@ impl DatasetManager {
     ///
     /// Returns an error if the system's cache directory cannot be determined.
     pub fn new() -> Result<Self> {
-        let cache_dir = dirs::home_dir()
-            .context("failed to determine home directory")?
-            .join(".cache")
-            .join("quantiles")
-            .join("datasets");
+        let cache_dir = if let Ok(dir) = std::env::var("QUANTILES_DATASET_CACHE_DIR") {
+            std::path::PathBuf::from(dir)
+        } else {
+            dirs::home_dir()
+                .context("failed to determine home directory")?
+                .join(".cache")
+                .join("quantiles")
+                .join("datasets")
+        };
         let client = HuggingFaceClient::new()?;
         Ok(Self {
             client,

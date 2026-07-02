@@ -213,4 +213,27 @@ mod tests {
         let err = plan_resume("my-eval", &RunStatus::Failed, Some(&bench)).unwrap_err();
         assert!(err.to_string().contains("non-empty `command`"));
     }
+
+    /// A `custom_nocode` benchmark should plan to resume as a builtin so that the
+    /// CLI can re-run the no-code workflow natively without spawning an external command.
+    #[test]
+    fn plan_resume_custom_nocode_with_config() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let bench =
+            qt::config::BenchmarkConfig::CustomNoCode(qt::config::CustomNoCodeBenchmarkConfig {
+                type_: "custom_nocode".to_owned(),
+                style: qt::config::CustomNoCodeStyle::Qa,
+                dataset: "quantiles/simpleqa-verified".to_owned(),
+                model: Some(qt::llm::Sampler::Random {}),
+                qa: qt::config::CustomNoCodeQaConfig {
+                    prompt_template_file: file.path().to_str().unwrap().to_owned(),
+                    prompt_column: "problem".to_owned(),
+                    golden_column: "answer".to_owned(),
+                    limit: None,
+                    max_workers: None,
+                },
+            });
+        let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench)).unwrap();
+        assert!(matches!(plan, ResumePlan::Builtin));
+    }
 }
