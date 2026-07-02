@@ -2,7 +2,7 @@
 
 This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and similar tools. It gives agents a short, public-safe map of the Quantiles repository and the rules for making focused, reviewable changes.
 
-Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) at [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for guidance and details on common Quantiles workflows, including running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs. For a concise public, LLM-readable overview of Quantiles docs and agent workflow links, see [quantiles.io/llms.txt](https://quantiles.io/llms.txt).
+Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) at [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for guidance and details on common Quantiles workflows, including running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs. For a concise, public, LLM-readable overview of Quantiles with links to agent guides and related documentation, see [quantiles.io/llms.txt](https://quantiles.io/llms.txt).
 
 To become familiar with this repository, and before attempting to complete tasks, read these files:
 
