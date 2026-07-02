@@ -69,8 +69,8 @@ pub const FINANCEBENCH: SimilarityBenchmark = SimilarityBenchmark {
 #[expect(clippy::too_many_lines)]
 #[async_trait::async_trait]
 impl BuiltinWorkflow for SimilarityBenchmark {
-    fn name(&self) -> &'static str {
-        self.name
+    fn name(&self) -> String {
+        self.name.to_string()
     }
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {

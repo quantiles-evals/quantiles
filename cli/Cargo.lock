@@ -3075,6 +3075,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "jinja"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4eef51ad9c68d377a1604706ae4121b1b766c1504c86cb5247f4b6946cba9f1"
+dependencies = [
+ "indexmap 2.14.0",
+ "minijinja",
+ "minijinja-contrib",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jni"
 version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3412,6 +3425,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b947ae49db0d222b1dbc6b113ce7248a3fc3a6ca21b696717bfc000ba4484d8"
 
 [[package]]
+name = "memo-map"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d1115007560874e373613744c6fba374c17688327a71c1476d1a5954cc857b"
+
+[[package]]
 name = "memoffset"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3434,6 +3453,35 @@ checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "minijinja"
+version = "2.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb3d648e68cea56d9858d535ee28f9538404e2dd8cb08ed0bd05dca379477f39"
+dependencies = [
+ "aho-corasick",
+ "indexmap 2.14.0",
+ "memo-map",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "unicase",
+ "unicode-ident",
+ "v_htmlescape",
+]
+
+[[package]]
+name = "minijinja-contrib"
+version = "2.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85342f6fac0be8ccd5bd00d9066be538f34f393f577b75d81b17c8398a6b43bb"
+dependencies = [
+ "minijinja",
+ "serde",
+ "textwrap",
+ "unicode_categories",
 ]
 
 [[package]]
@@ -4296,6 +4344,7 @@ dependencies = [
  "fastembed",
  "futures",
  "genai",
+ "jinja",
  "parquet",
  "predicates",
  "rand 0.8.6",
@@ -5400,6 +5449,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "smawk"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8e2fb0f499abb4d162f2bedad68f5ef91a1682b5a03596ddb67efd37768d100"
+
+[[package]]
 name = "snafu"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5870,6 +5925,15 @@ name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+
+[[package]]
+name = "textwrap"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c13547615a44dc9c452a8a534638acdf07120d4b6847c8178705da06306a3057"
+dependencies = [
+ "smawk",
+]
 
 [[package]]
 name = "thiserror"
@@ -6443,6 +6507,12 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "v_htmlescape"
+version = "0.15.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e8257fbc510f0a46eb602c10215901938b5c2a7d5e70fc11483b1d3c9b5b18c"
 
 [[package]]
 name = "value-ext"

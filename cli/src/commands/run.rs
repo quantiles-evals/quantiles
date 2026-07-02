@@ -75,6 +75,35 @@ pub async fn run(
                     )
                     .await
                 }
+                qt::config::BenchmarkConfig::CustomNoCode(c) => {
+                    let input = assemble_custom_nocode_input(c, cli_input);
+
+                    let cwd = std::env::current_dir()?;
+                    let root = db::resolve_workspace_root(&cwd, true).await?;
+                    let db = db::open_workspace(&root).await?;
+                    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
+                    let run_id = db::create_run(&db, workflow_name, input.as_deref()).await?;
+
+                    if !json {
+                        println!("Created run {run_id}");
+                    }
+
+                    let builtin =
+                        Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+                            workflow_name.to_owned(),
+                        ));
+                    execute_builtin(
+                        &db,
+                        &metrics_store,
+                        run_id,
+                        workflow_name,
+                        builtin,
+                        input.as_deref(),
+                        json,
+                        process_start,
+                    )
+                    .await
+                }
             }
         }
         None => {
@@ -122,6 +151,46 @@ fn assemble_builtin_input(
     }
 }
 
+/// Config input shape for `custom_nocode` benchmarks auto-generated from
+/// `quantiles.toml` `[benchmarks.*]`.
+#[derive(Serialize)]
+struct CustomNoCodeConfigInput<'a> {
+    style: &'a str,
+    dataset: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: &'a Option<qt::llm::Sampler>,
+    prompt_template_file: &'a str,
+    prompt_column: &'a str,
+    golden_column: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_workers: Option<usize>,
+}
+
+fn assemble_custom_nocode_input(
+    bench: &qt::config::CustomNoCodeBenchmarkConfig,
+    cli_input: Option<&str>,
+) -> Option<String> {
+    if let Some(cli_str) = cli_input {
+        return Some(cli_str.to_owned());
+    }
+
+    let input = CustomNoCodeConfigInput {
+        style: "qa",
+        dataset: &bench.dataset,
+        model: &bench.model,
+        prompt_template_file: &bench.qa.prompt_template_file,
+        prompt_column: &bench.qa.prompt_column,
+        golden_column: &bench.qa.golden_column,
+        limit: bench.qa.limit,
+        max_workers: bench.qa.max_workers,
+    };
+
+    let json = serde_json::to_string(&input).expect("infallible serialization");
+    Some(json)
+}
+
 fn merge_inputs(
     config_input: Option<&HashMap<String, serde_json::Value>>,
     cli_input: Option<&str>,
@@ -162,6 +231,9 @@ async fn run_builtin_workflow(
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
+    let builtin = builtins::resolve(workflow_name)
+        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
+
     let cwd = std::env::current_dir()?;
     let root = db::resolve_workspace_root(&cwd, true).await?;
     let db = db::open_workspace(&root).await?;
@@ -177,6 +249,7 @@ async fn run_builtin_workflow(
         &metrics_store,
         run_id,
         workflow_name,
+        builtin,
         input,
         json,
         process_start,
@@ -189,12 +262,11 @@ pub async fn execute_builtin(
     metrics_store: &MetricsStore,
     run_id: i64,
     workflow_name: &str,
+    builtin: Box<dyn builtins::BuiltinWorkflow>,
     input: Option<&str>,
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
-    let builtin = builtins::resolve(workflow_name)
-        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
 
     let builtin_result = builtin
         .execute(builtins::BuiltinContext {

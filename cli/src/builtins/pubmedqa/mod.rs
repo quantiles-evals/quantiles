@@ -25,8 +25,8 @@ pub struct PubmedqaBuiltin;
 #[expect(clippy::too_many_lines)]
 #[async_trait::async_trait]
 impl BuiltinWorkflow for PubmedqaBuiltin {
-    fn name(&self) -> &'static str {
-        "pubmedqa"
+    fn name(&self) -> String {
+        "pubmedqa".to_string()
     }
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
