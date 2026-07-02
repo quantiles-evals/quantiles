@@ -98,9 +98,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
         ResumePlan::Builtin => {
             let builtin: Box<dyn builtins::BuiltinWorkflow> = match bench_config {
                 Some(qt::config::BenchmarkConfig::CustomNoCode(_)) => {
-                    Box::new(builtins::CustomNoCodeBuiltin::new(
-                        workflow_name.to_owned(),
-                    ))
+                    Box::new(builtins::CustomNoCodeBuiltin::new(workflow_name.to_owned()))
                 }
                 _ => builtins::resolve(workflow_name)
                     .with_context(|| format!("builtin `{workflow_name}` not found"))?,

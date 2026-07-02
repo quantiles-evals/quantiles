@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::builtins::common::{get_max_workers, extract_text, hash_input, run_timed_step};
+use crate::builtins::common::{extract_text, get_max_workers, hash_input, run_timed_step};
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
@@ -44,6 +44,7 @@ pub struct CustomNoCodeBuiltin {
 
 impl CustomNoCodeBuiltin {
     /// Create a new builtin with the workflow name from the config file.
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self { name }
     }
@@ -76,8 +77,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         }
 
         // Load template file and validate syntax.
-        let template_str = std::fs::read_to_string(&config.prompt_template_file)
-            .with_context(|| {
+        let template_str =
+            std::fs::read_to_string(&config.prompt_template_file).with_context(|| {
                 format!(
                     "failed to read prompt template file `{}`",
                     config.prompt_template_file
@@ -100,9 +101,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         };
 
         let manager = DatasetManager::new()?;
-        let info = manager
-            .init(&config.dataset, None, None, None)
-            .await?;
+        let info = manager.init(&config.dataset, None, None, None).await?;
 
         let total = info
             .total_rows
@@ -139,27 +138,24 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let golden_column = golden_column.clone();
                 let env = env.clone();
                 async move {
-                    let prompt = extract_text(&row, &prompt_column)
-                        .with_context(|| {
-                            format!("row {i}: missing prompt column `{prompt_column}`")
-                        })?;
-                    let golden = extract_text(&row, &golden_column)
-                        .with_context(|| {
-                            format!("row {i}: missing golden column `{golden_column}`")
-                        })?;
+                    let prompt = extract_text(&row, &prompt_column).with_context(|| {
+                        format!("row {i}: missing prompt column `{prompt_column}`")
+                    })?;
+                    let golden = extract_text(&row, &golden_column).with_context(|| {
+                        format!("row {i}: missing golden column `{golden_column}`")
+                    })?;
 
                     let rendered = env
                         .render_str(&template_str, jinja::context!(prompt => &prompt))
-                        .with_context(|| {
-                            format!("row {i}: failed to render prompt template")
-                        })?;
+                        .with_context(|| format!("row {i}: failed to render prompt template"))?;
 
                     let model_str = model
                         .as_ref()
                         .map_or("random".to_string(), std::string::ToString::to_string);
                     let input_hash = hash_input(&format!(
-                        "{rendered}\nmodel={model_str}\nworkflow={}"
-                        , self.name()));
+                        "{rendered}\nmodel={model_str}\nworkflow={}",
+                        self.name()
+                    ));
                     let step_key = format!("row-{i}");
 
                     let (output, step_id) = run_timed_step(
@@ -172,9 +168,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                             let model_response = llm
                                 .sample(&rendered)
                                 .await
-                                .with_context(|| {
-                                    format!("failed to sample LLM for row {i}")
-                                })?;
+                                .with_context(|| format!("failed to sample LLM for row {i}"))?;
 
                             let is_correct = is_exact_match(&model_response, &golden);
 

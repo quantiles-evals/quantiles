@@ -88,10 +88,9 @@ pub async fn run(
                         println!("Created run {run_id}");
                     }
 
-                    let builtin =
-                        Box::new(qt::builtins::CustomNoCodeBuiltin::new(
-                            workflow_name.to_owned(),
-                        ));
+                    let builtin = Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+                        workflow_name.to_owned(),
+                    ));
                     execute_builtin(
                         &db,
                         &metrics_store,
@@ -267,7 +266,6 @@ pub async fn execute_builtin(
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
-
     let builtin_result = builtin
         .execute(builtins::BuiltinContext {
             db,
