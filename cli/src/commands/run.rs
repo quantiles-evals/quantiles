@@ -82,7 +82,7 @@ pub async fn run(
                     let root = db::resolve_workspace_root(&cwd, true).await?;
                     let db = db::open_workspace(&root).await?;
                     let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
-                    let run_id = db::create_run(&db, workflow_name, input.as_deref()).await?;
+                    let run_id = db::create_run(&db, workflow_name, Some(&input)).await?;
 
                     if !json {
                         println!("Created run {run_id}");
@@ -97,7 +97,7 @@ pub async fn run(
                         run_id,
                         workflow_name,
                         builtin,
-                        input.as_deref(),
+                        Some(&input),
                         json,
                         process_start,
                     )
@@ -170,9 +170,9 @@ struct CustomNoCodeConfigInput<'a> {
 fn assemble_custom_nocode_input(
     bench: &qt::config::CustomNoCodeBenchmarkConfig,
     cli_input: Option<&str>,
-) -> Option<String> {
+) -> String {
     if let Some(cli_str) = cli_input {
-        return Some(cli_str.to_owned());
+        return cli_str.to_owned();
     }
 
     let input = CustomNoCodeConfigInput {
@@ -186,8 +186,7 @@ fn assemble_custom_nocode_input(
         max_workers: bench.qa.max_workers,
     };
 
-    let json = serde_json::to_string(&input).expect("infallible serialization");
-    Some(json)
+    serde_json::to_string(&input).expect("infallible serialization")
 }
 
 fn merge_inputs(
@@ -256,6 +255,7 @@ async fn run_builtin_workflow(
     .await
 }
 
+#[expect(clippy::too_many_arguments)]
 pub async fn execute_builtin(
     db: &DatabaseConnection,
     metrics_store: &MetricsStore,

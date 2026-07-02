@@ -36,11 +36,11 @@ pub(crate) fn plan_resume(
         Some(bench) => {
             bench.validate()?;
             match bench {
-                qt::config::BenchmarkConfig::Builtin(_) => Ok(ResumePlan::Builtin),
                 qt::config::BenchmarkConfig::CustomCode(c) => {
                     Ok(ResumePlan::CustomCode(c.command.clone()))
                 }
-                qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::Builtin),
+                qt::config::BenchmarkConfig::Builtin(_)
+                | qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::Builtin),
             }
         }
         None => {
