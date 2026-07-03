@@ -255,7 +255,7 @@ async fn run_builtin_workflow(
     .await
 }
 
-/// Arguments for [`execute_builtin`].
+/// Arguments for the [`execute_builtin`] function.
 pub struct ExecuteBuiltinArgs<'a> {
     pub db: &'a DatabaseConnection,
     pub metrics_store: &'a MetricsStore,
