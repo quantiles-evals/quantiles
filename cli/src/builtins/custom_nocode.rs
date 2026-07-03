@@ -34,6 +34,32 @@ struct RowOutput {
     is_correct: bool,
 }
 
+/// Arguments for the [`CustomNoCodeBuiltin::evaluate_row`] method
+pub struct EvaluateRowArgs<'a> {
+    /// The row index
+    i: usize,
+    /// The row value
+    row: &'a serde_json::Value,
+    /// The name of the column in this row that has the prompt
+    prompt_column: &'a str,
+    /// The name of the column in this row that has the golden answer
+    golden_column: &'a str,
+    /// The prompt template
+    template_str: &'a str,
+    /// The pre-constructed jinja template env
+    env: &'a jinja::Environment<'a>,
+    /// The model to test
+    model: Option<&'a crate::llm::Sampler>,
+    /// TODO: figure out why we have 2 samplers!
+    llm: &'a std::sync::Arc<dyn crate::llm::LLMSampler>,
+    /// The connection to the metadata DB
+    db: &'a sea_orm::DatabaseConnection,
+    /// Metrics storage
+    metrics_store: &'a crate::metrics_store::MetricsStore,
+    /// The run ID
+    run_id: i64,
+}
+
 /// No-code custom benchmark builtin.
 pub struct CustomNoCodeBuiltin {
     name: String,
@@ -46,45 +72,47 @@ impl CustomNoCodeBuiltin {
         Self { name }
     }
 
-    #[expect(clippy::too_many_arguments)]
-    async fn evaluate_row(
-        &self,
-        i: usize,
-        row: &serde_json::Value,
-        prompt_column: &str,
-        golden_column: &str,
-        template_str: &str,
-        env: &jinja::Environment<'_>,
-        model: Option<&crate::llm::Sampler>,
-        llm: &std::sync::Arc<dyn crate::llm::LLMSampler>,
-        db: &sea_orm::DatabaseConnection,
-        metrics_store: &crate::metrics_store::MetricsStore,
-        run_id: i64,
-    ) -> Result<bool> {
-        let prompt = extract_text(row, prompt_column)
-            .with_context(|| format!("row {i}: missing prompt column `{prompt_column}`"))?;
-        let golden = extract_text(row, golden_column)
-            .with_context(|| format!("row {i}: missing golden column `{golden_column}`"))?;
+    async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<bool> {
+        let prompt = extract_text(args.row, args.prompt_column).with_context(|| {
+            format!(
+                "row {}: missing prompt column `{}`",
+                args.i, args.golden_column
+            )
+        })?;
+        let golden = extract_text(args.row, args.golden_column).with_context(|| {
+            format!(
+                "row {}: missing golden column `{}`",
+                args.i, args.golden_column
+            )
+        })?;
 
-        let rendered = env
-            .render_str(template_str, jinja::context!(prompt => &prompt))
-            .with_context(|| format!("row {i}: failed to render prompt template"))?;
+        let rendered = args
+            .env
+            .render_str(args.template_str, jinja::context!(prompt => &prompt))
+            .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
-        let model_str = model
+        let model_str = args
+            .model
             .as_ref()
             .map_or("random".to_string(), std::string::ToString::to_string);
         let input_hash = hash_input(&format!(
             "{rendered}\nmodel={model_str}\nworkflow={}",
             self.name()
         ));
-        let step_key = format!("row-{i}");
+        let step_key = format!("row-{}", args.i);
 
-        let (output, step_id) =
-            run_timed_step(db, metrics_store, run_id, &step_key, &input_hash, async {
-                let model_response = llm
+        let (output, step_id) = run_timed_step(
+            args.db,
+            args.metrics_store,
+            args.run_id,
+            &step_key,
+            &input_hash,
+            async {
+                let model_response = args
+                    .llm
                     .sample(&rendered)
                     .await
-                    .with_context(|| format!("failed to sample LLM for row {i}"))?;
+                    .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
                 let is_correct = is_exact_match(&model_response, &golden);
 
@@ -94,13 +122,14 @@ impl CustomNoCodeBuiltin {
                     golden,
                     is_correct,
                 })
-            })
-            .await?;
+            },
+        )
+        .await?;
 
         if let Some(step_id) = step_id {
-            metrics_store
+            args.metrics_store
                 .emit(
-                    run_id,
+                    args.run_id,
                     Some(step_id),
                     "is_correct",
                     if output.is_correct { 1.0 } else { 0.0 },
@@ -161,20 +190,20 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let golden_column = golden_column.clone();
                 let env = env.clone();
                 async move {
-                    self.evaluate_row(
+                    let args = EvaluateRowArgs {
                         i,
-                        &row,
-                        &prompt_column,
-                        &golden_column,
-                        &template_str,
-                        &env,
-                        model.as_ref(),
-                        &llm,
-                        &db,
-                        ctx.metrics_store,
+                        row: &row,
+                        prompt_column: &prompt_column,
+                        golden_column: &golden_column,
+                        template_str: &template_str,
+                        env: &env,
+                        model: model.as_ref(),
+                        llm: &llm,
+                        db: &db,
+                        metrics_store: ctx.metrics_store,
                         run_id,
-                    )
-                    .await
+                    };
+                    self.evaluate_row(args).await
                 }
             })
             .await?;
