@@ -56,7 +56,7 @@ pub struct CustomNoCodeBenchmarkConfig {
     #[serde(rename = "type")]
     pub type_: String,
     pub style: CustomNoCodeStyle,
-    /// Dataset identifier (e.g. `quantiles/simpleqa-verified`).
+    /// Dataset identifier in HuggingFace (e.g. `quantiles/simpleqa-verified`).
     pub dataset: String,
     /// Model sampler to use.
     pub model: Option<Sampler>,
