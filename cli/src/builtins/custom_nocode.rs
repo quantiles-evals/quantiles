@@ -48,9 +48,9 @@ struct EvaluateRowArgs<'a> {
     template_str: &'a str,
     /// The pre-constructed jinja template env
     env: &'a jinja::Environment<'a>,
-    /// The model to test
-    model: Option<&'a crate::llm::Sampler>,
-    /// TODO: figure out why we have 2 samplers!
+    /// The name of the model we're sampling (used for cache key hashing only)
+    model_name: &'a str,
+    /// The actual model to sample
     llm: &'a std::sync::Arc<dyn crate::llm::LLMSampler>,
     /// The connection to the metadata DB
     db: &'a sea_orm::DatabaseConnection,
@@ -91,12 +91,9 @@ impl CustomNoCodeBuiltin {
             .render_str(args.template_str, jinja::context!(prompt => &prompt))
             .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
-        let model_str = args
-            .model
-            .as_ref()
-            .map_or("random".to_string(), std::string::ToString::to_string);
         let input_hash = hash_input(&format!(
-            "{rendered}\nmodel={model_str}\nworkflow={}",
+            "{rendered}\nmodel={}\nworkflow={}",
+            args.model_name,
             self.name()
         ));
         let step_key = format!("row-{}", args.i);
@@ -170,7 +167,10 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         .await?;
 
         let db = ctx.db.clone();
-        let model = config.model.clone();
+        let model_name = config
+            .model
+            .as_ref()
+            .map_or("random".to_string(), std::string::ToString::to_string);
         let run_id = ctx.run_id;
         let dataset = config.dataset.clone();
         let prompt_column = config.qa.prompt_column.clone();
@@ -184,7 +184,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .for_each_concurrent(max_workers, move |i, row| {
                 let llm = Arc::clone(&llm);
                 let db = db.clone();
-                let model = model.clone();
+                let model_name = model_name.clone();
                 let template_str = Arc::clone(&template_str);
                 let prompt_column = prompt_column.clone();
                 let golden_column = golden_column.clone();
@@ -197,7 +197,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                         golden_column: &golden_column,
                         template_str: &template_str,
                         env: &env,
-                        model: model.as_ref(),
+                        model_name: &model_name,
                         llm: &llm,
                         db: &db,
                         metrics_store: ctx.metrics_store,
