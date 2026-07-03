@@ -35,7 +35,7 @@ struct RowOutput {
 }
 
 /// Arguments for the [`CustomNoCodeBuiltin::evaluate_row`] method
-pub struct EvaluateRowArgs<'a> {
+struct EvaluateRowArgs<'a> {
     /// The row index
     i: usize,
     /// The row value
