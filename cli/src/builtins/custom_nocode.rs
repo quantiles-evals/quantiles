@@ -3,29 +3,26 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::builtins::common::{extract_text, get_max_workers, hash_input, run_timed_step};
+use crate::builtins::common::{
+    emit_accuracy_metrics, extract_text, get_max_workers, hash_input, resolve_sampler,
+    run_timed_step,
+};
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 use crate::dataset::DatasetManager;
-use crate::llm::LLMSampler;
 use crate::llm::random::RandomSampler;
 
 /// Input deserialized from the JSON assembled by `commands::run`.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CustomNoCodeInput {
-    style: String,
+    style: crate::config::CustomNoCodeStyle,
     dataset: String,
     #[serde(default)]
     model: Option<crate::llm::Sampler>,
-    prompt_template_file: String,
-    prompt_column: String,
-    golden_column: String,
-    #[serde(default)]
-    limit: Option<usize>,
-    #[serde(default)]
-    max_workers: Option<usize>,
+    #[serde(flatten)]
+    qa: crate::config::CustomNoCodeQaConfig,
 }
 
 /// Per-row step output stored as JSON in the step record.
@@ -63,25 +60,25 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .map(serde_json::from_str)
             .transpose()
             .context("invalid builtin input JSON")?
-            .unwrap_or_default();
+            .context("custom_nocode benchmark requires input configuration")?;
 
-        if config.style != "qa" {
-            bail!(
-                "unsupported custom_nocode style `{}`; only `qa` is supported",
-                config.style
-            );
+        // The enum deserializer already rejects unknown styles;
+        // this match ensures the field is read and will become
+        // non-exhaustive when new variants are added.
+        match config.style {
+            crate::config::CustomNoCodeStyle::Qa => {}
         }
 
-        if config.limit == Some(0) {
+        if config.qa.limit == Some(0) {
             bail!("limit must be > 0");
         }
 
         // Load template file and validate syntax.
         let template_str =
-            std::fs::read_to_string(&config.prompt_template_file).with_context(|| {
+            std::fs::read_to_string(&config.qa.prompt_template_file).with_context(|| {
                 format!(
                     "failed to read prompt template file `{}`",
-                    config.prompt_template_file
+                    config.qa.prompt_template_file
                 )
             })?;
         let env = jinja::Environment::new();
@@ -89,16 +86,13 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .with_context(|| {
                 format!(
                     "invalid jinja syntax in prompt template file `{}`",
-                    config.prompt_template_file
+                    config.qa.prompt_template_file
                 )
             })?;
 
-        let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
+        let max_workers = config.qa.max_workers.unwrap_or_else(get_max_workers);
 
-        let llm: Arc<dyn LLMSampler> = match config.model {
-            None => Arc::new(RandomSampler::new(80)),
-            Some(ref sampler) => sampler.resolve()?,
-        };
+        let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
         let manager = DatasetManager::new()?;
         let info = manager.init(&config.dataset, None, None, None).await?;
@@ -106,14 +100,14 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let total = info
             .total_rows
             .context("could not determine dataset size; pass an explicit limit")?;
-        let limit = config.limit.unwrap_or(total).min(total);
+        let limit = config.qa.limit.unwrap_or(total).min(total);
 
         set_builtin_run_input(
             ctx.db,
             ctx.run_id,
             config.model.as_ref(),
             limit,
-            config.max_workers,
+            config.qa.max_workers,
         )
         .await?;
 
@@ -121,8 +115,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let model = config.model.clone();
         let run_id = ctx.run_id;
         let dataset = config.dataset.clone();
-        let prompt_column = config.prompt_column.clone();
-        let golden_column = config.golden_column.clone();
+        let prompt_column = config.qa.prompt_column.clone();
+        let golden_column = config.qa.golden_column.clone();
         let template_str = Arc::new(template_str);
 
         let name = self.name();
@@ -199,34 +193,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             })
             .await?;
 
-        let mut correct_count: usize = 0;
         let total_count = results.len();
-        for is_correct in results {
-            if is_correct {
-                correct_count += 1;
-            }
-        }
-
-        #[expect(clippy::cast_precision_loss)]
-        if total_count > 0 {
-            let accuracy = correct_count as f64 / total_count as f64;
-
-            ctx.metrics_store
-                .emit(ctx.run_id, None, "accuracy", accuracy, None)
-                .await;
-            ctx.metrics_store
-                .emit(
-                    ctx.run_id,
-                    None,
-                    "correct_count",
-                    correct_count as f64,
-                    None,
-                )
-                .await;
-            ctx.metrics_store
-                .emit(ctx.run_id, None, "total_count", total_count as f64, None)
-                .await;
-        }
+        emit_accuracy_metrics(ctx.metrics_store, ctx.run_id, results).await;
 
         set_builtin_run_output(ctx.db, ctx.run_id, total_count).await?;
 

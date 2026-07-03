@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 
-use crate::builtins::common::{get_max_workers, hash_input, run_timed_step};
+use crate::builtins::common::{
+    emit_accuracy_metrics, get_max_workers, hash_input, resolve_sampler, run_timed_step,
+};
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 use crate::dataset::DatasetManager;
-use crate::llm::LLMSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
 use config::{PubMedQAConfig, RowOutput};
@@ -22,7 +23,6 @@ mod eval;
 /// `PubMedQA` builtin using the quantiles/PubMedQA dataset.
 pub struct PubmedqaBuiltin;
 
-#[expect(clippy::too_many_lines)]
 #[async_trait::async_trait]
 impl BuiltinWorkflow for PubmedqaBuiltin {
     fn name(&self) -> String {
@@ -43,10 +43,9 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
 
         let max_workers = config.base.max_workers.unwrap_or_else(get_max_workers);
 
-        let llm: Arc<dyn LLMSampler> = match config.base.model {
-            None => Arc::new(RandomLabelSampler::new(&["yes", "no", "maybe"])),
-            Some(ref sampler) => sampler.resolve()?,
-        };
+        let llm = resolve_sampler(config.base.model.as_ref(), || {
+            Arc::new(RandomLabelSampler::new(&["yes", "no", "maybe"]))
+        })?;
 
         let manager = DatasetManager::new()?;
         let dataset_id = "quantiles/PubMedQA";
@@ -138,34 +137,8 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
             })
             .await?;
 
-        let mut correct_count: usize = 0;
         let total_count = results.len();
-        for is_correct in results {
-            if is_correct {
-                correct_count += 1;
-            }
-        }
-
-        #[expect(clippy::cast_precision_loss)]
-        if total_count > 0 {
-            let accuracy = correct_count as f64 / total_count as f64;
-
-            ctx.metrics_store
-                .emit(ctx.run_id, None, "accuracy", accuracy, None)
-                .await;
-            ctx.metrics_store
-                .emit(
-                    ctx.run_id,
-                    None,
-                    "correct_count",
-                    correct_count as f64,
-                    None,
-                )
-                .await;
-            ctx.metrics_store
-                .emit(ctx.run_id, None, "total_count", total_count as f64, None)
-                .await;
-        }
+        emit_accuracy_metrics(ctx.metrics_store, ctx.run_id, results).await;
 
         set_builtin_run_output(ctx.db, ctx.run_id, total_count).await?;
 

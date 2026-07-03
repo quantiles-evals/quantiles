@@ -103,16 +103,16 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 _ => builtins::resolve(workflow_name)
                     .with_context(|| format!("builtin `{workflow_name}` not found"))?,
             };
-            super::run::execute_builtin(
-                &db,
-                &metrics_store,
+            super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
+                db: &db,
+                metrics_store: &metrics_store,
                 run_id,
                 workflow_name,
                 builtin,
-                stored_input,
+                input: stored_input,
                 json,
                 process_start,
-            )
+            })
             .await
         }
         ResumePlan::CustomCode(command) => {

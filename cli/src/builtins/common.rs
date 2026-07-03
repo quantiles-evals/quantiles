@@ -1,13 +1,15 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use std::time::Instant;
+
 use anyhow::{Context, Result};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::time::Instant;
 
 use crate::db::steps::{self, StepDecision};
-use crate::llm::Sampler;
+use crate::llm::{LLMSampler, Sampler};
 use crate::metrics_store::MetricsStore;
 
 /// Fields shared by every builtin benchmark config. When adding a new builtin,
@@ -116,6 +118,48 @@ pub(crate) fn get_max_workers() -> usize {
             }
         }
         Err(_) => DEFAULT,
+    }
+}
+
+/// Resolve a model sampler, falling back to a default when none is configured.
+pub(crate) fn resolve_sampler(
+    model: Option<&Sampler>,
+    default: impl FnOnce() -> Arc<dyn LLMSampler>,
+) -> Result<Arc<dyn LLMSampler>> {
+    match model {
+        None => Ok(default()),
+        Some(sampler) => sampler.resolve(),
+    }
+}
+
+/// Emit aggregate `accuracy`, `correct_count`, and `total_count` metrics from a
+/// collection of per-sample boolean correctness values.
+#[expect(clippy::cast_precision_loss)]
+pub(crate) async fn emit_accuracy_metrics(
+    metrics_store: &MetricsStore,
+    run_id: i64,
+    results: impl IntoIterator<Item = bool>,
+) {
+    let mut correct_count = 0usize;
+    let mut total_count = 0usize;
+    for is_correct in results {
+        total_count += 1;
+        if is_correct {
+            correct_count += 1;
+        }
+    }
+
+    if total_count > 0 {
+        let accuracy = correct_count as f64 / total_count as f64;
+        metrics_store
+            .emit(run_id, None, "accuracy", accuracy, None)
+            .await;
+        metrics_store
+            .emit(run_id, None, "correct_count", correct_count as f64, None)
+            .await;
+        metrics_store
+            .emit(run_id, None, "total_count", total_count as f64, None)
+            .await;
     }
 }
 

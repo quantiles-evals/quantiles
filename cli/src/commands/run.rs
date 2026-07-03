@@ -91,16 +91,16 @@ pub async fn run(
                     let builtin = Box::new(qt::builtins::CustomNoCodeBuiltin::new(
                         workflow_name.to_owned(),
                     ));
-                    execute_builtin(
-                        &db,
-                        &metrics_store,
+                    execute_builtin(ExecuteBuiltinArgs {
+                        db: &db,
+                        metrics_store: &metrics_store,
                         run_id,
                         workflow_name,
                         builtin,
-                        Some(&input),
+                        input: Some(&input),
                         json,
                         process_start,
-                    )
+                    })
                     .await
                 }
             }
@@ -242,78 +242,88 @@ async fn run_builtin_workflow(
         println!("Created run {run_id}");
     }
 
-    execute_builtin(
-        &db,
-        &metrics_store,
+    execute_builtin(ExecuteBuiltinArgs {
+        db: &db,
+        metrics_store: &metrics_store,
         run_id,
         workflow_name,
         builtin,
         input,
         json,
         process_start,
-    )
+    })
     .await
 }
 
-#[expect(clippy::too_many_arguments)]
-pub async fn execute_builtin(
-    db: &DatabaseConnection,
-    metrics_store: &MetricsStore,
-    run_id: i64,
-    workflow_name: &str,
-    builtin: Box<dyn builtins::BuiltinWorkflow>,
-    input: Option<&str>,
-    json: bool,
-    process_start: Instant,
-) -> Result<()> {
-    let builtin_result = builtin
+/// Arguments for [`execute_builtin`].
+pub struct ExecuteBuiltinArgs<'a> {
+    pub db: &'a DatabaseConnection,
+    pub metrics_store: &'a MetricsStore,
+    pub run_id: i64,
+    pub workflow_name: &'a str,
+    pub builtin: Box<dyn builtins::BuiltinWorkflow>,
+    pub input: Option<&'a str>,
+    pub json: bool,
+    pub process_start: Instant,
+}
+
+pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
+    let builtin_result = args
+        .builtin
         .execute(builtins::BuiltinContext {
-            db,
-            metrics_store,
-            run_id,
-            workflow_name,
-            input,
-            quiet: json,
+            db: args.db,
+            metrics_store: args.metrics_store,
+            run_id: args.run_id,
+            workflow_name: args.workflow_name,
+            input: args.input,
+            quiet: args.json,
         })
         .await;
 
-    let duration = process_start.elapsed();
+    let duration = args.process_start.elapsed();
 
     match &builtin_result {
         Ok(()) => {
-            db::complete_run(db, metrics_store, run_id).await?;
-            if !json {
+            db::complete_run(args.db, args.metrics_store, args.run_id).await?;
+            if !args.json {
                 println!(
-                    "Run {run_id} completed successfully in {:.2}s",
+                    "Run {} completed successfully in {:.2}s",
+                    args.run_id,
                     duration.as_secs_f64()
                 );
             }
         }
         Err(err) => {
             let msg = format!("{err:#}");
-            db::fail_run(db, metrics_store, run_id, &msg).await?;
-            if !json {
-                println!("Run {run_id} failed: {msg}");
+            db::fail_run(args.db, args.metrics_store, args.run_id, &msg).await?;
+            if !args.json {
+                println!("Run {} failed: {msg}", args.run_id);
             }
         }
     }
 
-    let aggregate = metrics_store.list_aggregate_for_run(run_id).await?;
+    let aggregate = args
+        .metrics_store
+        .list_aggregate_for_run(args.run_id)
+        .await?;
 
-    if json {
+    if args.json {
         let metrics_map: HashMap<String, f64> = aggregate
             .iter()
             .map(|m| (m.metric_name.clone(), m.metric_value))
             .collect();
         let output = BuiltinRunJsonOutput {
             aggregate_metrics: metrics_map,
-            run_id,
+            run_id: args.run_id,
             warning: None,
         };
         println!("{}", serde_json::to_string(&output)?);
     } else {
         print_aggregate_metrics_table(&aggregate);
-        println!("\nRun `qt show {run_id} --verbose` for sample-level details.");
+        println!(
+            "\nRun `qt show {} --verbose` for sample-level details.",
+            args.run_id
+        );
     }
 
     builtin_result
