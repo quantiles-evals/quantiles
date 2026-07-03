@@ -147,16 +147,12 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
         let config = parse_input(ctx.input)?;
-
         let (template_str, env) = load_template(&config.qa.prompt_template_file)?;
-
         let max_workers = config.qa.max_workers.unwrap_or_else(get_max_workers);
-
         let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
         let (manager, info, limit) =
             resolve_dataset_limit(&config.dataset, config.qa.limit).await?;
-
         set_builtin_run_input(
             ctx.db,
             ctx.run_id,
