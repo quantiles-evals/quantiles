@@ -236,4 +236,147 @@ mod tests {
         let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench)).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
     }
+
+    /// A failed `custom_nocode` run can be resumed and re-execute successfully
+    /// through the `CustomNoCodeBuiltin`, verifying that the resume path wires
+    /// the correct builtin and `ExecuteBuiltinArgs`.
+    #[expect(clippy::too_many_lines)]
+    #[tokio::test]
+    async fn resume_failed_custom_nocode_run_re_executes_successfully() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let cache_dir = root.join("cache");
+
+        // Save original env var values so we can restore them later.
+        let orig_hf = std::env::var("HF_DATASETS_SERVER").ok();
+        let orig_cache = std::env::var("QUANTILES_DATASET_CACHE_DIR").ok();
+        unsafe {
+            std::env::set_var("HF_DATASETS_SERVER", server.uri());
+            std::env::set_var("QUANTILES_DATASET_CACHE_DIR", cache_dir.as_os_str());
+        }
+
+        // Mock HF dataset server endpoints used by DatasetManager::init().
+        Mock::given(method("GET"))
+            .and(path("/splits"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "splits": [{"config": "default", "split": "train"}]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/size"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "size": {"splits": [{"num_rows": 2}]}
+            })))
+            .mount(&server)
+            .await;
+
+        // Initialize workspace with SQLite DB and metrics dir.
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+
+        // Write a Jinja template file.
+        let template_path = root.join("template.txt");
+        std::fs::write(&template_path, "{{ prompt }}\nAnswer:").unwrap();
+
+        // Pre-populate the dataset cache so no network fetch is needed for rows.
+        let cache = qt::dataset::cache::DatasetCache::new(cache_dir);
+        let rows = vec![
+            serde_json::json!({"question": "what is 2+2", "answer": "4"}),
+            serde_json::json!({"question": "what is 3+3", "answer": "6"}),
+        ];
+        let key = qt::dataset::cache::cache_key("fixture/qa", "default", "train", None);
+        let batch_path = cache.batch_path(&key, 0, 2);
+        cache.write_batch(&batch_path, &rows).await.unwrap();
+
+        // Write a quantiles.toml so resume can load config.
+        std::fs::write(
+            root.join("quantiles.toml"),
+            format!(
+                r#"
+[benchmarks.nocode_resume_test]
+type = "custom_nocode"
+style = "qa"
+dataset = "fixture/qa"
+model = "random"
+prompt_template_file = "{}"
+prompt_column = "question"
+golden_column = "answer"
+limit = 2
+"#,
+                template_path.to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        let input_json = serde_json::to_string(&serde_json::json!({
+            "style": "qa",
+            "dataset": "fixture/qa",
+            "model": "random",
+            "prompt_template_file": template_path.to_str().unwrap(),
+            "prompt_column": "question",
+            "golden_column": "answer",
+            "limit": 2,
+        }))
+        .unwrap();
+
+        let workflow_name = "nocode_resume_test";
+        let run_id = qt::db::create_run(&db, workflow_name, Some(&input_json))
+            .await
+            .unwrap();
+
+        // Mark the run as failed so it can be resumed.
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+
+        let run_before = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run_before.status, qt::db::RunStatus::Failed);
+
+        // Change cwd so resume finds the config file.
+        let orig_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+
+        resume(run_id, true, std::time::Instant::now())
+            .await
+            .unwrap();
+
+        // Restore cwd.
+        std::env::set_current_dir(orig_cwd).unwrap();
+
+        // Verify the run is now completed.
+        let run_after = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run_after.status, qt::db::RunStatus::Completed);
+
+        // Verify aggregate metrics were written.
+        metrics_store.flush(run_id).await.unwrap();
+        let agg = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        let names: Vec<&str> = agg.iter().map(|m| m.metric_name.as_str()).collect();
+        assert!(names.contains(&"accuracy"));
+        assert!(names.contains(&"correct_count"));
+        assert!(names.contains(&"total_count"));
+
+        // Verify steps were persisted in SQLite.
+        let steps = qt::db::list_steps_for_run(&db, run_id).await.unwrap();
+        assert_eq!(steps.len(), 2);
+
+        // Restore environment variables.
+        unsafe {
+            match &orig_hf {
+                Some(v) => std::env::set_var("HF_DATASETS_SERVER", v),
+                None => std::env::remove_var("HF_DATASETS_SERVER"),
+            }
+            match &orig_cache {
+                Some(v) => std::env::set_var("QUANTILES_DATASET_CACHE_DIR", v),
+                None => std::env::remove_var("QUANTILES_DATASET_CACHE_DIR"),
+            }
+        }
+    }
 }
