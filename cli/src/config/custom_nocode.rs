@@ -11,6 +11,10 @@ use crate::llm::Sampler;
 /// - `Agent` – run multi-step agent loops.
 #[derive(Debug, Clone)]
 pub enum CustomNoCodeStyle {
+    /// A qa-style benchmark. These benchmarks generally have datasets with
+    /// a prompt and a golden answer, which the model under test must exactly
+    /// match (modulo minor whitespace and other cleanup) for it to "pass"
+    /// the sample
     Qa,
 }
 
