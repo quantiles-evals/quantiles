@@ -45,6 +45,72 @@ impl CustomNoCodeBuiltin {
     pub fn new(name: String) -> Self {
         Self { name }
     }
+
+    #[expect(clippy::too_many_arguments)]
+    async fn evaluate_row(
+        &self,
+        i: usize,
+        row: &serde_json::Value,
+        prompt_column: &str,
+        golden_column: &str,
+        template_str: &str,
+        env: &jinja::Environment<'_>,
+        model: Option<&crate::llm::Sampler>,
+        llm: &std::sync::Arc<dyn crate::llm::LLMSampler>,
+        db: &sea_orm::DatabaseConnection,
+        metrics_store: &crate::metrics_store::MetricsStore,
+        run_id: i64,
+    ) -> Result<bool> {
+        let prompt = extract_text(row, prompt_column)
+            .with_context(|| format!("row {i}: missing prompt column `{prompt_column}`"))?;
+        let golden = extract_text(row, golden_column)
+            .with_context(|| format!("row {i}: missing golden column `{golden_column}`"))?;
+
+        let rendered = env
+            .render_str(template_str, jinja::context!(prompt => &prompt))
+            .with_context(|| format!("row {i}: failed to render prompt template"))?;
+
+        let model_str = model
+            .as_ref()
+            .map_or("random".to_string(), std::string::ToString::to_string);
+        let input_hash = hash_input(&format!(
+            "{rendered}\nmodel={model_str}\nworkflow={}",
+            self.name()
+        ));
+        let step_key = format!("row-{i}");
+
+        let (output, step_id) =
+            run_timed_step(db, metrics_store, run_id, &step_key, &input_hash, async {
+                let model_response = llm
+                    .sample(&rendered)
+                    .await
+                    .with_context(|| format!("failed to sample LLM for row {i}"))?;
+
+                let is_correct = is_exact_match(&model_response, &golden);
+
+                Ok(RowOutput {
+                    input: rendered.clone(),
+                    response: model_response,
+                    golden,
+                    is_correct,
+                })
+            })
+            .await?;
+
+        if let Some(step_id) = step_id {
+            metrics_store
+                .emit(
+                    run_id,
+                    Some(step_id),
+                    "is_correct",
+                    if output.is_correct { 1.0 } else { 0.0 },
+                    None,
+                )
+                .await;
+        }
+
+        Ok(output.is_correct)
+    }
 }
 
 #[async_trait::async_trait]
@@ -53,54 +119,17 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         self.name.clone()
     }
 
-    #[expect(clippy::too_many_lines)]
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
-        let config: CustomNoCodeInput = ctx
-            .input
-            .map(serde_json::from_str)
-            .transpose()
-            .context("invalid builtin input JSON")?
-            .context("custom_nocode benchmark requires input configuration")?;
+        let config = parse_input(ctx.input)?;
 
-        // The enum deserializer already rejects unknown styles;
-        // this match ensures the field is read and will become
-        // non-exhaustive when new variants are added.
-        match config.style {
-            crate::config::CustomNoCodeStyle::Qa => {}
-        }
-
-        if config.qa.limit == Some(0) {
-            bail!("limit must be > 0");
-        }
-
-        // Load template file and validate syntax.
-        let template_str =
-            std::fs::read_to_string(&config.qa.prompt_template_file).with_context(|| {
-                format!(
-                    "failed to read prompt template file `{}`",
-                    config.qa.prompt_template_file
-                )
-            })?;
-        let env = jinja::Environment::new();
-        env.render_str(&template_str, jinja::context!(prompt => ""))
-            .with_context(|| {
-                format!(
-                    "invalid jinja syntax in prompt template file `{}`",
-                    config.qa.prompt_template_file
-                )
-            })?;
+        let (template_str, env) = load_template(&config.qa.prompt_template_file)?;
 
         let max_workers = config.qa.max_workers.unwrap_or_else(get_max_workers);
 
         let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
-        let manager = DatasetManager::new()?;
-        let info = manager.init(&config.dataset, None, None, None).await?;
-
-        let total = info
-            .total_rows
-            .context("could not determine dataset size; pass an explicit limit")?;
-        let limit = config.qa.limit.unwrap_or(total).min(total);
+        let (manager, info, limit) =
+            resolve_dataset_limit(&config.dataset, config.qa.limit).await?;
 
         set_builtin_run_input(
             ctx.db,
@@ -132,63 +161,20 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let golden_column = golden_column.clone();
                 let env = env.clone();
                 async move {
-                    let prompt = extract_text(&row, &prompt_column).with_context(|| {
-                        format!("row {i}: missing prompt column `{prompt_column}`")
-                    })?;
-                    let golden = extract_text(&row, &golden_column).with_context(|| {
-                        format!("row {i}: missing golden column `{golden_column}`")
-                    })?;
-
-                    let rendered = env
-                        .render_str(&template_str, jinja::context!(prompt => &prompt))
-                        .with_context(|| format!("row {i}: failed to render prompt template"))?;
-
-                    let model_str = model
-                        .as_ref()
-                        .map_or("random".to_string(), std::string::ToString::to_string);
-                    let input_hash = hash_input(&format!(
-                        "{rendered}\nmodel={model_str}\nworkflow={}",
-                        self.name()
-                    ));
-                    let step_key = format!("row-{i}");
-
-                    let (output, step_id) = run_timed_step(
+                    self.evaluate_row(
+                        i,
+                        &row,
+                        &prompt_column,
+                        &golden_column,
+                        &template_str,
+                        &env,
+                        model.as_ref(),
+                        &llm,
                         &db,
                         ctx.metrics_store,
                         run_id,
-                        &step_key,
-                        &input_hash,
-                        async {
-                            let model_response = llm
-                                .sample(&rendered)
-                                .await
-                                .with_context(|| format!("failed to sample LLM for row {i}"))?;
-
-                            let is_correct = is_exact_match(&model_response, &golden);
-
-                            Ok(RowOutput {
-                                input: rendered.clone(),
-                                response: model_response,
-                                golden,
-                                is_correct,
-                            })
-                        },
                     )
-                    .await?;
-
-                    if let Some(step_id) = step_id {
-                        ctx.metrics_store
-                            .emit(
-                                ctx.run_id,
-                                Some(step_id),
-                                "is_correct",
-                                if output.is_correct { 1.0 } else { 0.0 },
-                                None,
-                            )
-                            .await;
-                    }
-
-                    Ok::<_, anyhow::Error>(output.is_correct)
+                    .await
                 }
             })
             .await?;
@@ -200,6 +186,48 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
         Ok(())
     }
+}
+
+fn parse_input(input: Option<&str>) -> Result<CustomNoCodeInput> {
+    let config: CustomNoCodeInput = input
+        .map(serde_json::from_str)
+        .transpose()
+        .context("invalid builtin input JSON")?
+        .context("custom_nocode benchmark requires input configuration")?;
+
+    match config.style {
+        crate::config::CustomNoCodeStyle::Qa => {}
+    }
+
+    if config.qa.limit == Some(0) {
+        bail!("limit must be > 0");
+    }
+
+    Ok(config)
+}
+
+fn load_template(path: &str) -> Result<(String, jinja::Environment<'_>)> {
+    let template_str = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read prompt template file `{path}`"))?;
+    let env = jinja::Environment::new();
+    env.render_str(&template_str, jinja::context!(prompt => ""))
+        .with_context(|| format!("invalid jinja syntax in prompt template file `{path}`"))?;
+    Ok((template_str, env))
+}
+
+async fn resolve_dataset_limit(
+    dataset: &str,
+    limit: Option<usize>,
+) -> Result<(DatasetManager, crate::dataset::DatasetInfo, usize)> {
+    let manager = DatasetManager::new()?;
+    let info = manager.init(dataset, None, None, None).await?;
+
+    let total = info
+        .total_rows
+        .context("could not determine dataset size; pass an explicit limit")?;
+    let limit = limit.unwrap_or(total).min(total);
+
+    Ok((manager, info, limit))
 }
 
 /// Case-sensitive exact-match comparison after trimming whitespace.
