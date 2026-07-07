@@ -8,6 +8,7 @@ You need a config file when you want to do one or more of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
 - Define custom evaluations (`type = "custom_code"`)
+- Define no-code QA benchmarks (`type = "custom_nocode"`, `style = "qa"`)
 - Resume custom evaluations later with `qt resume <run_id>`
 
 You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
@@ -54,7 +55,7 @@ command = ["uv", "run", "my_eval.py"]
 
 ## Benchmark types
 
-Every benchmark section has a `type` field. Valid values are `"builtin"` (default when absent) and `"custom_code"`.
+Every benchmark section has a `type` field. Valid values are `"builtin"` (default when absent), `"custom_code"`, and `"custom_nocode"`.
 
 ### `builtin`
 
@@ -64,7 +65,7 @@ Built-in benchmarks run natively inside the CLI, without any custom code. Below 
 |--|--|--|--|
 | `type` | string | no | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
 | `samples` | integer | no | Number of dataset rows to evaluate. |
-| `model` | string or table | no | Model sampler. See [model format](#model-format). |
+| `model` | string or table | no | Model sampler. See [model naming](#model-naming). |
 | `max_workers` | integer | no | Maximum concurrent workers. |
 
 If none of these fields are customized, the built-in benchmark uses the following defaults:
@@ -96,6 +97,42 @@ model = { provider = "openai", model_id = "gpt-5.4-nano" }
 ```
 
 Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in [`cli/examples/configs`](./cli/examples/configs).
+
+### `custom_nocode`
+
+No-code benchmarks are configured in TOML and run natively inside the CLI, without a custom Python or TypeScript evaluation program. The initial supported style is `qa`, which renders a prompt from a dataset row, calls a model, and scores the response with exact-match accuracy against the configured golden answer column.
+
+```toml
+[benchmarks.nocode_custom]
+type = "custom_nocode"
+style = "qa"
+dataset = "quantiles/simpleqa-verified"
+model = "random"
+prompt_template_file = "prompts/qa.txt"
+prompt_column = "problem"
+golden_column = "answer"
+limit = 10
+```
+
+Run it with:
+
+```bash
+qt run nocode_custom
+```
+
+For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml).
+
+| Field | Type | Required | Description |
+|--|--|--|--|
+| `type` | string | yes | Must be `"custom_nocode"`. |
+| `style` | string | yes | Must be `"qa"`. |
+| `dataset` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
+| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives `prompt` from the configured prompt column. |
+| `prompt_column` | string | yes | Dataset column containing the prompt text. |
+| `golden_column` | string | yes | Dataset column containing the golden answer. |
+| `limit` | integer | no | Number of dataset rows to evaluate. |
+| `max_workers` | integer | no | Maximum concurrent workers. |
 
 ### `custom_code`
 

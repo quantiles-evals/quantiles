@@ -4,6 +4,10 @@ Quantiles is a local-first CLI and SDK for running durable AI evaluation workflo
 
 It includes a CLI (called `qt`), SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools. This monorepo centralizes all the pieces of Quantiles, making it easier for engineers and coding agents to inspect, change, test, and extend the system.
 
+## ![NEW!](./docs/assets/new-badge.svg) What's New
+
+**[2026.07.07]** Added `custom_nocode` QA benchmarks, which let users configure a dataset-backed question-answering benchmark in `quantiles.toml` without writing custom evaluation code. See [No-code QA benchmarks](./cli/src/builtins/custom_nocode.rs) for more details.
+
 ## Why Quantiles
 
 Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to built them from scratch:
@@ -117,7 +121,9 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 
 ## Built-in Benchmarks
 
-Built-in benchmarks are ready-to-run evalulations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
+Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
+
+For dataset-backed QA checks that do not need custom Python or TypeScript code, use a `custom_nocode` benchmark in `quantiles.toml`. A `custom_nocode` QA benchmark points to a dataset, a Jinja prompt template, the dataset column containing the prompt, and the dataset column containing the golden answer. See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for a minimal example.
 
 | Code | When to use |
 | --- | --- |

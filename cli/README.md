@@ -53,7 +53,7 @@ See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_co
 
 ## Configuration files and customization
 
-You can customize how the CLI executes built-in benchmarks and custom evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
+You can customize how the CLI executes built-in benchmarks, custom code evaluations, and no-code QA benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
 - [`../CONFIG.md`](../CONFIG.md): for a guide and reference.
 - [`./examples/configs`](./examples/configs) for complete working examples.
@@ -70,6 +70,28 @@ max_workers = 100
 ```
 
 >Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+
+### No-code QA benchmarks
+
+For dataset-backed QA checks that do not need custom evaluation code, set `type = "custom_nocode"` and `style = "qa"`. The benchmark runs inside the CLI, renders each prompt with the configured Jinja template, calls the configured model, and scores each row with exact-match accuracy against the golden answer column.
+
+```toml
+[benchmarks.nocode_custom]
+type = "custom_nocode"
+style = "qa"
+dataset = "quantiles/simpleqa-verified"
+model = "random"
+prompt_template_file = "prompts/qa.txt"
+prompt_column = "problem"
+golden_column = "answer"
+limit = 10
+```
+
+```bash
+qt run nocode_custom
+```
+
+See [`../custom-nocode-examples/quantiles.toml`](../custom-nocode-examples/quantiles.toml) for a complete minimal example.
 
 ### Custom code evals
 
