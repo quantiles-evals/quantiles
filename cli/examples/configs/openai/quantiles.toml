@@ -12,9 +12,9 @@
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50
 
-# The below model is good for demonstrating PubMedQA benchmarks without very high costs,
+# The following model is good for demonstrating PubMedQA benchmarks without very high costs,
 # since it's relatively cheap and fast. You may need to ensure the project associated with
-# your API key has permissions to use this model. Do so by going to the below page, and
+# your API key has permissions to use this model. Do so by going to the follwing page, and
 # enabling the model:
 #
 # https://platform.openai.com/settings/$PROJECT_ID/limits
@@ -26,7 +26,7 @@ samples = 50
 # And a list of all models can be found at:
 #
 # https://developers.openai.com/api/docs/models/all
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 
 # If you run this or other benchmarks with more samples, you may also need to increase this
 # `max_workers` parameter to improve throughput. This might cause you to run into rate

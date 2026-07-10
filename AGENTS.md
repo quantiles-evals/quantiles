@@ -39,7 +39,7 @@ When performing tasks in this repository, always do the following:
 - Prefer the smallest change that satisfies the task.
 - Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 - Keep changes small, public-safe, and reviewable.
-- Preserve Quantiles as local-first, offline system by default.
+- Preserve Quantiles as a local-first, offline system by default.
 - Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
 - Update public docs when CLI behavior, SDK APIs, workflows, benchmarks, schemas, setup steps, or agent guidance changes.
 - Prefer concrete examples with commands, file paths, inputs, outputs, and expected behavior.
@@ -60,7 +60,7 @@ Keep root-level changes focused on public orientation, documentation, contributi
 
 Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, metrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
 
-Update documentation in this repository (e.g. `README.md`, etc...) when any of the following change:
+Update the relevant documentation in this repository, such as `README.md`, when any of the following change:
 
 - CLI commands, flags, outputs, or setup steps.
 - APIs, SDKs, imports, examples, or package names.
@@ -85,7 +85,7 @@ When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON
 
 ### `typescript/` directory
 
->**Not released**. The TypeScript SDK is currently unsupported and unreleased.
+> **Not released**. The TypeScript SDK is currently unsupported and unreleased.
 
 The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals with the Quantiles stack using TypeScript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
@@ -105,16 +105,16 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 - `anthropic:<model>`
 - `gemini:<model>`
 
-## Safety, Security And Privacy
+## Safety, Security, and Privacy
 
-Preserve Quantiles as local-first infrastructure. Follow the below guidelines to ensure the project maintains safety, security and privacy:
+Preserve Quantiles as local-first infrastructure. Follow the guidelines below to ensure the project maintains safety, security, and privacy:
 
 - The CLI and local server should store Quantiles state locally by default
 - Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
 - Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
 - Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
-- Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
+- Keep public docs customer-safe. Avoid exposing secrets, API keys, and non-public security information.
 
 Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
 
@@ -140,7 +140,7 @@ When remote model calls, hosted judges, external tools, provider APIs, or networ
 
 ## Output Style For Coding Agents
 
-When adding documentation to files in this repository, follow the below guidelines:
+When adding documentation to files in this repository, follow the guidelines below:
 
 - Be concise, technical, and action-oriented.
 - Prefer runnable commands, real file paths, concrete inputs, and expected outputs.

@@ -28,7 +28,7 @@ pub enum Sampler {
     ///
     /// TODO: support custom endpoints
     OpenAI {
-        /// `OpenAI` model identifier (e.g. `gpt-5.4-nano`).
+        /// `OpenAI` model identifier (e.g. `gpt-5.6`).
         model_id: String,
     },
     /// Anthropic API
@@ -425,22 +425,22 @@ mod tests {
 
     #[test]
     fn deserialize_openai_string() {
-        let s: Sampler = serde_json::from_str("\"openai:gpt-5.4-nano\"").unwrap();
+        let s: Sampler = serde_json::from_str("\"openai:gpt-5.6\"").unwrap();
         assert_eq!(
             s,
             Sampler::OpenAI {
-                model_id: "gpt-5.4-nano".to_string(),
+                model_id: "gpt-5.6".to_string(),
             }
         );
     }
 
     #[test]
     fn deserialize_openai_table() {
-        let s: Sampler = serde_json::from_str(r#"{"type":"openai:gpt-5.4-nano"}"#).unwrap();
+        let s: Sampler = serde_json::from_str(r#"{"type":"openai:gpt-5.6"}"#).unwrap();
         assert_eq!(
             s,
             Sampler::OpenAI {
-                model_id: "gpt-5.4-nano".to_string(),
+                model_id: "gpt-5.6".to_string(),
             }
         );
     }
@@ -448,18 +448,18 @@ mod tests {
     #[test]
     fn serialize_openai() {
         let s = Sampler::OpenAI {
-            model_id: "gpt-5.4-nano".to_string(),
+            model_id: "gpt-5.6".to_string(),
         };
         let json = serde_json::to_string(&s).unwrap();
-        assert_eq!(json, "\"openai:gpt-5.4-nano\"");
+        assert_eq!(json, "\"openai:gpt-5.6\"");
     }
 
     #[test]
     fn display_openai() {
         let s = Sampler::OpenAI {
-            model_id: "gpt-5.4-nano".to_string(),
+            model_id: "gpt-5.6".to_string(),
         };
-        assert_eq!(s.to_string(), "openai:gpt-5.4-nano");
+        assert_eq!(s.to_string(), "openai:gpt-5.6");
     }
 
     #[test]

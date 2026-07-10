@@ -27,7 +27,7 @@ pub struct BuiltinContext<'a> {
 /// Trait for builtin evals that run natively inside the CLI.
 #[async_trait]
 pub trait BuiltinWorkflow: Send + Sync {
-    /// Unique name of the builtin (e.g. "financebench").
+    /// Unique name of the built-in (e.g. "financebench").
     fn name(&self) -> &'static str;
     /// Execute the builtin eval.
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()>;
