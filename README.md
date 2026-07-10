@@ -126,6 +126,12 @@ Built-in benchmarks are ready-to-run evalulations with predefined datasets, scor
 
 Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
 
+### Add a built-in benchmark 
+
+If there is an open-source benchmark you would like to add as a built-in benchmark, [file an issue](https://github.com/quantiles-evals/quantiles/issues).
+
+Helpful requests include the benchmark name, source dataset or repository, license and any reference implementation.
+
 ## Custom Evaluations
 
 A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](http://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
