@@ -109,14 +109,14 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 +-------------------+------------------+
                     │
                     │  HTTP / JSON
-                    |
+                    │
                     ▼
 +--------------------------------------+
 |            Quantiles Server          |
 +-------------------+------------------+
                     │
                     │  SQLite
-                    |
+                    │
                     ▼
 +------------------------------------------------+
 |     .quantiles/quantiles.sqlite (local DB)     |
