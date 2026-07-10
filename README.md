@@ -1,8 +1,8 @@
-# Quantiles Open-source
+# Quantiles: Local-First AI Evaluation Infrastructure
 
-Quantiles is a local-first CLI and SDK for running durable AI evaluation workflows with fast, continuous feedback. Teams can iterate on model behavior, prompts, agent workflows, and debugging scripts while preserving the metrics and run histories needed to understand what improved, what regressed, and why.
+Quantiles is a local-first CLI and SDK for running durable, reproducible AI evaluation workflows. Teams can iterate on models, prompts, agent workflows, and evaluation logic while preserving the metrics and run history needed to understand what improved, what regressed, and why.
 
-It includes a CLI (called `qt`), SDKs, built-in benchmarks, local run history, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools. This monorepo centralizes all the pieces of Quantiles, making it easier for engineers and coding agents to inspect, change, test, and extend the system.
+It includes the `qt` CLI, a Python SDK, built-in benchmarks, local evaluation data, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. This monorepo centralizes Quantiles components, making it easier for engineers, researchers, and coding agents to inspect, modify, test, and extend the system.
 
 ## Why Quantiles
 
@@ -59,15 +59,15 @@ Use `qt show` to inspect a single run, `qt list` to see a list of all runs, and 
 Common commands:
 
 ```bash
-qt run <evaluation>
+qt run <eval_name>
 qt list
 qt show <run_id>
 qt compare <run_id_a> <run_id_b>
 ```
 
->Note: you can pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
+> Note: you can pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
 
-To learn more detail about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
+To learn more about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
 
 ### Configuration file and customization
 
@@ -110,7 +110,7 @@ The Quantiles toolchain, including the `qt` CLI, SDKs, on-disk data formats, and
 Both the CLI and Python SDK support offline benchmark workflows, including the following local execution and analysis features:
 
 - Benchmark code runs locally on your machine
-- Measurements are computed locally, except for remote model calls, hosted judges, external tools, and LLM-as-judge evaluations that may call remote providers (e.g. OpenAI, Anthropic, cloud providers, etc.)
+- Measurements are computed locally, although model calls, hosted judges, external tools, and LLM-as-judge evaluations may use remote providers such as OpenAI, Anthropic, or cloud services.
 - Metadata are recorded to a local, on-disk database
 - Metrics and evaluation outputs are recorded to local, on-disk files
 - `qt show`, `qt list` and `qt compare` commands access only local metadata and analytics databases
@@ -119,22 +119,22 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 
 Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
-| Code | When to use |
-| --- | --- |
-| `qt run <benchmark>` | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
-| `qt run <benchmark> --input '{"model":"<model_name>}'` | Run a built-in benchmark against your model |
+| Code                                                   | When to use                                                                                                                                         |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `qt run <benchmark>`                                   | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
+| `qt run <benchmark> --input '{"model":"<model_name>}'` | Run a built-in benchmark against your model                                                                                                         |
 
 Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
 
-### Add a built-in benchmark 
+### Add a built-in benchmark
 
 If there is an open-source benchmark you would like to add as a built-in benchmark, [file an issue](https://github.com/quantiles-evals/quantiles/issues).
 
-Helpful requests include the benchmark name, source dataset or repository, license and any reference implementation.
+Helpful requests include the benchmark name, source dataset or repository, license, and any reference implementation.
 
 ## Custom Evaluations
 
-A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](http://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
+A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](https://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
 
 Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
 
@@ -155,9 +155,9 @@ Read more about how to build and run custom evaluations at [quantiles.io/documen
 
 ### Python SDK
 
-Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording and analyzing benchmarks.
+Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording, and analyzing benchmarks.
 
-The code for the Python SDK is located in this repository at [`./python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk)
+The code for the Python SDK is located in this repository at [`./python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk).
 
 ## Coding Agents
 
@@ -165,21 +165,21 @@ Quantiles is designed to work well with coding agents such as Codex, Claude Code
 
 ### `SKILL.md`
 
-The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) file that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the below prompt:
+The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) file that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the following prompt:
 
 ```text
 Install the Quantiles eval skill at github.com/quantiles-evals/skill
 ```
 
-If you want your agent to run an eval, use the below prompt:
+If you want your agent to run an eval, use the following prompt:
 
 ```text
- Use the Quantiles eval skill to run the SimpleQA Verified benchmark and summarize the results.
- ```
+Use the Quantiles eval skill to run the SimpleQA Verified benchmark and summarize the results.
+```
 
- ### `AGENTS.md`
+### `AGENTS.md`
 
- The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to Quantiles open source systems.
+The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to the Quantiles' open source components.
 
 ## Documentation
 
@@ -193,7 +193,7 @@ Start here:
 
 ## Contributing
 
-Quantiles exists to make AI evaluation workflows more practical, repeatable, and useful for engineering teams. We welcome contributions from the community, whether you are fixing bugs, improving documentation, adding evaluations and benchmarks, or helping make Quantiles Open Source more reliable for AI engineers and researchers.
+Quantiles exists to make AI evaluation workflows more practical, repeatable, and useful for engineering teams. We welcome contributions from the community, whether you are fixing bugs, improving documentation, adding evaluations and benchmarks, or helping make Quantiles open-source more reliable for AI engineers and researchers.
 
 Please read our [contributing guide](./CONTRIBUTING.md) to get started.
 
@@ -203,4 +203,4 @@ Please do not report security vulnerabilities through public GitHub issues. Foll
 
 ## License
 
-Quantiles Open-source is licensed under the [Apache License 2.0](./LICENSE). Hosted, enterprise, or managed Quantiles products may be offered under separate commercial terms.
+Quantiles open source is licensed under the [Apache License 2.0](./LICENSE). Hosted, enterprise, or managed Quantiles products may be offered under separate commercial terms.

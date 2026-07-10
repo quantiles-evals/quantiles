@@ -60,7 +60,7 @@ Keep root-level changes focused on public orientation, documentation, contributi
 
 Do not silently change evaluation semantics. Changes to prompts, datasets, scorers, rubrics, metrics, sampling parameters, judge configuration, model selection, tool configuration, or step inputs can invalidate comparisons. Call out any such changes in handoff.
 
-Update documentation in this repository (e.g. `README.md`, etc...) when any of the following change:
+Update the relevant documentation in this repository, such as `README.md`, when any of the following change:
 
 - CLI commands, flags, outputs, or setup steps.
 - APIs, SDKs, imports, examples, or package names.
@@ -85,7 +85,7 @@ When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON
 
 ### `typescript/` directory
 
->**Not released**. The TypeScript SDK is currently unsupported and unreleased.
+> **Not released**. The TypeScript SDK is currently unsupported and unreleased.
 
 The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals with the Quantiles stack using TypeScript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
@@ -107,7 +107,7 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 
 ## Safety, Security And Privacy
 
-Preserve Quantiles as local-first infrastructure. Follow the below guidelines to ensure the project maintains safety, security and privacy:
+Preserve Quantiles as local-first infrastructure. Follow the guidelines below to ensure the project maintains safety, security, and privacy:
 
 - The CLI and local server should store Quantiles state locally by default
 - Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
@@ -140,7 +140,7 @@ When remote model calls, hosted judges, external tools, provider APIs, or networ
 
 ## Output Style For Coding Agents
 
-When adding documentation to files in this repository, follow the below guidelines:
+When adding documentation to files in this repository, follow the guidelines below:
 
 - Be concise, technical, and action-oriented.
 - Prefer runnable commands, real file paths, concrete inputs, and expected outputs.

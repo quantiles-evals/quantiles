@@ -1,6 +1,6 @@
 # Contributing to Quantiles
 
-Thank you for interest in contributing to Quantiles Open source!
+Thank you for your interest in contributing to Quantiles open source!
 
 Quantiles open source projects provide local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
 
@@ -39,7 +39,7 @@ Please do not report security vulnerabilities through public GitHub issues. Foll
 
 ## Code of Conduct
 
-By participating in this project, you agree to follow our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+By participating in this project, you agree to follow our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 ## License
 

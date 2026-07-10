@@ -1,6 +1,6 @@
 # Quantiles CLI
 
-This directory holds the source code for the `qt` CLI. It is built with [Rust](https://rust-lang.org/) to help it efficiently use the resources of the local machine, to help ensure safety, and to provide strong lints and type-system invariants for humans and agents to work with.
+This directory contains the source code for the `qt` CLI. It is implemented in [Rust](https://rust-lang.org/) to use local machine resources efficiently, improve safety, and provide strong lints and type-system invariants for humans and agents.
 
 ## Install
 
@@ -17,9 +17,9 @@ A few commands to see `qt` in action:
 qt init
 
 # 2. Run a built-in eval
-# 
+#
 # Note that you can also build and run your own custom evals
-# with the `qt` CLI. See the below "Custom evaluations" section
+# with the `qt` CLI. See the following "Custom evaluations" section
 # for details.
 qt run pubmedqa
 
@@ -28,11 +28,11 @@ qt list
 qt show 1
 ```
 
->See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
+> See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 ### Custom evaluations
 
-Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed in the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below
+Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
 
 ```toml
 [benchmarks.my-eval]
@@ -69,7 +69,7 @@ model = "openai:gpt-5.4-nano"
 max_workers = 100
 ```
 
->Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+> Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
 
 ### Custom code evals
 
