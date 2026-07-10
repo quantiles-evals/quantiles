@@ -78,7 +78,7 @@ For **built-in benchmarks**, configure settings like `samples`, `model`, and `ma
 ```toml
 [benchmarks.pubmedqa]
 samples = 50
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
@@ -179,7 +179,7 @@ Use the Quantiles eval skill to run the SimpleQA Verified benchmark and summariz
 
 ### `AGENTS.md`
 
-The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to the Quantiles' open source components.
+The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific instructions, such as how to add features to the CLI and SDKs, ensuring that contributors can use agents of their choice to make high-quality contributions to the Quantiles open source components.
 
 ## Documentation
 
@@ -193,7 +193,7 @@ Start here:
 
 ## Contributing
 
-Quantiles exists to make AI evaluation workflows more practical, repeatable, and useful for engineering teams. We welcome contributions from the community, whether you are fixing bugs, improving documentation, adding evaluations and benchmarks, or helping make Quantiles open-source more reliable for AI engineers and researchers.
+Quantiles exists to make AI evaluation workflows more practical, repeatable, and useful for engineering teams. We welcome contributions from the community, whether you are fixing bugs, improving documentation, adding evaluations and benchmarks, or helping make the open-source Quantiles project more reliable for AI engineers and researchers.
 
 Please read our [contributing guide](./CONTRIBUTING.md) to get started.
 

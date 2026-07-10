@@ -32,7 +32,7 @@ qt show 1
 
 ### Custom evaluations
 
-Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
+Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `--input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
 
 ```toml
 [benchmarks.my-eval]
@@ -55,7 +55,7 @@ See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_co
 
 You can customize how the CLI executes built-in benchmarks and custom evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
-- [`../CONFIG.md`](../CONFIG.md): for a guide and reference.
+- [`../CONFIG.md`](../CONFIG.md) for a guide and reference.
 - [`./examples/configs`](./examples/configs) for complete working examples.
 
 ### Built-in benchmarks
@@ -65,7 +65,7 @@ For built-in benchmarks, configure settings like `samples`, `model`, and `max_wo
 ```toml
 [benchmarks.pubmedqa]
 samples = 50
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 max_workers = 100
 ```
 

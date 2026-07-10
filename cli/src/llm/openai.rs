@@ -33,7 +33,7 @@ pub struct OpenAISampler {
 }
 
 impl OpenAISampler {
-    /// Create a new sampler for the given model identifier (e.g. `gpt-5.4-nano`).
+    /// Create a new sampler for the given model identifier (e.g. `gpt-5.6`).
     #[must_use]
     pub fn new(model_id: &str) -> Self {
         Self {

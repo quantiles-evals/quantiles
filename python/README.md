@@ -1,6 +1,6 @@
 # Quantiles Python SDK
 
-Python SDK for the [quantiles](https://quantiles.io) local AI workload observability server.
+The Quantiles Python SDK for the [quantiles](https://quantiles.io) local AI workload observability server.
 
 ## Installation
 

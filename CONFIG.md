@@ -10,7 +10,7 @@ You need a config file when you want to do one or more of the following:
 - Define custom evaluations (`type = "custom_code"`)
 - Resume custom evaluations later with `qt resume <run_id>`
 
-You do not need a configuration file to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
+You do not need a configuration file to run built-in benchmarks. For example, `qt run pubmedqa` works out of the box.
 
 ## File location and name
 
@@ -23,22 +23,11 @@ Every benchmark lives under its own `[benchmarks.<eval_name>]` section. The sect
 For example, if you want to override default parameters for the built-in PubMedQA benchmark, add the following section to your config file:
 
 ```toml
-# This is configuration for a custom code benchmark called my-eval.
-#
-# When you run `qt run my-eval`, the CLI will look here for how to run
-# your custom benchmark.
-[benchmarks.my-eval]
+# Configure the model and sample limit for the built-in PubMedQA benchmark.
 
-# This parameter defaults to "builtin". For custom evaluations, override
-# the default with "custom_code".
-type = "custom_code"
-
-# The CLI executes this command to run your custom evaluation. We recommend
-# using `uv` to configure and manage Python evaluations, but you may use
-# any command or tool you prefer.
-command = ["uv", "run", "my_eval.py"]
-
-# See below for the full reference.
+[benchmarks.pubmedqa]
+samples = 50
+model = "openai:gpt-5.6"
 ```
 
 ## Benchmark types
@@ -68,7 +57,7 @@ If none of these fields are customized, the built-in benchmark uses the followin
 The `model` field described above accepts a provider-prefixed string, for example:
 
 ```toml
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 ```
 
 Supported provider prefixes are listed below:
@@ -81,7 +70,7 @@ Supported provider prefixes are listed below:
 You can pass a TOML table instead of such a prefixed string:
 
 ```toml
-model = { provider = "openai", model_id = "gpt-5.4-nano" }
+model = { provider = "openai", model_id = "gpt-5.6" }
 ```
 
 Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in [`cli/examples/configs`](./cli/examples/configs).
@@ -96,7 +85,7 @@ Custom evaluations are external programs built with the Quantiles Python SDK. Th
 | `command` | array of strings | yes      | Command and arguments to execute.                          |
 | `input`   | table            | no       | Structured input passed to the child as `QUANTILES_INPUT`. |
 
-Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python/examples/pubmedqa.py) for details on customizing the model in `custom_code` benchmarks.
+Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` benchmarks.
 
 #### The `input` table
 
@@ -167,7 +156,7 @@ When you run `qt resume <run_id>`, the CLI looks up the stored eval name and inp
 
 ```toml
 [benchmarks.pubmedqa]
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 ```
 
 ### Built-in using the demo model with a sample limit

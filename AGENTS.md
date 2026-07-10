@@ -39,7 +39,7 @@ When performing tasks in this repository, always do the following:
 - Prefer the smallest change that satisfies the task.
 - Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
 - Keep changes small, public-safe, and reviewable.
-- Preserve Quantiles as local-first, offline system by default.
+- Preserve Quantiles as a local-first, offline system by default.
 - Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
 - Update public docs when CLI behavior, SDK APIs, workflows, benchmarks, schemas, setup steps, or agent guidance changes.
 - Prefer concrete examples with commands, file paths, inputs, outputs, and expected behavior.
@@ -105,7 +105,7 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 - `anthropic:<model>`
 - `gemini:<model>`
 
-## Safety, Security And Privacy
+## Safety, Security, and Privacy
 
 Preserve Quantiles as local-first infrastructure. Follow the guidelines below to ensure the project maintains safety, security, and privacy:
 
@@ -114,7 +114,7 @@ Preserve Quantiles as local-first infrastructure. Follow the guidelines below to
 - Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
 - Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
-- Keep public docs customer-safe. Avoid exposing secrets, API keys and non-public security information.
+- Keep public docs customer-safe. Avoid exposing secrets, API keys, and non-public security information.
 
 Read [`SECURITY.md`](./SECURITY.md) for more details on keeping this repository and toolchain secure.
 

@@ -106,7 +106,7 @@ async def map_dataset[ItemT: BaseModel, U](
   representing the results of each function call.
 
   The order in which results are returned is specified by the given ``yield_order``
-  paramter. ``"input"`` matches the order of items yielded by the given ``dataset``,
+  parameter. ``"input"`` matches the order of items yielded by the given ``dataset``,
   while ``"completion"`` matches the order in which items are computed.
 
   Args:

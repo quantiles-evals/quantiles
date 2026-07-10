@@ -1,6 +1,6 @@
 # AGENTS.md
 
->**Note**: This SDK is currently unreleased and unsupported.
+> **Note**: This SDK is currently unreleased and unsupported.
 
 ## Scope
 
