@@ -6,7 +6,7 @@ It includes a CLI (called `qt`), SDKs, built-in benchmarks, local run history, a
 
 ## Why Quantiles
 
-Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to built them from scratch:
+Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to build them from scratch:
 
 - Write standard Python, with familiar developer patterns
 - Run workflows locally from the CLI
@@ -117,12 +117,12 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 
 ## Built-in Benchmarks
 
-Built-in benchmarks are ready-to-run evalulations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
+Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
 | Code | When to use |
 | --- | --- |
-| `qt run $BENCHMARK` | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
-| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'` | Run a built-in benchmark against your model |
+| `qt run <benchmark>` | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
+| `qt run <benchmark> --input '{"model":"<model_name>}'` | Run a built-in benchmark against your model |
 
 Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
 
