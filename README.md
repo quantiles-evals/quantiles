@@ -1,10 +1,12 @@
-# Quantiles: Local-First AI Evaluation Infrastructure
+# Quantiles
 
-Quantiles is a local-first CLI and SDK for running durable, reproducible AI evaluation workflows. Teams can iterate on models, prompts, agent workflows, and evaluation logic while preserving the metrics and run history needed to understand what improved, what regressed, and why.
+Quantiles is open-source, local-first evaluation infrastructure for applied AI systems, designed for developer and coding-agent workflows.
 
-It includes the `qt` CLI, a Python SDK, built-in benchmarks, local evaluation data, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. This monorepo centralizes Quantiles components, making it easier for engineers, researchers, and coding agents to inspect, modify, test, and extend the system.
+Use the `qt` CLI and Python SDK to create, run, analyze, and compare evaluations for models, prompts, and agents with resource-efficient local execution. Quantiles records metrics, sample-level results, execution history, and evaluation traces so you can measure system behavior, detect regressions, validate changes, and ship higher-quality, more reliable AI systems.
 
-## Why Quantiles
+Quantiles centralizes its components in this monorepo so developers, researchers, and coding agents can use, inspect, modify, test, and extend the system. Its reusable skills and instruction files work with Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other compatible agents.
+
+## Why use Quantiles?
 
 Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to build them from scratch:
 
@@ -161,7 +163,7 @@ The [Python SDK source code](./python) is available in this repository. See the 
 
 ## Coding Agents
 
-Quantiles is designed for use with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. The [Quantiles `llms.txt` file](https://quantiles.io/llms.txt) provides a concise, public, LLM-readable overview with links to agent guides and related documentation.
+Quantiles is designed for use with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. The [Quantiles `llms.txt`](https://quantiles.io/llms.txt) provides a concise, public, LLM-readable overview with links to agent guides and related documentation.
 
 ### `SKILL.md`
 
