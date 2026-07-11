@@ -13,20 +13,4 @@ uv = "0.11.21"
 
 [tasks.run-custom-nocode]
 description = "Run all configured no-code benchmarks with the random model"
-dir = "custom-nocode-examples"
-run = '''
-aggregate_exit=0
-
-for benchmark in nocode_custom medqa medmcqa mmlu-pro gpqa; do
-  printf '\n===== %s =====\n' "$benchmark"
-  if qt run "$benchmark"; then
-    printf '===== %s: PASS =====\n' "$benchmark"
-  else
-    exit_code=$?
-    printf '===== %s: FAIL (exit %s) =====\n' "$benchmark" "$exit_code"
-    aggregate_exit=1
-  fi
-done
-
-exit "$aggregate_exit"
-'''
+run = "./scripts/run-custom-nocode.sh"
