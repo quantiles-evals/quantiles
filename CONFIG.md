@@ -7,8 +7,8 @@ Quantiles uses a single TOML configuration file in the current working directory
 You need a config file when you want to do one or more of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
-- Define custom evaluations (`type = "custom_code"`)
-- Define custom benchmarks without writing or maintaining code (`type = "custom_nocode"`)
+- Build custom evaluations without writing or maintaining code (`type = "custom_nocode"` in the `quantiles.toml` configuration file)
+- Build custom evaluations with code (`type = "custom_code"` in the `quantiles.toml` configuration file)
 - Resume custom evaluations later with `qt resume <run_id>`
 
 You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
