@@ -28,7 +28,7 @@ style = { type = "multiple_choice", choices = { column = "options" }, choice_lab
 dataset = { name = "TIGER-Lab/MMLU-Pro", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/mmlu-pro.txt"
-limit = 10
+limit = 1000
 
 [benchmarks.gpqa]
 type = "custom_nocode"
