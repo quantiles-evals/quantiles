@@ -123,7 +123,7 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 
 Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
 
-For dataset-backed QA checks that do not need custom Python or TypeScript code, use a `custom_nocode` benchmark in `quantiles.toml`. A `custom_nocode` QA benchmark points to a dataset, a Jinja prompt template, the dataset column containing the prompt, and the dataset column containing the golden answer. See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for a minimal example.
+For dataset-backed QA checks that do not need custom Python or TypeScript code, use a `custom_nocode` benchmark in `quantiles.toml`. A `custom_nocode` QA benchmark points to a dataset, renders a Jinja prompt from the complete dataset row, and supports exact-answer and multiple-choice scoring. See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for runnable SimpleQA Verified, MedQA, MedMCQA, MMLU-Pro, and GPQA configurations.
 
 | Code | When to use |
 | --- | --- |

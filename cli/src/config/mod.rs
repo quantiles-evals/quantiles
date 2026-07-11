@@ -13,7 +13,7 @@ use crate::llm::Sampler;
 pub enum BenchmarkConfig {
     Builtin(BuiltinBenchmarkConfig),
     CustomCode(CustomCodeBenchmarkConfig),
-    CustomNoCode(CustomNoCodeBenchmarkConfig),
+    CustomNoCode(Box<CustomNoCodeBenchmarkConfig>),
 }
 
 impl BenchmarkConfig {
@@ -38,6 +38,7 @@ impl BenchmarkConfig {
                         c.qa.prompt_template_file
                     );
                 }
+                c.qa.validate()?;
                 Ok(())
             }
         }
@@ -69,7 +70,7 @@ impl<'de> Deserialize<'de> for BenchmarkConfig {
                         "failed to deserialize custom_nocode benchmark config: {e}"
                     ))
                 })?;
-                Ok(BenchmarkConfig::CustomNoCode(config))
+                Ok(BenchmarkConfig::CustomNoCode(Box::new(config)))
             }
             Some("builtin") | None => {
                 let config = BuiltinBenchmarkConfig::deserialize(value).map_err(|e| {

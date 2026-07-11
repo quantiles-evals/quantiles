@@ -6,10 +6,13 @@ use parquet::arrow::ArrowWriter;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
+
+const JSON_ENCODED_METADATA_KEY: &str = "quantiles.json_encoded";
+const CACHE_FORMAT_VERSION: &str = "v2";
 
 /// Manages the on-disk cache for dataset batches.
 pub struct DatasetCache {
@@ -81,7 +84,7 @@ impl DatasetCache {
                 let mut obj = serde_json::Map::new();
                 for (col_idx, field) in schema.fields().iter().enumerate() {
                     let col = batch.column(col_idx);
-                    let val = arrow_value_to_json(col, row_idx)?;
+                    let val = arrow_value_to_json(col, field, row_idx)?;
                     obj.insert(field.name().clone(), val);
                 }
                 rows.push(Value::Object(obj));
@@ -95,6 +98,8 @@ impl DatasetCache {
 #[must_use]
 pub fn cache_key(dataset_id: &str, config: &str, split: &str, revision: Option<&str>) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(CACHE_FORMAT_VERSION.as_bytes());
+    hasher.update(b":");
     hasher.update(dataset_id.as_bytes());
     hasher.update(b":");
     hasher.update(config.as_bytes());
@@ -128,8 +133,18 @@ fn json_to_arrow(rows: &[Value]) -> Result<RecordBatch> {
             .map(|r| r.get(&key).unwrap_or(&Value::Null))
             .collect();
         let dtype = infer_type(&values);
-        fields.push(Field::new(key.clone(), dtype.clone(), true));
-        arrays.push(build_array(&values, &dtype)?);
+        let mut field = Field::new(key.clone(), dtype.clone(), true);
+        let json_encoded = values
+            .iter()
+            .any(|value| matches!(value, Value::Array(_) | Value::Object(_)));
+        if json_encoded {
+            field = field.with_metadata(HashMap::from([(
+                JSON_ENCODED_METADATA_KEY.to_owned(),
+                "true".to_owned(),
+            )]));
+        }
+        fields.push(field);
+        arrays.push(build_array(&values, &dtype, json_encoded)?);
     }
 
     let schema = Arc::new(Schema::new(fields));
@@ -172,7 +187,7 @@ fn infer_type(values: &[&Value]) -> DataType {
     }
 }
 
-fn build_array(values: &[&Value], dtype: &DataType) -> Result<ArrayRef> {
+fn build_array(values: &[&Value], dtype: &DataType, json_encoded: bool) -> Result<ArrayRef> {
     match dtype {
         DataType::Boolean => {
             let mut builder = BooleanBuilder::new();
@@ -208,8 +223,9 @@ fn build_array(values: &[&Value], dtype: &DataType) -> Result<ArrayRef> {
             let mut builder = StringBuilder::new();
             for v in values {
                 match v {
-                    Value::String(s) => builder.append_value(s),
                     Value::Null => builder.append_null(),
+                    value if json_encoded => builder.append_value(serde_json::to_string(value)?),
+                    Value::String(s) => builder.append_value(s),
                     other => builder.append_value(other.to_string()),
                 }
             }
@@ -219,7 +235,7 @@ fn build_array(values: &[&Value], dtype: &DataType) -> Result<ArrayRef> {
     }
 }
 
-fn arrow_value_to_json(col: &dyn arrow::array::Array, row: usize) -> Result<Value> {
+fn arrow_value_to_json(col: &dyn arrow::array::Array, field: &Field, row: usize) -> Result<Value> {
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray};
 
     if col.is_null(row) {
@@ -227,7 +243,16 @@ fn arrow_value_to_json(col: &dyn arrow::array::Array, row: usize) -> Result<Valu
     }
 
     if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
-        Ok(Value::String(arr.value(row).to_string()))
+        let value = arr.value(row);
+        if field
+            .metadata()
+            .get(JSON_ENCODED_METADATA_KEY)
+            .is_some_and(|encoded| encoded == "true")
+        {
+            serde_json::from_str(value).context("failed to decode cached JSON column")
+        } else {
+            Ok(Value::String(value.to_string()))
+        }
     } else if let Some(arr) = col.as_any().downcast_ref::<Int64Array>() {
         let n: i64 = arr.value(row);
         Ok(Value::Number(n.into()))
@@ -289,6 +314,25 @@ mod tests {
         assert_eq!(read[0]["active"], true);
         assert_eq!(read[1]["name"], "bob");
         assert_eq!(read[2]["name"], "charlie");
+    }
+
+    #[tokio::test]
+    async fn test_nested_json_roundtrip() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let cache = DatasetCache::new(tmpdir.path().to_path_buf());
+        let path = cache.batch_path("nested", 0, 10);
+        let rows = vec![
+            json!({
+                "options": {"A": "alpha", "B": "beta"},
+                "list": ["one", "two"]
+            }),
+            json!({"options": "unstructured", "list": ["three"]}),
+        ];
+
+        cache.write_batch(&path, &rows).await.unwrap();
+        let read = cache.read_batch(&path).await.unwrap();
+
+        assert_eq!(read, rows);
     }
 
     #[tokio::test]

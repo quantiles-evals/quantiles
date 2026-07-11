@@ -82,7 +82,6 @@ style = "qa"
 dataset = "quantiles/simpleqa-verified"
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-prompt_column = "problem"
 golden_column = "answer"
 limit = 10
 ```

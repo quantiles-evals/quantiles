@@ -109,7 +109,6 @@ style = "qa"
 dataset = "quantiles/simpleqa-verified"
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-prompt_column = "problem"
 golden_column = "answer"
 limit = 10
 ```
@@ -127,12 +126,34 @@ For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./
 | `type` | string | yes | Must be `"custom_nocode"`. |
 | `style` | string | yes | Must be `"qa"`. |
 | `dataset` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `dataset_config` | string | no | Hugging Face dataset configuration or subset. |
+| `split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
+| `revision` | string | no | Dataset revision. |
 | `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
-| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives `prompt` from the configured prompt column. |
-| `prompt_column` | string | yes | Dataset column containing the prompt text. |
-| `golden_column` | string | yes | Dataset column containing the golden answer. |
+| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
+| `golden_column` | string | conditional | Dataset column containing the golden answer text or label. Exactly one golden answer source is required. |
+| `golden_index_column` | string | conditional | Dataset column containing the golden choice index. |
+| `golden_index_base` | integer | no | Index base for `golden_index_column`. Defaults to `0`. |
+| `correct_choice_column` | string | conditional | Choice column known to contain the correct answer, useful when choices are shuffled. |
+| `choices_column` | string | no | Dataset column containing choices as an array or label-keyed object. |
+| `choice_columns` | array of strings | no | Dataset columns containing choices in their original order. |
+| `choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
+| `shuffle_choices` | boolean | no | Deterministically shuffle choices. Defaults to `false`. |
+| `shuffle_seed_column` | string | conditional | Stable row identifier used when `shuffle_choices = true`. |
 | `limit` | integer | no | Number of dataset rows to evaluate. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
+
+Templates access dataset fields directly. A multiple-choice template can iterate the normalized choices:
+
+```jinja
+{{ row.question }}
+
+{% for choice in choices %}
+{{ choice.label }}. {{ choice.text }}
+{% endfor %}
+```
+
+See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for runnable MedQA, MedMCQA, MMLU-Pro, and GPQA configurations.
 
 ### `custom_code`
 

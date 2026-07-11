@@ -14,6 +14,7 @@ pub struct DatasetInfo {
     pub available_splits: Vec<String>,
     pub selected_split: String,
     pub config: String,
+    pub revision: Option<String>,
 }
 
 /// Central manager that coordinates fetching from huggingface and local caching.
@@ -105,6 +106,7 @@ impl DatasetManager {
             available_splits: splits,
             selected_split,
             config,
+            revision: revision.map(str::to_owned),
         })
     }
 

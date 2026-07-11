@@ -1,0 +1,5 @@
+{{ row["Question"] }}
+
+{% for choice in choices %}{{ choice.label }}. {{ choice.text }}
+{% endfor %}
+Answer with only the letter of the correct choice.

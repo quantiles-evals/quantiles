@@ -326,44 +326,51 @@ mod tests {
     }
 
     #[rstest]
-    fn test_resolve_sampler_uses_default_when_none() {
-        let result = resolve_sampler(None, || Arc::new(crate::llm::random::RandomSampler::new(80)))
-            .unwrap();
+    #[tokio::test]
+    async fn test_resolve_sampler_uses_default_when_none() {
+        let result = resolve_sampler(None, || {
+            Arc::new(crate::llm::random::RandomSampler::new(80))
+        })
+        .unwrap();
         // Should get the default sampler, not panic or error.
-        assert!(!result.sample("test").block_on().is_empty());
+        assert!(!result.sample("test").await.unwrap().is_empty());
     }
 
     #[rstest]
-    fn test_resolve_sampler_resolves_configured_sampler() {
+    #[tokio::test]
+    async fn test_resolve_sampler_resolves_configured_sampler() {
         let sampler = crate::llm::Sampler::Random {};
         let result = resolve_sampler(Some(&sampler), || {
             panic!("default should not be called when model is Some")
         })
         .unwrap();
         // Should get a resolved sampler, not the default.
-        assert!(!result.sample("test").block_on().is_empty());
+        assert!(!result.sample("test").await.unwrap().is_empty());
     }
 
     #[rstest]
     fn test_emit_accuracy_metrics_empty() {
         let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store = crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf())
-            .unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             emit_accuracy_metrics(&metrics_store, 1, [false; 0]).await;
             metrics_store.flush(1).await.unwrap();
             let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
-            assert!(agg.is_empty(), "no metrics should be emitted for empty results");
+            assert!(
+                agg.is_empty(),
+                "no metrics should be emitted for empty results"
+            );
         });
     }
 
     #[rstest]
     fn test_emit_accuracy_metrics_all_correct() {
         let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store = crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf())
-            .unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
@@ -374,19 +381,22 @@ mod tests {
             let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
             assert!((accuracy.metric_value - 1.0).abs() < 1e-10);
 
-            let correct = agg.iter().find(|m| m.metric_name == "correct_count").unwrap();
-            assert_eq!(correct.metric_value as i64, 3);
+            let correct = agg
+                .iter()
+                .find(|m| m.metric_name == "correct_count")
+                .unwrap();
+            assert!((correct.metric_value - 3.0).abs() < f64::EPSILON);
 
             let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
-            assert_eq!(total.metric_value as i64, 3);
+            assert!((total.metric_value - 3.0).abs() < f64::EPSILON);
         });
     }
 
     #[rstest]
     fn test_emit_accuracy_metrics_mixed() {
         let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store = crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf())
-            .unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
@@ -397,11 +407,14 @@ mod tests {
             let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
             assert!((accuracy.metric_value - 0.5).abs() < 1e-10);
 
-            let correct = agg.iter().find(|m| m.metric_name == "correct_count").unwrap();
-            assert_eq!(correct.metric_value as i64, 2);
+            let correct = agg
+                .iter()
+                .find(|m| m.metric_name == "correct_count")
+                .unwrap();
+            assert!((correct.metric_value - 2.0).abs() < f64::EPSILON);
 
             let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
-            assert_eq!(total.metric_value as i64, 4);
+            assert!((total.metric_value - 4.0).abs() < f64::EPSILON);
         });
     }
 }

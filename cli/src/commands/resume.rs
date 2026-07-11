@@ -103,13 +103,19 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 _ => builtins::resolve(workflow_name)
                     .with_context(|| format!("builtin `{workflow_name}` not found"))?,
             };
+            let custom_nocode_input = match bench_config {
+                Some(qt::config::BenchmarkConfig::CustomNoCode(config)) => {
+                    Some(super::run::assemble_custom_nocode_input(config, None))
+                }
+                _ => None,
+            };
             super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
                 db: &db,
                 metrics_store: &metrics_store,
                 run_id,
                 workflow_name,
                 builtin,
-                input: stored_input,
+                input: custom_nocode_input.as_deref().or(stored_input),
                 json,
                 process_start,
             })
@@ -219,20 +225,24 @@ mod tests {
     #[test]
     fn plan_resume_custom_nocode_with_config() {
         let file = tempfile::NamedTempFile::new().unwrap();
-        let bench =
-            qt::config::BenchmarkConfig::CustomNoCode(qt::config::CustomNoCodeBenchmarkConfig {
+        let bench = qt::config::BenchmarkConfig::CustomNoCode(Box::new(
+            qt::config::CustomNoCodeBenchmarkConfig {
                 type_: "custom_nocode".to_owned(),
                 style: qt::config::CustomNoCodeStyle::Qa,
                 dataset: "quantiles/simpleqa-verified".to_owned(),
+                dataset_config: None,
+                split: None,
+                revision: None,
                 model: Some(qt::llm::Sampler::Random {}),
                 qa: qt::config::CustomNoCodeQaConfig {
                     prompt_template_file: file.path().to_str().unwrap().to_owned(),
-                    prompt_column: "problem".to_owned(),
-                    golden_column: "answer".to_owned(),
+                    golden_column: Some("answer".to_owned()),
                     limit: None,
                     max_workers: None,
+                    ..qt::config::CustomNoCodeQaConfig::default()
                 },
-            });
+            },
+        ));
         let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench)).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
     }
@@ -240,7 +250,6 @@ mod tests {
     /// A failed `custom_nocode` run can be resumed and re-execute successfully
     /// through the `CustomNoCodeBuiltin`, verifying that the resume path wires
     /// the correct builtin and `ExecuteBuiltinArgs`.
-    #[expect(clippy::too_many_lines)]
     #[tokio::test]
     async fn resume_failed_custom_nocode_run_re_executes_successfully() {
         use wiremock::matchers::{method, path};
@@ -284,7 +293,7 @@ mod tests {
 
         // Write a Jinja template file.
         let template_path = root.join("template.txt");
-        std::fs::write(&template_path, "{{ prompt }}\nAnswer:").unwrap();
+        std::fs::write(&template_path, "{{ row.question }}\nAnswer:").unwrap();
 
         // Pre-populate the dataset cache so no network fetch is needed for rows.
         let cache = qt::dataset::cache::DatasetCache::new(cache_dir);
@@ -307,7 +316,6 @@ style = "qa"
 dataset = "fixture/qa"
 model = "random"
 prompt_template_file = "{}"
-prompt_column = "question"
 golden_column = "answer"
 limit = 2
 "#,
@@ -316,14 +324,11 @@ limit = 2
         )
         .unwrap();
 
+        // A started no-code run stores normalized display input, so resume must
+        // reconstruct the executable configuration from quantiles.toml.
         let input_json = serde_json::to_string(&serde_json::json!({
-            "style": "qa",
-            "dataset": "fixture/qa",
-            "model": "random",
-            "prompt_template_file": template_path.to_str().unwrap(),
-            "prompt_column": "question",
-            "golden_column": "answer",
-            "limit": 2,
+            "model": "demo-builtin",
+            "num_samples": 2,
         }))
         .unwrap();
 

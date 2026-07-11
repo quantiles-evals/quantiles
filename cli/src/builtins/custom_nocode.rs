@@ -4,8 +4,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::builtins::common::{
-    emit_accuracy_metrics, extract_text, get_max_workers, hash_input, resolve_sampler,
-    run_timed_step,
+    emit_accuracy_metrics, get_max_workers, hash_input, resolve_sampler, run_timed_step,
 };
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
@@ -19,6 +18,9 @@ use crate::llm::random::RandomSampler;
 struct CustomNoCodeInput {
     style: crate::config::CustomNoCodeStyle,
     dataset: String,
+    dataset_config: Option<String>,
+    split: Option<String>,
+    revision: Option<String>,
     #[serde(default)]
     model: Option<crate::llm::Sampler>,
     #[serde(flatten)]
@@ -30,8 +32,21 @@ struct CustomNoCodeInput {
 struct RowOutput {
     input: String,
     response: String,
+    parsed_response: Option<String>,
     golden: String,
     is_correct: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PromptChoice {
+    label: String,
+    text: String,
+}
+
+struct PreparedRow {
+    choices: Vec<PromptChoice>,
+    golden: String,
+    is_multiple_choice: bool,
 }
 
 /// Arguments for the [`CustomNoCodeBuiltin::evaluate_row`] method
@@ -40,10 +55,8 @@ struct EvaluateRowArgs<'a> {
     i: usize,
     /// The row value
     row: &'a serde_json::Value,
-    /// The name of the column in this row that has the prompt
-    prompt_column: &'a str,
-    /// The name of the column in this row that has the golden answer
-    golden_column: &'a str,
+    /// QA and multiple-choice configuration.
+    qa: &'a crate::config::CustomNoCodeQaConfig,
     /// The prompt template
     template_str: &'a str,
     /// The pre-constructed jinja template env
@@ -73,26 +86,19 @@ impl CustomNoCodeBuiltin {
     }
 
     async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<bool> {
-        let prompt = extract_text(args.row, args.prompt_column).with_context(|| {
-            format!(
-                "row {}: missing prompt column `{}`",
-                args.i, args.golden_column
-            )
-        })?;
-        let golden = extract_text(args.row, args.golden_column).with_context(|| {
-            format!(
-                "row {}: missing golden column `{}`",
-                args.i, args.golden_column
-            )
-        })?;
+        let prepared = prepare_row(args.i, args.row, args.qa)?;
 
         let rendered = args
             .env
-            .render_str(args.template_str, jinja::context!(prompt => &prompt))
+            .render_str(
+                args.template_str,
+                jinja::context!(row => args.row, choices => &prepared.choices),
+            )
             .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
         let input_hash = hash_input(&format!(
-            "{rendered}\nmodel={}\nworkflow={}",
+            "{rendered}\ngolden={}\nmodel={}\nworkflow={}",
+            prepared.golden,
             args.model_name,
             self.name()
         ));
@@ -111,12 +117,21 @@ impl CustomNoCodeBuiltin {
                     .await
                     .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
-                let is_correct = is_exact_match(&model_response, &golden);
+                let parsed_response = if prepared.is_multiple_choice {
+                    extract_choice_label(
+                        &model_response,
+                        args.qa.choice_labels.as_deref().unwrap_or_default(),
+                    )
+                } else {
+                    Some(model_response.trim().to_owned())
+                };
+                let is_correct = parsed_response.as_deref() == Some(prepared.golden.trim());
 
                 Ok(RowOutput {
                     input: rendered.clone(),
                     response: model_response,
-                    golden,
+                    parsed_response,
+                    golden: prepared.golden,
                     is_correct,
                 })
             },
@@ -151,8 +166,14 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let max_workers = config.qa.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
-        let (manager, info, limit) =
-            resolve_dataset_limit(&config.dataset, config.qa.limit).await?;
+        let (manager, info, limit) = resolve_dataset_limit(
+            &config.dataset,
+            config.dataset_config.as_deref(),
+            config.split.as_deref(),
+            config.revision.as_deref(),
+            config.qa.limit,
+        )
+        .await?;
         set_builtin_run_input(
             ctx.db,
             ctx.run_id,
@@ -169,8 +190,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .map_or("random".to_string(), std::string::ToString::to_string);
         let run_id = ctx.run_id;
         let dataset = config.dataset.clone();
-        let prompt_column = config.qa.prompt_column.clone();
-        let golden_column = config.qa.golden_column.clone();
+        let qa = Arc::new(config.qa.clone());
         let template_str = Arc::new(template_str);
 
         let name = self.name();
@@ -182,15 +202,13 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let db = db.clone();
                 let model_name = model_name.clone();
                 let template_str = Arc::clone(&template_str);
-                let prompt_column = prompt_column.clone();
-                let golden_column = golden_column.clone();
+                let qa = Arc::clone(&qa);
                 let env = env.clone();
                 async move {
                     let args = EvaluateRowArgs {
                         i,
                         row: &row,
-                        prompt_column: &prompt_column,
-                        golden_column: &golden_column,
+                        qa: &qa,
                         template_str: &template_str,
                         env: &env,
                         model_name: &model_name,
@@ -235,17 +253,25 @@ fn load_template(path: &str) -> Result<(String, jinja::Environment<'_>)> {
     let template_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read prompt template file `{path}`"))?;
     let env = jinja::Environment::new();
-    env.render_str(&template_str, jinja::context!(prompt => ""))
-        .with_context(|| format!("invalid jinja syntax in prompt template file `{path}`"))?;
+    env.render_str(
+        &template_str,
+        jinja::context!(row => serde_json::json!({}), choices => Vec::<PromptChoice>::new()),
+    )
+    .with_context(|| format!("invalid jinja syntax in prompt template file `{path}`"))?;
     Ok((template_str, env))
 }
 
 async fn resolve_dataset_limit(
     dataset: &str,
+    dataset_config: Option<&str>,
+    split: Option<&str>,
+    revision: Option<&str>,
     limit: Option<usize>,
 ) -> Result<(DatasetManager, crate::dataset::DatasetInfo, usize)> {
     let manager = DatasetManager::new()?;
-    let info = manager.init(dataset, None, None, None).await?;
+    let info = manager
+        .init(dataset, dataset_config, split, revision)
+        .await?;
 
     let total = info
         .total_rows
@@ -255,9 +281,219 @@ async fn resolve_dataset_limit(
     Ok((manager, info, limit))
 }
 
-/// Case-sensitive exact-match comparison after trimming whitespace.
-fn is_exact_match(response: &str, golden: &str) -> bool {
-    response.trim() == golden.trim()
+fn prepare_row(
+    row_index: usize,
+    row: &serde_json::Value,
+    config: &crate::config::CustomNoCodeQaConfig,
+) -> Result<PreparedRow> {
+    let Some(labels) = config.choice_labels.as_ref() else {
+        let column = config
+            .golden_column
+            .as_deref()
+            .context("validated custom_nocode config has no golden column")?;
+        let golden = extract_scalar(row, column)
+            .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
+        return Ok(PreparedRow {
+            choices: Vec::new(),
+            golden,
+            is_multiple_choice: false,
+        });
+    };
+
+    let choice_values = extract_choices(row_index, row, config, labels)?;
+    if choice_values.is_empty() || choice_values.len() > labels.len() {
+        bail!(
+            "row {row_index}: found {} choices but configured only {} labels",
+            choice_values.len(),
+            labels.len()
+        );
+    }
+    let labels = &labels[..choice_values.len()];
+
+    let correct_index = resolve_correct_index(row_index, row, config, labels, &choice_values)?;
+    let mut indexed_choices: Vec<(String, bool)> = choice_values
+        .into_iter()
+        .enumerate()
+        .map(|(index, text)| (text, index == correct_index))
+        .collect();
+
+    if config.shuffle_choices {
+        let seed_column = config
+            .shuffle_seed_column
+            .as_deref()
+            .context("validated shuffle config has no seed column")?;
+        let seed = extract_scalar(row, seed_column).with_context(|| {
+            format!("row {row_index}: missing shuffle seed column `{seed_column}`")
+        })?;
+        deterministic_shuffle(&mut indexed_choices, &seed);
+    }
+
+    let mut golden = None;
+    let choices = indexed_choices
+        .into_iter()
+        .zip(labels)
+        .map(|((text, is_correct), label)| {
+            if is_correct {
+                golden = Some(label.clone());
+            }
+            PromptChoice {
+                label: label.clone(),
+                text,
+            }
+        })
+        .collect();
+
+    Ok(PreparedRow {
+        choices,
+        golden: golden.context("correct choice disappeared while assigning labels")?,
+        is_multiple_choice: true,
+    })
+}
+
+fn extract_choices(
+    row_index: usize,
+    row: &serde_json::Value,
+    config: &crate::config::CustomNoCodeQaConfig,
+    labels: &[String],
+) -> Result<Vec<String>> {
+    if let Some(columns) = &config.choice_columns {
+        return columns
+            .iter()
+            .map(|column| {
+                extract_scalar(row, column)
+                    .with_context(|| format!("row {row_index}: missing choice column `{column}`"))
+            })
+            .collect();
+    }
+
+    let column = config
+        .choices_column
+        .as_deref()
+        .context("validated multiple-choice config has no choices source")?;
+    let value = row
+        .get(column)
+        .with_context(|| format!("row {row_index}: missing choices column `{column}`"))?;
+    let owned;
+    let value = if let Some(encoded) = value.as_str() {
+        owned = serde_json::from_str(encoded).unwrap_or_else(|_| value.clone());
+        &owned
+    } else {
+        value
+    };
+
+    match value {
+        serde_json::Value::Array(values) => values
+            .iter()
+            .map(value_to_scalar)
+            .collect::<Option<Vec<_>>>()
+            .with_context(|| format!("row {row_index}: choices column `{column}` contains non-scalar values")),
+        serde_json::Value::Object(values) => labels
+            .iter()
+            .map(|label| {
+                values.get(label).and_then(value_to_scalar).with_context(|| {
+                    format!("row {row_index}: choices object `{column}` has no scalar `{label}` value")
+                })
+            })
+            .collect(),
+        _ => bail!("row {row_index}: choices column `{column}` must be an array or object"),
+    }
+}
+
+fn resolve_correct_index(
+    row_index: usize,
+    row: &serde_json::Value,
+    config: &crate::config::CustomNoCodeQaConfig,
+    labels: &[String],
+    choices: &[String],
+) -> Result<usize> {
+    if let Some(column) = &config.golden_index_column {
+        let raw = row
+            .get(column)
+            .with_context(|| format!("row {row_index}: missing golden index column `{column}`"))?;
+        let index = raw
+            .as_u64()
+            .or_else(|| raw.as_str().and_then(|value| value.parse().ok()))
+            .with_context(|| {
+                format!("row {row_index}: golden index column `{column}` is not an integer")
+            })?;
+        let index = usize::try_from(index)
+            .ok()
+            .and_then(|index| index.checked_sub(config.golden_index_base))
+            .with_context(|| format!("row {row_index}: golden index is below configured base"))?;
+        if index >= choices.len() {
+            bail!("row {row_index}: golden index {index} is outside the choice list");
+        }
+        return Ok(index);
+    }
+
+    if let Some(column) = &config.correct_choice_column {
+        let columns = config
+            .choice_columns
+            .as_ref()
+            .context("validated correct-choice config has no choice columns")?;
+        return columns
+            .iter()
+            .position(|candidate| candidate == column)
+            .context("validated correct choice is absent from choice columns");
+    }
+
+    let column = config
+        .golden_column
+        .as_deref()
+        .context("validated multiple-choice config has no answer source")?;
+    let golden = extract_scalar(row, column)
+        .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
+    labels
+        .iter()
+        .position(|label| label.eq_ignore_ascii_case(golden.trim()))
+        .with_context(|| {
+            format!("row {row_index}: golden label `{golden}` is not in `choice_labels`")
+        })
+}
+
+fn extract_scalar(row: &serde_json::Value, key: &str) -> Option<String> {
+    row.get(key).and_then(value_to_scalar)
+}
+
+fn value_to_scalar(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Number(value) => Some(value.to_string()),
+        serde_json::Value::Bool(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn deterministic_shuffle<T>(values: &mut [T], seed: &str) {
+    for upper in (1..values.len()).rev() {
+        let hash = hash_input(&format!("custom-nocode-choice-shuffle-v1:{seed}:{upper}"));
+        let random = u64::from_str_radix(&hash, 16).unwrap_or_default();
+        let index =
+            usize::try_from(random % u64::try_from(upper + 1).unwrap_or(1)).unwrap_or_default();
+        values.swap(upper, index);
+    }
+}
+
+fn extract_choice_label(response: &str, labels: &[String]) -> Option<String> {
+    let trimmed = response.trim();
+    if let Some(label) = labels
+        .iter()
+        .find(|label| label.eq_ignore_ascii_case(trimmed))
+    {
+        return Some(label.clone());
+    }
+
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    for token in tokens.iter().rev().take(8) {
+        let cleaned = token.trim_matches(|character: char| !character.is_ascii_alphanumeric());
+        if let Some(label) = labels
+            .iter()
+            .find(|label| label.eq_ignore_ascii_case(cleaned))
+        {
+            return Some(label.clone());
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -274,35 +510,133 @@ mod tests {
     }
 
     #[test]
-    fn render_template_with_prompt_variable() {
-        let template = "Answer this: {{ prompt }}";
+    fn render_template_with_row_variable() {
+        let template = "Answer this: {{ row.question }}";
         let env = jinja::Environment::new();
         let rendered = env
-            .render_str(template, jinja::context!(prompt => "what is 2+2"))
+            .render_str(
+                template,
+                jinja::context!(row => json!({"question": "what is 2+2"})),
+            )
             .unwrap();
         assert_eq!(rendered, "Answer this: what is 2+2");
     }
 
     #[test]
     fn render_template_preserves_newlines() {
-        let template = "Question:\n{{ prompt }}\nAnswer:";
+        let template = "Question:\n{{ row.question }}\nAnswer:";
         let env = jinja::Environment::new();
         let rendered = env
-            .render_str(template, jinja::context!(prompt => "hello"))
+            .render_str(
+                template,
+                jinja::context!(row => json!({"question": "hello"})),
+            )
             .unwrap();
         assert_eq!(rendered, "Question:\nhello\nAnswer:");
     }
 
     #[test]
-    fn exact_match_case_sensitive() {
-        assert!(is_exact_match("hello", "hello"));
-        assert!(!is_exact_match("Hello", "hello"));
+    fn extracts_multiple_choice_labels() {
+        let labels = vec!["A".to_owned(), "B".to_owned(), "C".to_owned()];
+        assert_eq!(extract_choice_label("B", &labels).as_deref(), Some("B"));
+        assert_eq!(
+            extract_choice_label("The answer is (c).", &labels).as_deref(),
+            Some("C")
+        );
+        assert_eq!(extract_choice_label("unknown", &labels), None);
+    }
+
+    fn multiple_choice_config() -> crate::config::CustomNoCodeQaConfig {
+        crate::config::CustomNoCodeQaConfig {
+            prompt_template_file: "unused.txt".to_owned(),
+            choice_labels: Some(["A", "B", "C", "D"].map(str::to_owned).to_vec()),
+            ..crate::config::CustomNoCodeQaConfig::default()
+        }
     }
 
     #[test]
-    fn exact_match_trims_whitespace() {
-        assert!(is_exact_match("  hello  ", "hello"));
-        assert!(is_exact_match("hello", "  hello  "));
+    fn prepares_medqa_object_choices() {
+        let config = crate::config::CustomNoCodeQaConfig {
+            choices_column: Some("options".to_owned()),
+            golden_column: Some("answer_idx".to_owned()),
+            ..multiple_choice_config()
+        };
+        let row = json!({
+            "options": {"A": "alpha", "B": "beta", "C": "gamma", "D": "delta"},
+            "answer_idx": "C"
+        });
+
+        let prepared = prepare_row(0, &row, &config).unwrap();
+        assert_eq!(prepared.golden, "C");
+        assert_eq!(prepared.choices[2].text, "gamma");
+    }
+
+    #[test]
+    fn prepares_mmlu_pro_array_choices() {
+        let config = crate::config::CustomNoCodeQaConfig {
+            choices_column: Some("options".to_owned()),
+            golden_column: Some("answer".to_owned()),
+            ..multiple_choice_config()
+        };
+        let row = json!({"options": ["alpha", "beta", "gamma"], "answer": "B"});
+
+        let prepared = prepare_row(0, &row, &config).unwrap();
+        assert_eq!(prepared.golden, "B");
+        assert_eq!(prepared.choices[1].text, "beta");
+    }
+
+    #[test]
+    fn prepares_medmcqa_indexed_choice_columns() {
+        let config = crate::config::CustomNoCodeQaConfig {
+            choice_columns: Some(["opa", "opb", "opc", "opd"].map(str::to_owned).to_vec()),
+            golden_index_column: Some("cop".to_owned()),
+            ..multiple_choice_config()
+        };
+        let row = json!({"opa": "alpha", "opb": "beta", "opc": "gamma", "opd": "delta", "cop": 1});
+
+        let prepared = prepare_row(0, &row, &config).unwrap();
+        assert_eq!(prepared.golden, "B");
+        assert_eq!(prepared.choices[1].text, "beta");
+    }
+
+    #[test]
+    fn prepares_gpqa_with_deterministic_shuffle() {
+        let config = crate::config::CustomNoCodeQaConfig {
+            choice_columns: Some(
+                [
+                    "Correct Answer",
+                    "Incorrect Answer 1",
+                    "Incorrect Answer 2",
+                    "Incorrect Answer 3",
+                ]
+                .map(str::to_owned)
+                .to_vec(),
+            ),
+            correct_choice_column: Some("Correct Answer".to_owned()),
+            shuffle_choices: true,
+            shuffle_seed_column: Some("Record ID".to_owned()),
+            ..multiple_choice_config()
+        };
+        let row = json!({
+            "Correct Answer": "correct",
+            "Incorrect Answer 1": "wrong one",
+            "Incorrect Answer 2": "wrong two",
+            "Incorrect Answer 3": "wrong three",
+            "Record ID": "gpqa-row-1"
+        });
+
+        let first = prepare_row(0, &row, &config).unwrap();
+        let second = prepare_row(0, &row, &config).unwrap();
+        assert_eq!(
+            serde_json::to_value(&first.choices).unwrap(),
+            serde_json::to_value(&second.choices).unwrap()
+        );
+        let correct = first
+            .choices
+            .iter()
+            .find(|choice| choice.label == first.golden)
+            .unwrap();
+        assert_eq!(correct.text, "correct");
     }
 
     #[tokio::test]
@@ -321,7 +655,6 @@ mod tests {
             "style": "qa",
             "dataset": "fixture/qa",
             "prompt_template_file": template_path.to_str().unwrap(),
-            "prompt_column": "q",
             "golden_column": "a",
         }))
         .unwrap();
@@ -393,7 +726,7 @@ mod tests {
 
         // Write a Jinja template file.
         let template_path = root.join("template.txt");
-        std::fs::write(&template_path, "{{ prompt }}\nAnswer:").unwrap();
+        std::fs::write(&template_path, "{{ row.question }}\nAnswer:").unwrap();
 
         // Pre-populate the dataset cache so no network fetch is needed for rows.
         let cache = crate::dataset::cache::DatasetCache::new(cache_dir);
@@ -411,7 +744,6 @@ mod tests {
             "dataset": "fixture/qa",
             "model": "random",
             "prompt_template_file": template_path.to_str().unwrap(),
-            "prompt_column": "question",
             "golden_column": "answer",
             "limit": 2,
         }))
