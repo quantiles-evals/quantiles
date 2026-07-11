@@ -1,0 +1,92 @@
+name: cli-release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QT_R2_BUCKET: ${{ vars.QT_R2_BUCKET || 'quantiles-cli' }}
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Package release artifact
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          archive="qt-${version}-${TARGET}.tar.gz"
+          mkdir -p dist/package
+          cp "target/${TARGET}/release/qt" dist/package/qt
+          COPYFILE_DISABLE=1 tar -czf "dist/${archive}" -C dist/package qt
+          shasum -a 256 "dist/${archive}" > "dist/${archive}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: cli/dist/qt-*.tar.gz*
+          if-no-files-found: error
+
+  publish:
+    name: publish to R2
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist
+          merge-multiple: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Publish release artifacts and installer
+        working-directory: cli
+        run: |
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v${version}" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match CLI version v${version}" >&2
+            exit 1
+          fi
+          object_prefix="releases/v${version}"
+
+          for file in ../dist/qt-*.tar.gz ../dist/qt-*.tar.gz.sha256; do
+            wrangler r2 object put "${QT_R2_BUCKET}/${object_prefix}/$(basename "$file")" --file "$file" --remote --cache-control "no-store"
+          done
+
+          wrangler r2 object put "${QT_R2_BUCKET}/install.sh" --file scripts/install.sh --remote --cache-control "no-store"
+          wrangler r2 object put "${QT_R2_BUCKET}/${object_prefix}/install.sh" --file scripts/install.sh --remote --cache-control "no-store"
