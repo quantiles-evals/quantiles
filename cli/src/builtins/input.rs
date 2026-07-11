@@ -5,6 +5,7 @@ use crate::llm::Sampler;
 /// Normalized run input schema for all builtins.
 #[derive(Serialize)]
 pub(crate) struct BuiltinRunInput {
+    pub(crate) dataset: String,
     pub(crate) model: String,
     pub(crate) num_samples: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -15,11 +16,13 @@ pub(crate) struct BuiltinRunInput {
 pub(crate) async fn set_builtin_run_input(
     db: &sea_orm::DatabaseConnection,
     run_id: i64,
+    dataset: &str,
     model: Option<&Sampler>,
     num_samples: usize,
     max_workers: Option<usize>,
 ) -> anyhow::Result<()> {
     let input = serde_json::to_string(&BuiltinRunInput {
+        dataset: dataset.to_owned(),
         model: builtin_model_name(model),
         num_samples,
         max_workers,

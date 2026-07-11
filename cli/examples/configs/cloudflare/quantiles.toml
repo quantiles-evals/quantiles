@@ -13,6 +13,8 @@
 # https://dash.cloudflare.com/<account_id>/ai/ai-gateway
 
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
+
 # The full expert-labeled PubMedQA benchmark has 1000 samples. Since Cloudflare charges for
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50

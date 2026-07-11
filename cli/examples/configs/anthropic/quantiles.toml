@@ -5,6 +5,8 @@
 # variable. To get an API key, go to https://platform.claude.com/settings/workspaces/default/keys
 
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
+
 # The full expert-labeled PubMedQA benchmark has 1000 samples. Since Anthropic charges for
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50

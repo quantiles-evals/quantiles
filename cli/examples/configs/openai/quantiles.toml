@@ -8,6 +8,8 @@
 # https://platform.openai.com/home
 
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
+
 # The full expert-labeled PubMedQA benchmark has 1000 samples. Since OpenAI charges for
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50

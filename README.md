@@ -77,6 +77,7 @@ For **built-in benchmarks**, configure settings like `samples`, `model`, and `ma
 
 ```toml
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
 samples = 50
 model = "openai:gpt-5.6"
 max_workers = 100

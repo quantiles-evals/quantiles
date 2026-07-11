@@ -103,12 +103,17 @@ fn assemble_builtin_input(
     }
 
     if let Some(bench) = bench {
-        if bench.samples.is_none() && bench.model.is_none() && bench.max_workers.is_none() {
+        if bench.samples.is_none()
+            && bench.dataset.is_none()
+            && bench.model.is_none()
+            && bench.max_workers.is_none()
+        {
             return (None, Vec::new());
         }
 
         let input = BuiltinConfigInput {
             limit: bench.samples,
+            dataset: bench.dataset.clone(),
             model: bench.model.clone(),
             max_workers: bench.max_workers,
         };
@@ -383,6 +388,8 @@ struct BuiltinConfigInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     limit: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    dataset: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<qt::llm::Sampler>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_workers: Option<usize>,
@@ -623,6 +630,7 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(10),
+            dataset: None,
             model: None,
             max_workers: None,
         };
@@ -637,12 +645,14 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(5),
+            dataset: Some("hf://quantiles/PubMedQA".to_owned()),
             model: Some(qt::llm::Sampler::Random {}),
             max_workers: Some(8),
         };
         let (input, _) = super::assemble_builtin_input(Some(&bench), None);
         let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
         assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["max_workers"], 8);
     }
@@ -654,6 +664,7 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: None,
+            dataset: None,
             model: None,
             max_workers: None,
         };

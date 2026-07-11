@@ -9,7 +9,7 @@ use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
-use crate::dataset::DatasetManager;
+use crate::dataset::{DatasetManager, resolve_hf_dataset_source};
 use crate::llm::LLMSampler;
 use crate::llm::random::RandomSampler;
 use crate::similarity::{
@@ -45,7 +45,7 @@ struct RowOutput {
 #[derive(Clone, Copy)]
 pub struct SimilarityBenchmark {
     name: &'static str,
-    dataset_id: &'static str,
+    dataset_source: &'static str,
     input_field: &'static str,
     target_field: &'static str,
 }
@@ -53,7 +53,7 @@ pub struct SimilarityBenchmark {
 /// `simpleqa-verified` builtin.
 pub const SIMPLEQA: SimilarityBenchmark = SimilarityBenchmark {
     name: "simpleqa-verified",
-    dataset_id: "quantiles/simpleqa-verified",
+    dataset_source: "hf://quantiles/simpleqa-verified",
     input_field: "problem",
     target_field: "answer",
 };
@@ -61,7 +61,7 @@ pub const SIMPLEQA: SimilarityBenchmark = SimilarityBenchmark {
 /// `financebench` builtin.
 pub const FINANCEBENCH: SimilarityBenchmark = SimilarityBenchmark {
     name: "financebench",
-    dataset_id: "quantiles/financebench",
+    dataset_source: "hf://quantiles/financebench",
     input_field: "question",
     target_field: "answer",
 };
@@ -96,7 +96,13 @@ impl BuiltinWorkflow for SimilarityBenchmark {
         };
 
         let manager = DatasetManager::new()?;
-        let info = manager.init(self.dataset_id, None, None, None).await?;
+        let dataset_source = config
+            .base
+            .dataset
+            .as_deref()
+            .unwrap_or(self.dataset_source);
+        let dataset_id = resolve_hf_dataset_source(dataset_source)?;
+        let info = manager.init(dataset_id, None, None, None).await?;
 
         let total = info
             .total_rows
@@ -109,6 +115,7 @@ impl BuiltinWorkflow for SimilarityBenchmark {
         set_builtin_run_input(
             db,
             run_id,
+            dataset_source,
             config.base.model.as_ref(),
             limit,
             config.base.max_workers,
@@ -120,7 +127,7 @@ impl BuiltinWorkflow for SimilarityBenchmark {
         let metric = &metric;
         let max_workers = config.base.max_workers.unwrap_or_else(get_max_workers);
 
-        let scores = DatasetRunner::new(&manager, self.dataset_id, &info, limit)
+        let scores = DatasetRunner::new(&manager, dataset_id, &info, limit)
             .desc(self.name)
             .set_quiet(ctx.quiet)
             .for_each_concurrent(max_workers, |i, row| {

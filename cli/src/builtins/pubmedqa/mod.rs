@@ -7,7 +7,7 @@ use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
-use crate::dataset::DatasetManager;
+use crate::dataset::{DatasetManager, resolve_hf_dataset_source};
 use crate::llm::LLMSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
@@ -21,6 +21,8 @@ mod eval;
 
 /// `PubMedQA` builtin using the quantiles/PubMedQA dataset.
 pub struct PubmedqaBuiltin;
+
+const DEFAULT_DATASET_SOURCE: &str = "hf://quantiles/PubMedQA";
 
 #[expect(clippy::too_many_lines)]
 #[async_trait::async_trait]
@@ -49,7 +51,12 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
         };
 
         let manager = DatasetManager::new()?;
-        let dataset_id = "quantiles/PubMedQA";
+        let dataset_source = config
+            .base
+            .dataset
+            .as_deref()
+            .unwrap_or(DEFAULT_DATASET_SOURCE);
+        let dataset_id = resolve_hf_dataset_source(dataset_source)?;
         let info = manager
             .init(dataset_id, Some("pqa_labeled"), Some("train"), None)
             .await?;
@@ -62,6 +69,7 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
         set_builtin_run_input(
             ctx.db,
             ctx.run_id,
+            dataset_source,
             config.base.model.as_ref(),
             limit,
             config.base.max_workers,

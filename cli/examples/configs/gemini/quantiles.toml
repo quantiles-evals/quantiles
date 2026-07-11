@@ -7,6 +7,8 @@
 # https://aistudio.google.com/prompts/new_chat
 
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
+
 # The full expert-labeled PubMedQA benchmark has 1000 samples. Since Google charges for
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50

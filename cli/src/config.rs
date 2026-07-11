@@ -76,6 +76,8 @@ pub struct BuiltinBenchmarkConfig {
     pub type_: String,
     /// Number of samples (rows) to evaluate.
     pub samples: Option<usize>,
+    /// Dataset source for this benchmark.
+    pub dataset: Option<String>,
     /// Which model sampler to use for this benchmark.
     pub model: Option<Sampler>,
     /// Maximum concurrent workers for this benchmark.
@@ -167,6 +169,7 @@ mod tests {
         if let BenchmarkConfig::Builtin(b) = bench {
             assert_eq!(b.type_, "builtin");
             assert_eq!(b.samples, Some(10));
+            assert!(b.dataset.is_none());
             assert!(b.model.is_none());
         }
     }
@@ -177,11 +180,15 @@ mod tests {
             [benchmarks.demo]
             type = "builtin"
             samples = 5
+            dataset = "hf://quantiles/demo"
             model = "openai:gpt-4"
         "#;
         let config: WorkspaceConfig = toml::from_str(toml).unwrap();
         let bench = config.benchmarks.get("demo").unwrap();
         assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
+        if let BenchmarkConfig::Builtin(b) = bench {
+            assert_eq!(b.dataset.as_deref(), Some("hf://quantiles/demo"));
+        }
     }
 
     #[test]

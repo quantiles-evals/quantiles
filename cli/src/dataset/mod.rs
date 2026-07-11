@@ -3,7 +3,7 @@ pub mod hf_client;
 
 use crate::dataset::cache::DatasetCache;
 use crate::dataset::hf_client::HuggingFaceClient;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -143,5 +143,48 @@ impl DatasetManager {
             }
         }
         splits.first().cloned().context("dataset has no splits")
+    }
+}
+
+/// Resolve a configured Hugging Face dataset source to the dataset ID expected
+/// by the existing Hugging Face download client.
+pub fn resolve_hf_dataset_source(source: &str) -> Result<&str> {
+    if let Some(dataset_id) = source.strip_prefix("hf://") {
+        if dataset_id.is_empty() {
+            bail!("dataset source `hf://` is missing a Hugging Face dataset id");
+        }
+        Ok(dataset_id)
+    } else if source.contains("://") {
+        bail!("unsupported dataset source `{source}`; expected `hf://...`");
+    } else {
+        bail!("dataset source `{source}` is missing required `hf://` prefix");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_hf_dataset_source;
+
+    #[test]
+    fn resolve_hf_dataset_source_strips_hf_prefix() {
+        assert_eq!(
+            resolve_hf_dataset_source("hf://quantiles/PubMedQA").unwrap(),
+            "quantiles/PubMedQA"
+        );
+    }
+
+    #[test]
+    fn resolve_hf_dataset_source_rejects_other_prefixes() {
+        let err = resolve_hf_dataset_source("s3://bucket/dataset").unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("unsupported dataset source `s3://bucket/dataset`")
+        );
+    }
+
+    #[test]
+    fn resolve_hf_dataset_source_requires_prefix() {
+        let err = resolve_hf_dataset_source("quantiles/PubMedQA").unwrap_err();
+        assert!(err.to_string().contains("missing required `hf://` prefix"));
     }
 }

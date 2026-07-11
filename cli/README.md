@@ -60,10 +60,11 @@ You can customize how the CLI executes built-in benchmarks and custom evaluation
 
 ### Built-in benchmarks
 
-For built-in benchmarks, configure settings like `samples`, `model`, and `max_workers`:
+For built-in benchmarks, configure settings like `dataset`, `samples`, `model`, and `max_workers`:
 
 ```toml
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
 samples = 50
 model = "openai:gpt-5.6"
 max_workers = 100
