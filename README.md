@@ -1,10 +1,12 @@
-# Quantiles: Local-First AI Evaluation Infrastructure
+# Quantiles
 
-Quantiles is a local-first CLI and SDK for running durable, reproducible AI evaluation workflows. Teams can iterate on models, prompts, agent workflows, and evaluation logic while preserving the metrics and run history needed to understand what improved, what regressed, and why.
+Quantiles is open-source, local-first evaluation infrastructure for applied AI systems, designed for developer and coding-agent workflows.
 
-It includes the `qt` CLI, a Python SDK, built-in benchmarks, local evaluation data, and agent-friendly instructions for coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. This monorepo centralizes Quantiles components, making it easier for engineers, researchers, and coding agents to inspect, modify, test, and extend the system.
+Use the `qt` CLI and Python SDK to create, run, analyze, and compare evaluations for models, prompts, and agents with resource-efficient local execution. Quantiles records metrics, sample-level results, execution history, and evaluation traces so you can measure system behavior, detect regressions, validate changes, and ship higher-quality, more reliable AI systems.
 
-## Why Quantiles
+Quantiles centralizes its components in this monorepo so developers, researchers, and coding agents can use, inspect, modify, test, and extend the system. Its reusable skills and instruction files work with Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other compatible agents.
+
+## Why use Quantiles?
 
 Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to build them from scratch:
 
@@ -26,13 +28,13 @@ Install the CLI:
 curl -fsSL https://cli.quantiles.io/install.sh | bash
 ```
 
-Run the [SimpleQA-verified](https://arxiv.org/abs/2509.07968) built-in benchmark:
+Run the [SimpleQA Verified](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) built-in benchmark:
 
 ```bash
 qt run simpleqa-verified
 ```
 
-> Important note: this `qt run` command will run the [`simpleqa-verified`](https://arxiv.org/abs/2509.07968) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
+> Important note: this `qt run` command will run the [`simpleqa-verified`](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
 
 Inspect the recorded run:
 
@@ -67,7 +69,7 @@ qt compare <run_id_a> <run_id_b>
 
 > Note: you can pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
 
-To learn more about what you can do with the CLI, see [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli).
+See the [CLI reference](https://quantiles.io/documentation/reference/cli) for available commands, options, and usage details.
 
 ### Configuration file and customization
 
@@ -98,8 +100,8 @@ The CLI will execute the command with `QUANTILES_RUN_ID`, `QUANTILES_WORKFLOW_NA
 
 See the following resources for more details:
 
-- [`CONFIG.md`](./CONFIG.md) - in-depth guides to configuration and reference
-- [`./cli/examples/configs`](./cli/examples/configs) - complete examples, including a [custom code benchmark example](./cli/examples/configs/custom_code/quantiles.toml)
+- [Configuration guide](./CONFIG.md) - Detailed configuration instructions and reference documentation.
+- [Complete configuration examples](./cli/examples/configs) - Complete examples, including a [custom-code benchmark configuration](./cli/examples/configs/custom_code/quantiles.toml)
 
 ## Local-First and Offline by Default
 
@@ -124,7 +126,7 @@ Built-in benchmarks are ready-to-run evaluations with predefined datasets, scori
 | `qt run <benchmark>`                                   | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
 | `qt run <benchmark> --input '{"model":"<model_name>}'` | Run a built-in benchmark against your model                                                                                                         |
 
-Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
+Quantiles also provides a [Benchmark Hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
 
 ### Add a built-in benchmark
 
@@ -134,7 +136,7 @@ Helpful requests include the benchmark name, source dataset or repository, licen
 
 ## Custom Evaluations
 
-A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](https://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
+A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](https://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages durable steps, step caching, and step resume, metrics, inputs, outputs, and comparisons.
 
 Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
 
@@ -151,21 +153,21 @@ Run the evaluation with `qt run my-eval`. If it fails, resume it later with `qt 
 
 Use custom evaluations when you need to measure behavior that is specific to your product, workflow, prompt, dataset, rubric, or release process.
 
-Read more about how to build and run custom evaluations at [quantiles.io/documentation/custom-evaluations](https://quantiles.io/documentation/custom-evaluations).
+See the [custom evaluations guide](https://quantiles.io/documentation/custom-evaluations) for instructions on building and running custom evaluations.
 
 ### Python SDK
 
 Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording, and analyzing benchmarks.
 
-The code for the Python SDK is located in this repository at [`./python/`](./python). Read more about it at [quantiles.io/documentation/reference/python-sdk](https://quantiles.io/documentation/reference/python-sdk).
+The [Python SDK source code](./python) is available in this repository. See the [Python SDK reference](https://quantiles.io/documentation/reference/python-sdk) for usage and API documentation.
 
 ## Coding Agents
 
-Quantiles is designed to work well with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other agentic development tools. For a concise, public, LLM-readable overview of Quantiles with links to agent guides and related documentation, see [quantiles.io/llms.txt](https://quantiles.io/llms.txt).
+Quantiles is designed for use with coding agents such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, and OpenCode. The [Quantiles `llms.txt`](https://quantiles.io/llms.txt) provides a concise, public, LLM-readable overview with links to agent guides and related documentation.
 
 ### `SKILL.md`
 
-The [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) repository includes a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) file that gives agents complete instructions for running evaluations, inspecting results, comparing runs, and summarizing regressions. To use the skill with your agent, install it with the following prompt:
+The [Quantiles agent skill repository](https://github.com/quantiles-evals/skill) provides a [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) instruction file that guides coding agents through creating, running, analyzing, and comparing evaluations. Use the following agent prompt to install it:
 
 ```text
 Install the Quantiles eval skill at github.com/quantiles-evals/skill
@@ -183,7 +185,7 @@ The embedded [`AGENTS.md` file](./AGENTS.md) gives agents repository-specific in
 
 ## Documentation
 
-Full documentation is available at [quantiles.io/documentation](https://quantiles.io/documentation/).
+See the [Quantiles documentation](https://quantiles.io/documentation/) for comprehensive guides and reference documentation.
 
 Start here:
 
@@ -199,7 +201,7 @@ Please read our [contributing guide](./CONTRIBUTING.md) to get started.
 
 ## Security
 
-Please do not report security vulnerabilities through public GitHub issues. Follow the reporting guidance in [SECURITY.md](./SECURITY.md).
+Please do not report security vulnerabilities through public GitHub issues. Follow the security reporting guidance in [SECURITY.md](./SECURITY.md).
 
 ## License
 
