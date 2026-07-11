@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -u
+set -eou pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root/custom-nocode-examples" || exit 1
