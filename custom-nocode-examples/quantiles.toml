@@ -25,7 +25,7 @@ limit = 100
 [benchmarks.mmlu-pro]
 type = "custom_nocode"
 style = { type = "multiple_choice", choices = { column = "options" }, choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"], answer = { label_column = "answer" } }
-dataset = { name = "TIGER-Lab/MMLU-Pro", config_name = "default", split = "test" }
+dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/mmlu-pro.txt"
 limit = 1000
@@ -33,7 +33,6 @@ limit = 1000
 [benchmarks.gpqa]
 type = "custom_nocode"
 style = { type = "multiple_choice", choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }, choice_labels = ["A", "B", "C", "D"], answer = { correct_choice_column = "Correct Answer" }, shuffle = { seed_column = "Record ID" } }
-dataset = { name = "Wanfq/gpqa", config_name = "gpqa_diamond", split = "train" }
+dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
-limit = 10
