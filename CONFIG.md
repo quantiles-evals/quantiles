@@ -100,9 +100,9 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_nocode`
 
-No-code benchmarks are configured in TOML and run natively inside the CLI, without a custom Python or TypeScript evaluation program. The `exact_match` style scores an open answer or label against a golden answer column. The `multiple_choice` style normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
+No-code evals are configured in TOML and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
 
-With `model = "random"`, exact-match benchmarks use the demo random-text sampler, while multiple-choice benchmarks uniformly sample one of the configured `style.choice_labels`.
+When you use a `"random"` model (`model = "random"`) with an `exact_match` eval, your eval will use the built-in "model" that generates random text, so you'll likely to get very low accuracy numbers. When you configure a `multiple_choice` eval with the `"random"` model, the built-in "model" will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, this model is intended for testing your benchmark. We do not recommend relying on it for any real ML evaluation work.
 
 ```toml
 [benchmarks.nocode_custom]
