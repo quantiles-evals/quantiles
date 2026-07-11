@@ -28,7 +28,7 @@ qt list
 qt show 1
 ```
 
-> See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
+> See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 ### Custom evaluations
 
@@ -49,14 +49,14 @@ qt run my-eval
 qt resume <run_id>
 ```
 
-See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_code/quantiles.toml) for a complete working example.
+See the [custom-code configuration example](./examples/configs/custom_code/quantiles.toml) for a complete working configuration.
 
 ## Configuration files and customization
 
 You can customize how the CLI executes built-in benchmarks and custom evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
-- [`../CONFIG.md`](../CONFIG.md) for a guide and reference.
-- [`./examples/configs`](./examples/configs) for complete working examples.
+- [Configuration reference](../CONFIG.md) for configuration guidance and supported options.
+- [Configuration examples](./examples/configs) for complete working configurations.
 
 ### Built-in benchmarks
 

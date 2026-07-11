@@ -10,7 +10,7 @@ uv add quantiles
 
 ## Usage
 
-To build a custom eval with Python, use the following code. To ensure this eval is runnable with `qt run`, set up a `quantiles.toml` configuration file. See [`../CONFIG.md`](../CONFIG.md) for details.
+Use the following code to build a custom evaluation with Python. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](../CONFIG.md).
 
 ```python
 import asyncio
