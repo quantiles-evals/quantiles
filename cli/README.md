@@ -75,6 +75,8 @@ max_workers = 100
 
 For dataset-backed QA checks that do not need custom evaluation code, set `type = "custom_nocode"`. Set `style.type` to `"exact_match"` for benchmarks that test an exact match to a golden answer, or `"multiple_choice"` for choice-based benchmarks. Style-specific dataset columns belong inside the `style` table. The benchmark runs inside the CLI, renders each prompt with the configured Jinja template, calls the configured model, and scores each row against the configured answer source.
 
+With `model = "random"`, exact-match benchmarks generate demo random text and multiple-choice benchmarks uniformly select from `style.choice_labels`.
+
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"

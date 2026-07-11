@@ -12,6 +12,7 @@ use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
+use crate::llm::random_label::RandomLabelSampler;
 
 /// Input deserialized from the JSON assembled by `commands::run`.
 #[derive(Debug, Deserialize)]
@@ -162,7 +163,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let config = parse_input(ctx.input)?;
         let (template_str, env) = load_template(&config.prompt_template_file)?;
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
-        let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
+        let llm = resolve_custom_nocode_sampler(config.model.as_ref(), &config.style)?;
 
         let (manager, info, limit) = resolve_dataset_limit(
             &config.dataset.name,
@@ -227,6 +228,19 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
         Ok(())
     }
+}
+
+fn resolve_custom_nocode_sampler(
+    model: Option<&crate::llm::Sampler>,
+    style: &crate::config::CustomNoCodeStyleConfig,
+) -> Result<Arc<dyn crate::llm::LLMSampler>> {
+    if model.is_none_or(|sampler| matches!(sampler, crate::llm::Sampler::Random))
+        && let crate::config::CustomNoCodeStyleConfig::MultipleChoice { choice_labels, .. } = style
+    {
+        return Ok(Arc::new(RandomLabelSampler::new(choice_labels)));
+    }
+
+    resolve_sampler(model, || Arc::new(RandomSampler::new(80)))
 }
 
 fn parse_input(input: Option<&str>) -> Result<CustomNoCodeInput> {
@@ -564,6 +578,51 @@ mod tests {
             Some("C")
         );
         assert_eq!(extract_choice_label("unknown", &labels), None);
+    }
+
+    #[tokio::test]
+    async fn multiple_choice_random_sampler_uses_configured_labels() {
+        let style = multiple_choice_config(
+            crate::config::CustomNoCodeChoiceSource::Column(
+                crate::config::CustomNoCodeChoiceColumn {
+                    column: "options".to_owned(),
+                },
+            ),
+            crate::config::CustomNoCodeAnswerSource::LabelColumn(
+                crate::config::CustomNoCodeLabelAnswer {
+                    label_column: "answer".to_owned(),
+                },
+            ),
+        );
+        let configured_random = crate::llm::Sampler::Random;
+
+        for model in [None, Some(&configured_random)] {
+            let sampler = resolve_custom_nocode_sampler(model, &style).unwrap();
+            for _ in 0..100 {
+                let response = sampler.sample("ignored prompt").await.unwrap();
+                assert!(matches!(response.as_str(), "A" | "B" | "C" | "D"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn exact_match_random_sampler_remains_alphanumeric() {
+        let style = crate::config::CustomNoCodeStyleConfig::ExactMatch {
+            golden_column: "answer".to_owned(),
+        };
+        let sampler =
+            resolve_custom_nocode_sampler(Some(&crate::llm::Sampler::Random), &style).unwrap();
+
+        for _ in 0..100 {
+            let response = sampler.sample("ignored prompt").await.unwrap();
+            assert!(!response.is_empty());
+            assert!(response.len() <= 80);
+            assert!(
+                response
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+            );
+        }
     }
 
     fn multiple_choice_config(
