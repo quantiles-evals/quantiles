@@ -50,6 +50,7 @@ limit = 1000
 type = "custom_nocode"
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
+dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
 
     [benchmarks.gpqa.style]
     type = "multiple_choice"
@@ -57,8 +58,3 @@ prompt_template_file = "prompts/gpqa.txt"
     choice_labels = ["A", "B", "C", "D"]
     answer = { correct_choice_column = "Correct Answer" }
     shuffle = { seed_column = "Record ID" }
-
-    [benchmarks.gpqa.dataset]
-    name = "quantiles/gpqa"
-    config_name = "gpqa_diamond"
-    split = "train"
