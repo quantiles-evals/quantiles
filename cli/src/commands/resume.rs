@@ -235,10 +235,10 @@ mod tests {
                     revision: None,
                 },
                 model: Some(qt::llm::Sampler::Random {}),
+                prompt_template_file: file.path().to_str().unwrap().to_owned(),
                 limit: None,
                 max_workers: None,
-                task: qt::config::CustomNoCodeTaskConfig::ExactMatch {
-                    prompt_template_file: file.path().to_str().unwrap().to_owned(),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
             },
@@ -312,11 +312,10 @@ mod tests {
                 r#"
 [benchmarks.nocode_resume_test]
 type = "custom_nocode"
-style = "exact_match"
+style = {{ type = "exact_match", golden_column = "answer" }}
 dataset = {{ name = "fixture/qa" }}
 model = "random"
 prompt_template_file = "{}"
-golden_column = "answer"
 limit = 2
 "#,
                 template_path.to_str().unwrap()

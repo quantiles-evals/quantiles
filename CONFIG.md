@@ -105,11 +105,10 @@ No-code benchmarks are configured in TOML and run natively inside the CLI, witho
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"
-style = "exact_match"
+style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-golden_column = "answer"
 limit = 10
 ```
 
@@ -124,7 +123,8 @@ For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./
 | Field | Type | Required | Description |
 |--|--|--|--|
 | `type` | string | yes | Must be `"custom_nocode"`. |
-| `style` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
+| `style` | table | yes | Scoring style and its style-specific configuration. |
+| `style.type` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
 | `dataset` | table | yes | Hugging Face dataset coordinates. |
 | `dataset.name` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
 | `dataset.config_name` | string | no | Hugging Face dataset configuration or subset. |
@@ -132,20 +132,32 @@ For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./
 | `dataset.revision` | string | no | Dataset revision. |
 | `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
 | `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
-| `golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
-| `choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `choices.column` or `choices.columns`. |
-| `choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
-| `choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
-| `answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
-| `answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
-| `answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
-| `answer.index_base` | integer | no | Index base for `answer.index_column`. Defaults to `0`. |
-| `answer.correct_choice_column` | string | conditional | Member of `choices.columns` known to contain the correct answer. |
-| `choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
-| `shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
-| `shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `shuffle` is present. |
+| `style.golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
+| `style.choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`. |
+| `style.choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
+| `style.choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
+| `style.answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
+| `style.answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
+| `style.answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
+| `style.answer.index_base` | integer | no | Index base for `style.answer.index_column`. Defaults to `0`. |
+| `style.answer.correct_choice_column` | string | conditional | Member of `style.choices.columns` known to contain the correct answer. |
+| `style.choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
+| `style.shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
+| `style.shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present. |
 | `limit` | integer | no | Number of dataset rows to evaluate. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
+
+Multiple-choice configuration keeps its choice and answer sources inside `style`:
+
+```toml
+[benchmarks.medqa]
+type = "custom_nocode"
+style = { type = "multiple_choice", choices = { column = "options" }, choice_labels = ["A", "B", "C", "D"], answer = { label_column = "answer_idx" } }
+dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
+model = "random"
+prompt_template_file = "prompts/medqa.txt"
+limit = 10
+```
 
 Templates access dataset fields directly. A multiple-choice template can iterate the normalized choices:
 

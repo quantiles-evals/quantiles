@@ -1,53 +1,39 @@
 [benchmarks.nocode_custom]
 type = "custom_nocode"
-style = "exact_match"
+style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-golden_column = "answer"
 limit = 10
 
 [benchmarks.medqa]
 type = "custom_nocode"
-style = "multiple_choice"
+style = { type = "multiple_choice", choices = { column = "options" }, choice_labels = ["A", "B", "C", "D"], answer = { label_column = "answer_idx" } }
 dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/medqa.txt"
-choices = { column = "options" }
-choice_labels = ["A", "B", "C", "D"]
-answer = { label_column = "answer_idx" }
 limit = 10
 
 [benchmarks.medmcqa]
 type = "custom_nocode"
-style = "multiple_choice"
+style = { type = "multiple_choice", choices = { columns = ["opa", "opb", "opc", "opd"] }, choice_labels = ["A", "B", "C", "D"], answer = { index_column = "cop", index_base = 0 } }
 dataset = { name = "quantiles/medmcqa", config_name = "default", split = "validation" }
 model = "random"
 prompt_template_file = "prompts/medmcqa.txt"
-choices = { columns = ["opa", "opb", "opc", "opd"] }
-choice_labels = ["A", "B", "C", "D"]
-answer = { index_column = "cop", index_base = 0 }
-limit = 10
+limit = 100
 
 [benchmarks.mmlu-pro]
 type = "custom_nocode"
-style = "multiple_choice"
+style = { type = "multiple_choice", choices = { column = "options" }, choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"], answer = { label_column = "answer" } }
 dataset = { name = "TIGER-Lab/MMLU-Pro", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/mmlu-pro.txt"
-choices = { column = "options" }
-choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-answer = { label_column = "answer" }
 limit = 10
 
 [benchmarks.gpqa]
 type = "custom_nocode"
-style = "multiple_choice"
+style = { type = "multiple_choice", choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }, choice_labels = ["A", "B", "C", "D"], answer = { correct_choice_column = "Correct Answer" }, shuffle = { seed_column = "Record ID" } }
 dataset = { name = "Wanfq/gpqa", config_name = "gpqa_diamond", split = "train" }
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
-choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }
-choice_labels = ["A", "B", "C", "D"]
-answer = { correct_choice_column = "Correct Answer" }
-shuffle = { seed_column = "Record ID" }
 limit = 10

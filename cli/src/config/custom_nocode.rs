@@ -3,18 +3,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::llm::Sampler;
 
-/// Task-specific configuration for a no-code benchmark.
+/// Scoring style and style-specific configuration for a no-code benchmark.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(tag = "style", rename_all = "snake_case")]
-pub enum CustomNoCodeTaskConfig {
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CustomNoCodeStyleConfig {
     /// Compare the trimmed model response with a golden dataset column.
-    ExactMatch {
-        prompt_template_file: String,
-        golden_column: String,
-    },
+    ExactMatch { golden_column: String },
     /// Render labeled choices and score the selected label.
     MultipleChoice {
-        prompt_template_file: String,
         choices: CustomNoCodeChoiceSource,
         answer: CustomNoCodeAnswerSource,
         choice_labels: Vec<String>,
@@ -81,6 +77,7 @@ pub struct CustomNoCodeShuffleConfig {
 
 /// No-code custom benchmark configuration.
 #[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct CustomNoCodeBenchmarkConfig {
     #[serde(rename = "type")]
     pub type_: String,
@@ -88,12 +85,14 @@ pub struct CustomNoCodeBenchmarkConfig {
     pub dataset: CustomNoCodeDatasetConfig,
     /// Model sampler to use.
     pub model: Option<Sampler>,
+    /// Path to a Jinja template file for rendering prompts.
+    pub prompt_template_file: String,
     /// Number of dataset rows to evaluate.
     pub limit: Option<usize>,
     /// Maximum concurrent workers.
     pub max_workers: Option<usize>,
-    #[serde(flatten)]
-    pub task: CustomNoCodeTaskConfig,
+    /// Scoring style and its required dataset-column configuration.
+    pub style: CustomNoCodeStyleConfig,
 }
 
 /// Hugging Face dataset coordinates for a no-code benchmark.
@@ -113,21 +112,7 @@ pub struct CustomNoCodeDatasetConfig {
     pub revision: Option<String>,
 }
 
-impl CustomNoCodeTaskConfig {
-    #[must_use]
-    pub fn prompt_template_file(&self) -> &str {
-        match self {
-            Self::ExactMatch {
-                prompt_template_file,
-                ..
-            }
-            | Self::MultipleChoice {
-                prompt_template_file,
-                ..
-            } => prompt_template_file,
-        }
-    }
-
+impl CustomNoCodeStyleConfig {
     pub(crate) fn validate(&self) -> Result<()> {
         let Self::MultipleChoice {
             choices,
@@ -188,11 +173,10 @@ mod tests {
         let toml = r#"
             [benchmarks.nocode_custom]
             type = "custom_nocode"
-            style = "exact_match"
+            style = { type = "exact_match", golden_column = "answer" }
             dataset = { name = "quantiles/simpleqa-verified" }
             model = "random"
             prompt_template_file = "prompts/qa.txt"
-            golden_column = "answer"
             limit = 10
         "#;
         let config: WorkspaceConfig = toml::from_str(toml).unwrap();
@@ -202,14 +186,10 @@ mod tests {
             assert_eq!(c.dataset.name, "quantiles/simpleqa-verified");
             assert_eq!(c.model, Some(Sampler::Random));
             assert_eq!(c.limit, Some(10));
-            let CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file,
-                golden_column,
-            } = &c.task
-            else {
+            let CustomNoCodeStyleConfig::ExactMatch { golden_column } = &c.style else {
                 panic!("expected exact-match task");
             };
-            assert_eq!(prompt_template_file, "prompts/qa.txt");
+            assert_eq!(c.prompt_template_file, "prompts/qa.txt");
             assert_eq!(golden_column, "answer");
         }
     }
@@ -219,11 +199,10 @@ mod tests {
         let toml = r#"
             [benchmarks.nocode_custom]
             type = "custom_nocode"
-            style = "judge"
+            style = { type = "judge", golden_column = "answer" }
             dataset = { name = "quantiles/simpleqa-verified" }
             model = "random"
             prompt_template_file = "prompts/qa.txt"
-            golden_column = "answer"
         "#;
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
         assert!(result.is_err());
@@ -234,10 +213,9 @@ mod tests {
         let toml = r#"
             [benchmarks.nocode_custom]
             type = "custom_nocode"
-            style = "exact_match"
+            style = { type = "exact_match", golden_column = "answer" }
             dataset = { name = "quantiles/simpleqa-verified" }
             model = "random"
-            golden_column = "answer"
         "#;
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
         assert!(result.is_err());
@@ -254,10 +232,10 @@ mod tests {
                 revision: None,
             },
             model: Some(Sampler::Random),
+            prompt_template_file: "does_not_exist.txt".to_owned(),
             limit: None,
             max_workers: None,
-            task: CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file: "does_not_exist.txt".to_owned(),
+            style: CustomNoCodeStyleConfig::ExactMatch {
                 golden_column: "answer".to_owned(),
             },
         }));
@@ -277,10 +255,10 @@ mod tests {
                 revision: None,
             },
             model: Some(Sampler::Random),
+            prompt_template_file: file.path().to_str().unwrap().to_owned(),
             limit: None,
             max_workers: None,
-            task: CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file: file.path().to_str().unwrap().to_owned(),
+            style: CustomNoCodeStyleConfig::ExactMatch {
                 golden_column: "answer".to_owned(),
             },
         }));
@@ -308,8 +286,8 @@ mod tests {
             panic!("missing MedMCQA example");
         };
         assert!(matches!(
-            medmcqa.task,
-            CustomNoCodeTaskConfig::MultipleChoice { .. }
+            medmcqa.style,
+            CustomNoCodeStyleConfig::MultipleChoice { .. }
         ));
         assert_eq!(medmcqa.dataset.name, "quantiles/medmcqa");
         assert_eq!(medmcqa.dataset.split.as_deref(), Some("validation"));
@@ -320,12 +298,38 @@ mod tests {
         let toml = r#"
             [benchmarks.invalid]
             type = "custom_nocode"
-            style = "multiple_choice"
+            style = { type = "multiple_choice", choices = { column = "options" }, answer = { label_column = "answer", index_column = "answer_index" }, choice_labels = ["A", "B"] }
             dataset = { name = "fixture/qa" }
             prompt_template_file = "prompts/qa.txt"
-            choices = { column = "options" }
-            answer = { label_column = "answer", index_column = "answer_index" }
-            choice_labels = ["A", "B"]
+        "#;
+
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exact_match_rejects_multiple_choice_fields() {
+        let toml = r#"
+            [benchmarks.invalid]
+            type = "custom_nocode"
+            style = { type = "exact_match", golden_column = "answer", choices = { column = "options" } }
+            dataset = { name = "fixture/qa" }
+            prompt_template_file = "prompts/qa.txt"
+        "#;
+
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn benchmark_rejects_style_fields_at_top_level() {
+        let toml = r#"
+            [benchmarks.invalid]
+            type = "custom_nocode"
+            style = { type = "exact_match", golden_column = "answer" }
+            dataset = { name = "fixture/qa" }
+            prompt_template_file = "prompts/qa.txt"
+            golden_column = "answer"
         "#;
 
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);

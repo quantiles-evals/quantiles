@@ -161,8 +161,8 @@ struct CustomNoCodeConfigInput<'a> {
     limit: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_workers: Option<usize>,
-    #[serde(flatten)]
-    task: &'a qt::config::CustomNoCodeTaskConfig,
+    prompt_template_file: &'a str,
+    style: &'a qt::config::CustomNoCodeStyleConfig,
 }
 
 pub(super) fn assemble_custom_nocode_input(
@@ -178,7 +178,8 @@ pub(super) fn assemble_custom_nocode_input(
         model: &bench.model,
         limit: bench.limit,
         max_workers: bench.max_workers,
-        task: &bench.task,
+        prompt_template_file: &bench.prompt_template_file,
+        style: &bench.style,
     };
 
     serde_json::to_string(&input).expect("infallible serialization")
@@ -316,7 +317,7 @@ pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
     } else {
         print_aggregate_metrics_table(&aggregate);
         println!(
-            "\nRun `qt show {} --verbose` for sample-level details.",
+            "\nRun `qt show {} --json` for sample-level details.",
             args.run_id
         );
     }
@@ -757,23 +758,23 @@ mod tests {
                 revision: Some("main".to_owned()),
             },
             model: Some(qt::llm::Sampler::Random {}),
+            prompt_template_file: "prompts/qa.txt".to_owned(),
             limit: Some(10),
             max_workers: Some(4),
-            task: qt::config::CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file: "prompts/qa.txt".to_owned(),
+            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                 golden_column: "answer".to_owned(),
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, None);
         let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
-        assert_eq!(parsed["style"], "exact_match");
+        assert_eq!(parsed["style"]["type"], "exact_match");
         assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
         assert_eq!(parsed["dataset"]["config_name"], "default");
         assert_eq!(parsed["dataset"]["split"], "test");
         assert_eq!(parsed["dataset"]["revision"], "main");
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["prompt_template_file"], "prompts/qa.txt");
-        assert_eq!(parsed["golden_column"], "answer");
+        assert_eq!(parsed["style"]["golden_column"], "answer");
         assert_eq!(parsed["limit"], 10);
         assert_eq!(parsed["max_workers"], 4);
     }
@@ -791,10 +792,10 @@ mod tests {
                 revision: None,
             },
             model: None,
+            prompt_template_file: "prompts/qa.txt".to_owned(),
             limit: None,
             max_workers: None,
-            task: qt::config::CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file: "prompts/qa.txt".to_owned(),
+            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                 golden_column: "answer".to_owned(),
             },
         };
@@ -818,10 +819,10 @@ mod tests {
                 revision: None,
             },
             model: None,
+            prompt_template_file: "prompts/qa.txt".to_owned(),
             limit: None,
             max_workers: None,
-            task: qt::config::CustomNoCodeTaskConfig::ExactMatch {
-                prompt_template_file: "prompts/qa.txt".to_owned(),
+            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                 golden_column: "answer".to_owned(),
             },
         };

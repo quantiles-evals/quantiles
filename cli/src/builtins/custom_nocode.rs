@@ -21,8 +21,8 @@ struct CustomNoCodeInput {
     model: Option<crate::llm::Sampler>,
     limit: Option<usize>,
     max_workers: Option<usize>,
-    #[serde(flatten)]
-    task: crate::config::CustomNoCodeTaskConfig,
+    prompt_template_file: String,
+    style: crate::config::CustomNoCodeStyleConfig,
 }
 
 /// Per-row step output stored as JSON in the step record.
@@ -54,7 +54,7 @@ struct EvaluateRowArgs<'a> {
     /// The row value
     row: &'a serde_json::Value,
     /// Exact-match or multiple-choice task configuration.
-    task: &'a crate::config::CustomNoCodeTaskConfig,
+    style: &'a crate::config::CustomNoCodeStyleConfig,
     /// The prompt template
     template_str: &'a str,
     /// The pre-constructed jinja template env
@@ -84,7 +84,7 @@ impl CustomNoCodeBuiltin {
     }
 
     async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<bool> {
-        let prepared = prepare_row(args.i, args.row, args.task)?;
+        let prepared = prepare_row(args.i, args.row, args.style)?;
 
         let rendered = args
             .env
@@ -116,9 +116,10 @@ impl CustomNoCodeBuiltin {
                     .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
                 let parsed_response = if prepared.is_multiple_choice {
-                    let crate::config::CustomNoCodeTaskConfig::MultipleChoice {
-                        choice_labels, ..
-                    } = args.task
+                    let crate::config::CustomNoCodeStyleConfig::MultipleChoice {
+                        choice_labels,
+                        ..
+                    } = args.style
                     else {
                         unreachable!("prepared multiple-choice row has exact-match config")
                     };
@@ -163,7 +164,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
         let config = parse_input(ctx.input)?;
-        let (template_str, env) = load_template(config.task.prompt_template_file())?;
+        let (template_str, env) = load_template(&config.prompt_template_file)?;
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
@@ -191,7 +192,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .map_or("random".to_string(), std::string::ToString::to_string);
         let run_id = ctx.run_id;
         let dataset = config.dataset.name.clone();
-        let task = Arc::new(config.task.clone());
+        let style = Arc::new(config.style.clone());
         let template_str = Arc::new(template_str);
 
         let name = self.name();
@@ -203,13 +204,13 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let db = db.clone();
                 let model_name = model_name.clone();
                 let template_str = Arc::clone(&template_str);
-                let task = Arc::clone(&task);
+                let style = Arc::clone(&style);
                 let env = env.clone();
                 async move {
                     let args = EvaluateRowArgs {
                         i,
                         row: &row,
-                        task: &task,
+                        style: &style,
                         template_str: &template_str,
                         env: &env,
                         model_name: &model_name,
@@ -281,17 +282,17 @@ async fn resolve_dataset_limit(
 fn prepare_row(
     row_index: usize,
     row: &serde_json::Value,
-    task: &crate::config::CustomNoCodeTaskConfig,
+    style: &crate::config::CustomNoCodeStyleConfig,
 ) -> Result<PreparedRow> {
-    let crate::config::CustomNoCodeTaskConfig::MultipleChoice {
+    let crate::config::CustomNoCodeStyleConfig::MultipleChoice {
         choices: choice_source,
         answer,
         choice_labels,
         shuffle,
         ..
-    } = task
+    } = style
     else {
-        let crate::config::CustomNoCodeTaskConfig::ExactMatch { golden_column, .. } = task else {
+        let crate::config::CustomNoCodeStyleConfig::ExactMatch { golden_column } = style else {
             unreachable!()
         };
         let golden = extract_scalar(row, golden_column)
@@ -581,9 +582,8 @@ mod tests {
     fn multiple_choice_config(
         choices: crate::config::CustomNoCodeChoiceSource,
         answer: crate::config::CustomNoCodeAnswerSource,
-    ) -> crate::config::CustomNoCodeTaskConfig {
-        crate::config::CustomNoCodeTaskConfig::MultipleChoice {
-            prompt_template_file: "unused.txt".to_owned(),
+    ) -> crate::config::CustomNoCodeStyleConfig {
+        crate::config::CustomNoCodeStyleConfig::MultipleChoice {
             choices,
             answer,
             choice_labels: ["A", "B", "C", "D"].map(str::to_owned).to_vec(),
@@ -660,8 +660,7 @@ mod tests {
 
     #[test]
     fn prepares_gpqa_with_deterministic_shuffle() {
-        let config = crate::config::CustomNoCodeTaskConfig::MultipleChoice {
-            prompt_template_file: "unused.txt".to_owned(),
+        let config = crate::config::CustomNoCodeStyleConfig::MultipleChoice {
             choices: crate::config::CustomNoCodeChoiceSource::Columns(
                 crate::config::CustomNoCodeChoiceColumns {
                     columns: [
@@ -719,10 +718,9 @@ mod tests {
         std::fs::write(&template_path, "{{ unclosed").unwrap();
 
         let input_json = serde_json::to_string(&json!({
-            "style": "exact_match",
+            "style": {"type": "exact_match", "golden_column": "a"},
             "dataset": {"name": "fixture/qa"},
             "prompt_template_file": template_path.to_str().unwrap(),
-            "golden_column": "a",
         }))
         .unwrap();
 
@@ -807,11 +805,10 @@ mod tests {
 
         // Assemble the input JSON that execute() expects.
         let input_json = serde_json::to_string(&json!({
-            "style": "exact_match",
+            "style": {"type": "exact_match", "golden_column": "answer"},
             "dataset": {"name": "fixture/qa"},
             "model": "random",
             "prompt_template_file": template_path.to_str().unwrap(),
-            "golden_column": "answer",
             "limit": 2,
         }))
         .unwrap();
