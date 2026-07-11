@@ -12,14 +12,14 @@ bun install quantiles
 
 ## Usage
 
-To build a custom eval with TypeScript, use the following code. To ensure this eval is runnable with `qt run`, set up a `quantiles.toml` configuration file. See [`../CONFIG.md`](../CONFIG.md) for details.
+Use the following code to build a custom evaluation with TypeScript. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](../CONFIG.md).`
 
 ```ts
 import { QuantilesClient } from "@quantiles/sdk";
 
 const client = new QuantilesClient();
 const run = await client.createRun("eval-smoke-test", {
-  model: "gpt-4.1-mini",
+  model: "gpt-5.6",
 });
 
 const output = await run.step("call-model", { prompt: "hello" }, async () => {
