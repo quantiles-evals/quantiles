@@ -4,7 +4,8 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::builtins::common::{
-    emit_accuracy_metrics, get_max_workers, hash_input, resolve_sampler, run_timed_step,
+    compute_statistics, emit_accuracy_metrics, get_max_workers, hash_input, resolve_sampler,
+    run_timed_step,
 };
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
@@ -47,6 +48,12 @@ struct PreparedRow {
     golden: String,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SampleResult {
+    is_correct: bool,
+    response_parsed: bool,
+}
+
 /// Arguments for the [`CustomNoCodeBuiltin::evaluate_row`] method
 struct EvaluateRowArgs<'a> {
     /// The row index
@@ -83,7 +90,7 @@ impl CustomNoCodeBuiltin {
         Self { name }
     }
 
-    async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<bool> {
+    async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<SampleResult> {
         let prepared = prepare_row(args.i, args.row, args.style)?;
 
         let rendered = args
@@ -147,9 +154,25 @@ impl CustomNoCodeBuiltin {
                     None,
                 )
                 .await;
+            args.metrics_store
+                .emit(
+                    args.run_id,
+                    Some(step_id),
+                    "response_parsed",
+                    if output.parsed_response.is_some() {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                    None,
+                )
+                .await;
         }
 
-        Ok(output.is_correct)
+        Ok(SampleResult {
+            is_correct: output.is_correct,
+            response_parsed: output.parsed_response.is_some(),
+        })
     }
 }
 
@@ -222,12 +245,91 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .await?;
 
         let total_count = results.len();
-        emit_accuracy_metrics(ctx.metrics_store, ctx.run_id, results).await;
+        emit_custom_nocode_aggregate_metrics(ctx.metrics_store, ctx.run_id, &results).await?;
 
         set_builtin_run_output(ctx.db, ctx.run_id, total_count).await?;
 
         Ok(())
     }
+}
+
+#[expect(clippy::cast_precision_loss)]
+async fn emit_custom_nocode_aggregate_metrics(
+    metrics_store: &crate::metrics_store::MetricsStore,
+    run_id: i64,
+    results: &[SampleResult],
+) -> Result<()> {
+    if results.is_empty() {
+        return Ok(());
+    }
+
+    emit_accuracy_metrics(
+        metrics_store,
+        run_id,
+        results.iter().map(|result| result.is_correct),
+    )
+    .await;
+
+    let incorrect_count = results.iter().filter(|result| !result.is_correct).count();
+    let parsed_response_count = results
+        .iter()
+        .filter(|result| result.response_parsed)
+        .count();
+    let unparsed_response_count = results.len() - parsed_response_count;
+    let parse_rate = parsed_response_count as f64 / results.len() as f64;
+
+    metrics_store
+        .emit(
+            run_id,
+            None,
+            "incorrect_count",
+            incorrect_count as f64,
+            None,
+        )
+        .await;
+    metrics_store
+        .emit(
+            run_id,
+            None,
+            "parsed_response_count",
+            parsed_response_count as f64,
+            None,
+        )
+        .await;
+    metrics_store
+        .emit(
+            run_id,
+            None,
+            "unparsed_response_count",
+            unparsed_response_count as f64,
+            None,
+        )
+        .await;
+    metrics_store
+        .emit(run_id, None, "parse_rate", parse_rate, None)
+        .await;
+
+    let latency_values = metrics_store
+        .sample_metric_values(run_id, "latency_ms")
+        .await?;
+    if latency_values.is_empty() {
+        return Ok(());
+    }
+    let stats = compute_statistics(&latency_values);
+    for (metric_name, metric_value) in [
+        ("mean_latency_ms", stats.mean),
+        ("median_latency_ms", stats.median),
+        ("p95_latency_ms", stats.p95),
+        ("p99_latency_ms", stats.p99),
+        ("min_latency_ms", stats.min),
+        ("max_latency_ms", stats.max),
+    ] {
+        metrics_store
+            .emit(run_id, None, metric_name, metric_value, Some("ms"))
+            .await;
+    }
+
+    Ok(())
 }
 
 fn resolve_custom_nocode_sampler(
@@ -625,6 +727,67 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn emits_extended_aggregate_metrics() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().join("metrics")).unwrap();
+        let run_id = 17;
+        for (step_id, latency) in [(1, 10.0), (2, 20.0), (3, 30.0)] {
+            metrics_store
+                .emit(run_id, Some(step_id), "latency_ms", latency, Some("ms"))
+                .await;
+        }
+        let results = [
+            SampleResult {
+                is_correct: true,
+                response_parsed: true,
+            },
+            SampleResult {
+                is_correct: false,
+                response_parsed: false,
+            },
+            SampleResult {
+                is_correct: false,
+                response_parsed: true,
+            },
+        ];
+
+        emit_custom_nocode_aggregate_metrics(&metrics_store, run_id, &results)
+            .await
+            .unwrap();
+        metrics_store.flush(run_id).await.unwrap();
+        let metrics = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        let value = |name: &str| {
+            metrics
+                .iter()
+                .find(|metric| metric.metric_name == name)
+                .unwrap()
+                .metric_value
+        };
+        let assert_metric = |name: &str, expected: f64| {
+            let actual = value(name);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "expected {name}={expected}, got {actual}"
+            );
+        };
+
+        assert_metric("accuracy", 1.0 / 3.0);
+        assert_metric("correct_count", 1.0);
+        assert_metric("incorrect_count", 2.0);
+        assert_metric("total_count", 3.0);
+        assert_metric("parsed_response_count", 2.0);
+        assert_metric("unparsed_response_count", 1.0);
+        assert_metric("parse_rate", 2.0 / 3.0);
+        assert_metric("mean_latency_ms", 20.0);
+        assert_metric("median_latency_ms", 20.0);
+        assert_metric("p95_latency_ms", 29.0);
+        assert_metric("p99_latency_ms", 29.8);
+        assert_metric("min_latency_ms", 10.0);
+        assert_metric("max_latency_ms", 30.0);
+    }
+
     fn multiple_choice_config(
         choices: crate::config::CustomNoCodeChoiceSource,
         answer: crate::config::CustomNoCodeAnswerSource,
@@ -885,7 +1048,17 @@ mod tests {
         let names: Vec<&str> = agg.iter().map(|m| m.metric_name.as_str()).collect();
         assert!(names.contains(&"accuracy"));
         assert!(names.contains(&"correct_count"));
+        assert!(names.contains(&"incorrect_count"));
         assert!(names.contains(&"total_count"));
+        assert!(names.contains(&"parsed_response_count"));
+        assert!(names.contains(&"unparsed_response_count"));
+        assert!(names.contains(&"parse_rate"));
+        assert!(names.contains(&"mean_latency_ms"));
+        assert!(names.contains(&"median_latency_ms"));
+        assert!(names.contains(&"p95_latency_ms"));
+        assert!(names.contains(&"p99_latency_ms"));
+        assert!(names.contains(&"min_latency_ms"));
+        assert!(names.contains(&"max_latency_ms"));
 
         let total_metric = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
         assert_eq!(total_metric.metric_value as i64, 2);
@@ -904,6 +1077,11 @@ mod tests {
             .filter(|m| m.metric_name == "is_correct")
             .count();
         assert_eq!(is_correct_count, 2);
+        let response_parsed_count = all_metrics
+            .iter()
+            .filter(|m| m.metric_name == "response_parsed")
+            .count();
+        assert_eq!(response_parsed_count, 2);
 
         // Verify steps were persisted in SQLite.
         let steps = crate::db::list_steps_for_run(&db, run_id).await.unwrap();

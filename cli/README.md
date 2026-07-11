@@ -77,6 +77,8 @@ For dataset-backed QA checks that do not need custom evaluation code, set `type 
 
 With `model = "random"`, exact-match benchmarks generate demo random text and multiple-choice benchmarks uniformly select from `style.choice_labels`.
 
+Samples emit correctness, response-parsing, and latency metrics. Runs aggregate accuracy and counts, parse success, and mean, median, p95, p99, minimum, and maximum latency.
+
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"

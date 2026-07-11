@@ -149,6 +149,14 @@ For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./
 | `limit` | integer | no | Number of dataset rows to evaluate. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
 
+Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
+
+Each run emits these aggregate metrics:
+
+- `accuracy`, `correct_count`, `incorrect_count`, and `total_count`
+- `parsed_response_count`, `unparsed_response_count`, and `parse_rate`
+- `mean_latency_ms`, `median_latency_ms`, `p95_latency_ms`, `p99_latency_ms`, `min_latency_ms`, and `max_latency_ms`
+
 Multiple-choice configuration keeps its choice and answer sources inside `style`:
 
 ```toml
