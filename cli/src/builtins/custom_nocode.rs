@@ -44,7 +44,6 @@ struct PromptChoice {
 struct PreparedRow {
     choices: Vec<PromptChoice>,
     golden: String,
-    is_multiple_choice: bool,
 }
 
 /// Arguments for the [`CustomNoCodeBuiltin::evaluate_row`] method
@@ -115,17 +114,14 @@ impl CustomNoCodeBuiltin {
                     .await
                     .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
-                let parsed_response = if prepared.is_multiple_choice {
-                    let crate::config::CustomNoCodeStyleConfig::MultipleChoice {
+                let parsed_response = match args.style {
+                    crate::config::CustomNoCodeStyleConfig::MultipleChoice {
                         choice_labels,
                         ..
-                    } = args.style
-                    else {
-                        unreachable!("prepared multiple-choice row has exact-match config")
-                    };
-                    extract_choice_label(&model_response, choice_labels)
-                } else {
-                    Some(model_response.trim().to_owned())
+                    } => extract_choice_label(&model_response, choice_labels),
+                    crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => {
+                        Some(model_response.trim().to_owned())
+                    }
                 };
                 let is_correct = parsed_response.as_deref() == Some(prepared.golden.trim());
 
@@ -284,80 +280,77 @@ fn prepare_row(
     row: &serde_json::Value,
     style: &crate::config::CustomNoCodeStyleConfig,
 ) -> Result<PreparedRow> {
-    let crate::config::CustomNoCodeStyleConfig::MultipleChoice {
-        choices: choice_source,
-        answer,
-        choice_labels,
-        shuffle,
-        ..
-    } = style
-    else {
-        let crate::config::CustomNoCodeStyleConfig::ExactMatch { golden_column } = style else {
-            unreachable!()
-        };
-        let golden = extract_scalar(row, golden_column)
-            .with_context(|| format!("row {row_index}: missing golden column `{golden_column}`"))?;
-        return Ok(PreparedRow {
-            choices: Vec::new(),
-            golden,
-            is_multiple_choice: false,
-        });
-    };
-
-    let choice_values = extract_choices(row_index, row, choice_source, choice_labels)?;
-    if choice_values.is_empty() || choice_values.len() > choice_labels.len() {
-        bail!(
-            "row {row_index}: found {} choices but configured only {} labels",
-            choice_values.len(),
-            choice_labels.len()
-        );
-    }
-    let labels = &choice_labels[..choice_values.len()];
-
-    let correct_index = resolve_correct_index(
-        row_index,
-        row,
-        choice_source,
-        answer,
-        labels,
-        &choice_values,
-    )?;
-    let mut indexed_choices: Vec<(String, bool)> = choice_values
-        .into_iter()
-        .enumerate()
-        .map(|(index, text)| (text, index == correct_index))
-        .collect();
-
-    if let Some(shuffle) = shuffle {
-        let seed = extract_scalar(row, &shuffle.seed_column).with_context(|| {
-            format!(
-                "row {row_index}: missing shuffle seed column `{}`",
-                shuffle.seed_column
-            )
-        })?;
-        deterministic_shuffle(&mut indexed_choices, &seed);
-    }
-
-    let mut golden = None;
-    let choices = indexed_choices
-        .into_iter()
-        .zip(labels)
-        .map(|((text, is_correct), label)| {
-            if is_correct {
-                golden = Some(label.clone());
+    match style {
+        crate::config::CustomNoCodeStyleConfig::ExactMatch { golden_column } => {
+            let golden = extract_scalar(row, golden_column).with_context(|| {
+                format!("row {row_index}: missing golden column `{golden_column}`")
+            })?;
+            Ok(PreparedRow {
+                choices: Vec::new(),
+                golden,
+            })
+        }
+        crate::config::CustomNoCodeStyleConfig::MultipleChoice {
+            choices: choice_source,
+            answer,
+            choice_labels,
+            shuffle,
+        } => {
+            let choice_values = extract_choices(row_index, row, choice_source, choice_labels)?;
+            if choice_values.is_empty() || choice_values.len() > choice_labels.len() {
+                bail!(
+                    "row {row_index}: found {} choices but configured only {} labels",
+                    choice_values.len(),
+                    choice_labels.len()
+                );
             }
-            PromptChoice {
-                label: label.clone(),
-                text,
-            }
-        })
-        .collect();
+            let labels = &choice_labels[..choice_values.len()];
 
-    Ok(PreparedRow {
-        choices,
-        golden: golden.context("correct choice disappeared while assigning labels")?,
-        is_multiple_choice: true,
-    })
+            let correct_index = resolve_correct_index(
+                row_index,
+                row,
+                choice_source,
+                answer,
+                labels,
+                &choice_values,
+            )?;
+            let mut indexed_choices: Vec<(String, bool)> = choice_values
+                .into_iter()
+                .enumerate()
+                .map(|(index, text)| (text, index == correct_index))
+                .collect();
+
+            if let Some(shuffle) = shuffle {
+                let seed = extract_scalar(row, &shuffle.seed_column).with_context(|| {
+                    format!(
+                        "row {row_index}: missing shuffle seed column `{}`",
+                        shuffle.seed_column
+                    )
+                })?;
+                deterministic_shuffle(&mut indexed_choices, &seed);
+            }
+
+            let mut golden = None;
+            let choices = indexed_choices
+                .into_iter()
+                .zip(labels)
+                .map(|((text, is_correct), label)| {
+                    if is_correct {
+                        golden = Some(label.clone());
+                    }
+                    PromptChoice {
+                        label: label.clone(),
+                        text,
+                    }
+                })
+                .collect();
+
+            Ok(PreparedRow {
+                choices,
+                golden: golden.context("correct choice disappeared while assigning labels")?,
+            })
+        }
+    }
 }
 
 fn extract_choices(
@@ -366,51 +359,47 @@ fn extract_choices(
     source: &crate::config::CustomNoCodeChoiceSource,
     labels: &[String],
 ) -> Result<Vec<String>> {
-    if let crate::config::CustomNoCodeChoiceSource::Columns(
-        crate::config::CustomNoCodeChoiceColumns { columns },
-    ) = source
-    {
-        return columns
+    match source {
+        crate::config::CustomNoCodeChoiceSource::Columns(
+            crate::config::CustomNoCodeChoiceColumns { columns },
+        ) => columns
             .iter()
             .map(|column| {
                 extract_scalar(row, column)
                     .with_context(|| format!("row {row_index}: missing choice column `{column}`"))
             })
-            .collect();
-    }
-
-    let crate::config::CustomNoCodeChoiceSource::Column(crate::config::CustomNoCodeChoiceColumn {
-        column,
-    }) = source
-    else {
-        unreachable!()
-    };
-    let value = row
-        .get(column)
-        .with_context(|| format!("row {row_index}: missing choices column `{column}`"))?;
-    let owned;
-    let value = if let Some(encoded) = value.as_str() {
-        owned = serde_json::from_str(encoded).unwrap_or_else(|_| value.clone());
-        &owned
-    } else {
-        value
-    };
-
-    match value {
-        serde_json::Value::Array(values) => values
-            .iter()
-            .map(value_to_scalar)
-            .collect::<Option<Vec<_>>>()
-            .with_context(|| format!("row {row_index}: choices column `{column}` contains non-scalar values")),
-        serde_json::Value::Object(values) => labels
-            .iter()
-            .map(|label| {
-                values.get(label).and_then(value_to_scalar).with_context(|| {
-                    format!("row {row_index}: choices object `{column}` has no scalar `{label}` value")
-                })
-            })
             .collect(),
-        _ => bail!("row {row_index}: choices column `{column}` must be an array or object"),
+        crate::config::CustomNoCodeChoiceSource::Column(
+            crate::config::CustomNoCodeChoiceColumn { column },
+        ) => {
+            let value = row
+                .get(column)
+                .with_context(|| format!("row {row_index}: missing choices column `{column}`"))?;
+            let owned;
+            let value = if let Some(encoded) = value.as_str() {
+                owned = serde_json::from_str(encoded).unwrap_or_else(|_| value.clone());
+                &owned
+            } else {
+                value
+            };
+
+            match value {
+                serde_json::Value::Array(values) => values
+                    .iter()
+                    .map(value_to_scalar)
+                    .collect::<Option<Vec<_>>>()
+                    .with_context(|| format!("row {row_index}: choices column `{column}` contains non-scalar values")),
+                serde_json::Value::Object(values) => labels
+                    .iter()
+                    .map(|label| {
+                        values.get(label).and_then(value_to_scalar).with_context(|| {
+                            format!("row {row_index}: choices object `{column}` has no scalar `{label}` value")
+                        })
+                    })
+                    .collect(),
+                _ => bail!("row {row_index}: choices column `{column}` must be an array or object"),
+            }
+        }
     }
 }
 
@@ -422,66 +411,64 @@ fn resolve_correct_index(
     labels: &[String],
     choices: &[String],
 ) -> Result<usize> {
-    if let crate::config::CustomNoCodeAnswerSource::IndexColumn(
-        crate::config::CustomNoCodeIndexAnswer {
-            index_column: column,
-            index_base,
-        },
-    ) = answer
-    {
-        let raw = row
-            .get(column)
-            .with_context(|| format!("row {row_index}: missing golden index column `{column}`"))?;
-        let index = raw
-            .as_u64()
-            .or_else(|| raw.as_str().and_then(|value| value.parse().ok()))
-            .with_context(|| {
-                format!("row {row_index}: golden index column `{column}` is not an integer")
+    match answer {
+        crate::config::CustomNoCodeAnswerSource::IndexColumn(
+            crate::config::CustomNoCodeIndexAnswer {
+                index_column: column,
+                index_base,
+            },
+        ) => {
+            let raw = row.get(column).with_context(|| {
+                format!("row {row_index}: missing golden index column `{column}`")
             })?;
-        let index = usize::try_from(index)
-            .ok()
-            .and_then(|index| index.checked_sub(*index_base))
-            .with_context(|| format!("row {row_index}: golden index is below configured base"))?;
-        if index >= choices.len() {
-            bail!("row {row_index}: golden index {index} is outside the choice list");
+            let index = raw
+                .as_u64()
+                .or_else(|| raw.as_str().and_then(|value| value.parse().ok()))
+                .with_context(|| {
+                    format!("row {row_index}: golden index column `{column}` is not an integer")
+                })?;
+            let index = usize::try_from(index)
+                .ok()
+                .and_then(|index| index.checked_sub(*index_base))
+                .with_context(|| {
+                    format!("row {row_index}: golden index is below configured base")
+                })?;
+            if index >= choices.len() {
+                bail!("row {row_index}: golden index {index} is outside the choice list");
+            }
+            Ok(index)
         }
-        return Ok(index);
+        crate::config::CustomNoCodeAnswerSource::CorrectChoiceColumn(
+            crate::config::CustomNoCodeCorrectChoiceAnswer {
+                correct_choice_column: column,
+            },
+        ) => {
+            let crate::config::CustomNoCodeChoiceSource::Columns(
+                crate::config::CustomNoCodeChoiceColumns { columns },
+            ) = choice_source
+            else {
+                bail!("correct-choice answer requires column-backed choices");
+            };
+            columns
+                .iter()
+                .position(|candidate| candidate == column)
+                .context("validated correct choice is absent from choice columns")
+        }
+        crate::config::CustomNoCodeAnswerSource::LabelColumn(
+            crate::config::CustomNoCodeLabelAnswer {
+                label_column: column,
+            },
+        ) => {
+            let golden = extract_scalar(row, column)
+                .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
+            labels
+                .iter()
+                .position(|label| label.eq_ignore_ascii_case(golden.trim()))
+                .with_context(|| {
+                    format!("row {row_index}: golden label `{golden}` is not in `choice_labels`")
+                })
+        }
     }
-
-    if let crate::config::CustomNoCodeAnswerSource::CorrectChoiceColumn(
-        crate::config::CustomNoCodeCorrectChoiceAnswer {
-            correct_choice_column: column,
-        },
-    ) = answer
-    {
-        let crate::config::CustomNoCodeChoiceSource::Columns(
-            crate::config::CustomNoCodeChoiceColumns { columns },
-        ) = choice_source
-        else {
-            bail!("correct-choice answer requires column-backed choices");
-        };
-        return columns
-            .iter()
-            .position(|candidate| candidate == column)
-            .context("validated correct choice is absent from choice columns");
-    }
-
-    let crate::config::CustomNoCodeAnswerSource::LabelColumn(
-        crate::config::CustomNoCodeLabelAnswer {
-            label_column: column,
-        },
-    ) = answer
-    else {
-        unreachable!()
-    };
-    let golden = extract_scalar(row, column)
-        .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
-    labels
-        .iter()
-        .position(|label| label.eq_ignore_ascii_case(golden.trim()))
-        .with_context(|| {
-            format!("row {row_index}: golden label `{golden}` is not in `choice_labels`")
-        })
 }
 
 fn extract_scalar(row: &serde_json::Value, key: &str) -> Option<String> {
