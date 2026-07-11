@@ -8,7 +8,7 @@ You need a config file when you want to do one or more of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
 - Define custom evaluations (`type = "custom_code"`)
-- Define no-code QA benchmarks (`type = "custom_nocode"`)
+- Define custom benchmarks without writing or maintaining code (`type = "custom_nocode"`)
 - Resume custom evaluations later with `qt resume <run_id>`
 
 You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
