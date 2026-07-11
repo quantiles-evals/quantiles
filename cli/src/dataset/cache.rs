@@ -11,7 +11,9 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
+/// Arrow field metadata key marking values that were serialized as JSON strings.
 const JSON_ENCODED_METADATA_KEY: &str = "quantiles.json_encoded";
+/// Version included in cache keys so incompatible on-disk formats use separate entries.
 const CACHE_FORMAT_VERSION: &str = "v2";
 
 /// Manages the on-disk cache for dataset batches.
