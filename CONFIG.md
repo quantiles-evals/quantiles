@@ -42,7 +42,7 @@ Built-in benchmarks run natively inside the CLI, without any custom code. Below 
 | Field         | Type            | Required | Description                                                      |
 | ------------- | --------------- | -------- | ---------------------------------------------------------------- |
 | `type`        | string          | no       | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
-| `dataset`     | string          | no       | Dataset source. Hugging Face datasets must use `hf://...`.       |
+| `dataset`     | string          | yes      | Dataset source. Hugging Face datasets must use `hf://...` or `huggingface://...`. |
 | `samples`     | integer         | no       | Number of dataset rows to evaluate.                              |
 | `model`       | string or table | no       | Model sampler. See [model format](#model-format).                |
 | `max_workers` | integer         | no       | Maximum concurrent workers.                                      |
@@ -50,15 +50,15 @@ Built-in benchmarks run natively inside the CLI, without any custom code. Below 
 If none of these fields are customized, the built-in benchmark uses the following defaults:
 
 - `type`: `builtin`
-- `dataset`: The benchmark's default Hugging Face dataset.
+- `dataset`: The benchmark's default Hugging Face dataset, used when no config section is provided.
 - `samples`: All samples available in the benchmark's dataset, in order
 - `model`: The "demo" model, which outputs random values
 - `max_workers`: The default parallelism provided by the Rust [Tokio runtime](https://tokio.rs/)
 
 #### `dataset` naming
 
-The `dataset` field accepts a Hugging Face dataset source prefixed with `hf://`.
-For example:
+The `dataset` field accepts a Hugging Face dataset source prefixed with `hf://`
+or `huggingface://`. For example:
 
 ```toml
 dataset = "hf://quantiles/PubMedQA"

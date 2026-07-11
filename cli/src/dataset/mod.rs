@@ -149,15 +149,18 @@ impl DatasetManager {
 /// Resolve a configured Hugging Face dataset source to the dataset ID expected
 /// by the existing Hugging Face download client.
 pub fn resolve_hf_dataset_source(source: &str) -> Result<&str> {
-    if let Some(dataset_id) = source.strip_prefix("hf://") {
+    if let Some(dataset_id) = source
+        .strip_prefix("hf://")
+        .or_else(|| source.strip_prefix("huggingface://"))
+    {
         if dataset_id.is_empty() {
-            bail!("dataset source `hf://` is missing a Hugging Face dataset id");
+            bail!("dataset source `{source}` is missing a Hugging Face dataset id");
         }
         Ok(dataset_id)
     } else if source.contains("://") {
-        bail!("unsupported dataset source `{source}`; expected `hf://...`");
+        bail!("unsupported dataset source `{source}`; expected `hf://...` or `huggingface://...`");
     } else {
-        bail!("dataset source `{source}` is missing required `hf://` prefix");
+        bail!("dataset source `{source}` is missing required `hf://` or `huggingface://` prefix");
     }
 }
 
@@ -174,6 +177,14 @@ mod tests {
     }
 
     #[test]
+    fn resolve_hf_dataset_source_strips_huggingface_prefix() {
+        assert_eq!(
+            resolve_hf_dataset_source("huggingface://quantiles/PubMedQA").unwrap(),
+            "quantiles/PubMedQA"
+        );
+    }
+
+    #[test]
     fn resolve_hf_dataset_source_rejects_other_prefixes() {
         let err = resolve_hf_dataset_source("s3://bucket/dataset").unwrap_err();
         assert!(
@@ -185,6 +196,9 @@ mod tests {
     #[test]
     fn resolve_hf_dataset_source_requires_prefix() {
         let err = resolve_hf_dataset_source("quantiles/PubMedQA").unwrap_err();
-        assert!(err.to_string().contains("missing required `hf://` prefix"));
+        assert!(
+            err.to_string()
+                .contains("missing required `hf://` or `huggingface://` prefix")
+        );
     }
 }

@@ -103,14 +103,6 @@ fn assemble_builtin_input(
     }
 
     if let Some(bench) = bench {
-        if bench.samples.is_none()
-            && bench.dataset.is_none()
-            && bench.model.is_none()
-            && bench.max_workers.is_none()
-        {
-            return (None, Vec::new());
-        }
-
         let input = BuiltinConfigInput {
             limit: bench.samples,
             dataset: bench.dataset.clone(),
@@ -387,8 +379,7 @@ struct BuiltinRunJsonOutput {
 struct BuiltinConfigInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     limit: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    dataset: Option<String>,
+    dataset: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<qt::llm::Sampler>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -630,7 +621,7 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(10),
-            dataset: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         };
@@ -645,7 +636,7 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(5),
-            dataset: Some("hf://quantiles/PubMedQA".to_owned()),
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: Some(qt::llm::Sampler::Random {}),
             max_workers: Some(8),
         };
@@ -657,19 +648,20 @@ mod tests {
         assert_eq!(parsed["max_workers"], 8);
     }
 
-    /// When the builtin config section exists but has no runtime-relevant fields, the
-    /// input should be `None` rather than an empty JSON object.
+    /// When the builtin config section only has the required dataset, the input should
+    /// still carry that dataset source into builtin execution.
     #[test]
-    fn assemble_builtin_input_none_when_no_config_fields() {
+    fn assemble_builtin_input_with_dataset_only_config() {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: None,
-            dataset: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         };
         let (input, _) = super::assemble_builtin_input(Some(&bench), None);
-        assert!(input.is_none());
+        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
+        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
     }
 
     /// When there is no config section at all and no CLI `--input`, builtin runs should

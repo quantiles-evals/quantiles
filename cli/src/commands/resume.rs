@@ -132,7 +132,7 @@ mod tests {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: None,
-            dataset: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         });
@@ -147,7 +147,7 @@ mod tests {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(10),
-            dataset: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         });
