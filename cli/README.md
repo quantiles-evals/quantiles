@@ -73,13 +73,13 @@ max_workers = 100
 
 ### No-code QA benchmarks
 
-For dataset-backed QA checks that do not need custom evaluation code, set `type = "custom_nocode"` and `style = "qa"`. The benchmark runs inside the CLI, renders each prompt with the configured Jinja template, calls the configured model, and scores each row with exact-match accuracy against the golden answer column.
+For dataset-backed QA checks that do not need custom evaluation code, set `type = "custom_nocode"`. Use `style = "exact_match"` for benchmarks that test an exact match to a golden answer, and `style = "multiple_choice"` for choice-based benchmarks. The benchmark runs inside the CLI, renders each prompt with the configured Jinja template, calls the configured model, and scores each row against the configured answer source.
 
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"
-style = "qa"
-dataset = "quantiles/simpleqa-verified"
+style = "exact_match"
+dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
 golden_column = "answer"

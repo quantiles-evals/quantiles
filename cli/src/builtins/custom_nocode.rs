@@ -16,15 +16,13 @@ use crate::llm::random::RandomSampler;
 /// Input deserialized from the JSON assembled by `commands::run`.
 #[derive(Debug, Deserialize)]
 struct CustomNoCodeInput {
-    style: crate::config::CustomNoCodeStyle,
-    dataset: String,
-    dataset_config: Option<String>,
-    split: Option<String>,
-    revision: Option<String>,
+    dataset: crate::config::CustomNoCodeDatasetConfig,
     #[serde(default)]
     model: Option<crate::llm::Sampler>,
+    limit: Option<usize>,
+    max_workers: Option<usize>,
     #[serde(flatten)]
-    qa: crate::config::CustomNoCodeQaConfig,
+    task: crate::config::CustomNoCodeTaskConfig,
 }
 
 /// Per-row step output stored as JSON in the step record.
@@ -55,8 +53,8 @@ struct EvaluateRowArgs<'a> {
     i: usize,
     /// The row value
     row: &'a serde_json::Value,
-    /// QA and multiple-choice configuration.
-    qa: &'a crate::config::CustomNoCodeQaConfig,
+    /// Exact-match or multiple-choice task configuration.
+    task: &'a crate::config::CustomNoCodeTaskConfig,
     /// The prompt template
     template_str: &'a str,
     /// The pre-constructed jinja template env
@@ -86,7 +84,7 @@ impl CustomNoCodeBuiltin {
     }
 
     async fn evaluate_row(&self, args: EvaluateRowArgs<'_>) -> Result<bool> {
-        let prepared = prepare_row(args.i, args.row, args.qa)?;
+        let prepared = prepare_row(args.i, args.row, args.task)?;
 
         let rendered = args
             .env
@@ -118,10 +116,13 @@ impl CustomNoCodeBuiltin {
                     .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
                 let parsed_response = if prepared.is_multiple_choice {
-                    extract_choice_label(
-                        &model_response,
-                        args.qa.choice_labels.as_deref().unwrap_or_default(),
-                    )
+                    let crate::config::CustomNoCodeTaskConfig::MultipleChoice {
+                        choice_labels, ..
+                    } = args.task
+                    else {
+                        unreachable!("prepared multiple-choice row has exact-match config")
+                    };
+                    extract_choice_label(&model_response, choice_labels)
                 } else {
                     Some(model_response.trim().to_owned())
                 };
@@ -162,16 +163,16 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
         let config = parse_input(ctx.input)?;
-        let (template_str, env) = load_template(&config.qa.prompt_template_file)?;
-        let max_workers = config.qa.max_workers.unwrap_or_else(get_max_workers);
+        let (template_str, env) = load_template(config.task.prompt_template_file())?;
+        let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler(config.model.as_ref(), || Arc::new(RandomSampler::new(80)))?;
 
         let (manager, info, limit) = resolve_dataset_limit(
-            &config.dataset,
-            config.dataset_config.as_deref(),
-            config.split.as_deref(),
-            config.revision.as_deref(),
-            config.qa.limit,
+            &config.dataset.name,
+            config.dataset.config_name.as_deref(),
+            config.dataset.split.as_deref(),
+            config.dataset.revision.as_deref(),
+            config.limit,
         )
         .await?;
         set_builtin_run_input(
@@ -179,7 +180,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             ctx.run_id,
             config.model.as_ref(),
             limit,
-            config.qa.max_workers,
+            config.max_workers,
         )
         .await?;
 
@@ -189,8 +190,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .as_ref()
             .map_or("random".to_string(), std::string::ToString::to_string);
         let run_id = ctx.run_id;
-        let dataset = config.dataset.clone();
-        let qa = Arc::new(config.qa.clone());
+        let dataset = config.dataset.name.clone();
+        let task = Arc::new(config.task.clone());
         let template_str = Arc::new(template_str);
 
         let name = self.name();
@@ -202,13 +203,13 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let db = db.clone();
                 let model_name = model_name.clone();
                 let template_str = Arc::clone(&template_str);
-                let qa = Arc::clone(&qa);
+                let task = Arc::clone(&task);
                 let env = env.clone();
                 async move {
                     let args = EvaluateRowArgs {
                         i,
                         row: &row,
-                        qa: &qa,
+                        task: &task,
                         template_str: &template_str,
                         env: &env,
                         model_name: &model_name,
@@ -238,11 +239,7 @@ fn parse_input(input: Option<&str>) -> Result<CustomNoCodeInput> {
         .context("invalid builtin input JSON")?
         .context("custom_nocode benchmark requires input configuration")?;
 
-    match config.style {
-        crate::config::CustomNoCodeStyle::Qa => {}
-    }
-
-    if config.qa.limit == Some(0) {
+    if config.limit == Some(0) {
         bail!("limit must be > 0");
     }
 
@@ -284,15 +281,21 @@ async fn resolve_dataset_limit(
 fn prepare_row(
     row_index: usize,
     row: &serde_json::Value,
-    config: &crate::config::CustomNoCodeQaConfig,
+    task: &crate::config::CustomNoCodeTaskConfig,
 ) -> Result<PreparedRow> {
-    let Some(labels) = config.choice_labels.as_ref() else {
-        let column = config
-            .golden_column
-            .as_deref()
-            .context("validated custom_nocode config has no golden column")?;
-        let golden = extract_scalar(row, column)
-            .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
+    let crate::config::CustomNoCodeTaskConfig::MultipleChoice {
+        choices: choice_source,
+        answer,
+        choice_labels,
+        shuffle,
+        ..
+    } = task
+    else {
+        let crate::config::CustomNoCodeTaskConfig::ExactMatch { golden_column, .. } = task else {
+            unreachable!()
+        };
+        let golden = extract_scalar(row, golden_column)
+            .with_context(|| format!("row {row_index}: missing golden column `{golden_column}`"))?;
         return Ok(PreparedRow {
             choices: Vec::new(),
             golden,
@@ -300,30 +303,36 @@ fn prepare_row(
         });
     };
 
-    let choice_values = extract_choices(row_index, row, config, labels)?;
-    if choice_values.is_empty() || choice_values.len() > labels.len() {
+    let choice_values = extract_choices(row_index, row, choice_source, choice_labels)?;
+    if choice_values.is_empty() || choice_values.len() > choice_labels.len() {
         bail!(
             "row {row_index}: found {} choices but configured only {} labels",
             choice_values.len(),
-            labels.len()
+            choice_labels.len()
         );
     }
-    let labels = &labels[..choice_values.len()];
+    let labels = &choice_labels[..choice_values.len()];
 
-    let correct_index = resolve_correct_index(row_index, row, config, labels, &choice_values)?;
+    let correct_index = resolve_correct_index(
+        row_index,
+        row,
+        choice_source,
+        answer,
+        labels,
+        &choice_values,
+    )?;
     let mut indexed_choices: Vec<(String, bool)> = choice_values
         .into_iter()
         .enumerate()
         .map(|(index, text)| (text, index == correct_index))
         .collect();
 
-    if config.shuffle_choices {
-        let seed_column = config
-            .shuffle_seed_column
-            .as_deref()
-            .context("validated shuffle config has no seed column")?;
-        let seed = extract_scalar(row, seed_column).with_context(|| {
-            format!("row {row_index}: missing shuffle seed column `{seed_column}`")
+    if let Some(shuffle) = shuffle {
+        let seed = extract_scalar(row, &shuffle.seed_column).with_context(|| {
+            format!(
+                "row {row_index}: missing shuffle seed column `{}`",
+                shuffle.seed_column
+            )
         })?;
         deterministic_shuffle(&mut indexed_choices, &seed);
     }
@@ -353,10 +362,13 @@ fn prepare_row(
 fn extract_choices(
     row_index: usize,
     row: &serde_json::Value,
-    config: &crate::config::CustomNoCodeQaConfig,
+    source: &crate::config::CustomNoCodeChoiceSource,
     labels: &[String],
 ) -> Result<Vec<String>> {
-    if let Some(columns) = &config.choice_columns {
+    if let crate::config::CustomNoCodeChoiceSource::Columns(
+        crate::config::CustomNoCodeChoiceColumns { columns },
+    ) = source
+    {
         return columns
             .iter()
             .map(|column| {
@@ -366,10 +378,12 @@ fn extract_choices(
             .collect();
     }
 
-    let column = config
-        .choices_column
-        .as_deref()
-        .context("validated multiple-choice config has no choices source")?;
+    let crate::config::CustomNoCodeChoiceSource::Column(crate::config::CustomNoCodeChoiceColumn {
+        column,
+    }) = source
+    else {
+        unreachable!()
+    };
     let value = row
         .get(column)
         .with_context(|| format!("row {row_index}: missing choices column `{column}`"))?;
@@ -402,11 +416,18 @@ fn extract_choices(
 fn resolve_correct_index(
     row_index: usize,
     row: &serde_json::Value,
-    config: &crate::config::CustomNoCodeQaConfig,
+    choice_source: &crate::config::CustomNoCodeChoiceSource,
+    answer: &crate::config::CustomNoCodeAnswerSource,
     labels: &[String],
     choices: &[String],
 ) -> Result<usize> {
-    if let Some(column) = &config.golden_index_column {
+    if let crate::config::CustomNoCodeAnswerSource::IndexColumn(
+        crate::config::CustomNoCodeIndexAnswer {
+            index_column: column,
+            index_base,
+        },
+    ) = answer
+    {
         let raw = row
             .get(column)
             .with_context(|| format!("row {row_index}: missing golden index column `{column}`"))?;
@@ -418,7 +439,7 @@ fn resolve_correct_index(
             })?;
         let index = usize::try_from(index)
             .ok()
-            .and_then(|index| index.checked_sub(config.golden_index_base))
+            .and_then(|index| index.checked_sub(*index_base))
             .with_context(|| format!("row {row_index}: golden index is below configured base"))?;
         if index >= choices.len() {
             bail!("row {row_index}: golden index {index} is outside the choice list");
@@ -426,21 +447,32 @@ fn resolve_correct_index(
         return Ok(index);
     }
 
-    if let Some(column) = &config.correct_choice_column {
-        let columns = config
-            .choice_columns
-            .as_ref()
-            .context("validated correct-choice config has no choice columns")?;
+    if let crate::config::CustomNoCodeAnswerSource::CorrectChoiceColumn(
+        crate::config::CustomNoCodeCorrectChoiceAnswer {
+            correct_choice_column: column,
+        },
+    ) = answer
+    {
+        let crate::config::CustomNoCodeChoiceSource::Columns(
+            crate::config::CustomNoCodeChoiceColumns { columns },
+        ) = choice_source
+        else {
+            bail!("correct-choice answer requires column-backed choices");
+        };
         return columns
             .iter()
             .position(|candidate| candidate == column)
             .context("validated correct choice is absent from choice columns");
     }
 
-    let column = config
-        .golden_column
-        .as_deref()
-        .context("validated multiple-choice config has no answer source")?;
+    let crate::config::CustomNoCodeAnswerSource::LabelColumn(
+        crate::config::CustomNoCodeLabelAnswer {
+            label_column: column,
+        },
+    ) = answer
+    else {
+        unreachable!()
+    };
     let golden = extract_scalar(row, column)
         .with_context(|| format!("row {row_index}: missing golden column `{column}`"))?;
     labels
@@ -546,21 +578,33 @@ mod tests {
         assert_eq!(extract_choice_label("unknown", &labels), None);
     }
 
-    fn multiple_choice_config() -> crate::config::CustomNoCodeQaConfig {
-        crate::config::CustomNoCodeQaConfig {
+    fn multiple_choice_config(
+        choices: crate::config::CustomNoCodeChoiceSource,
+        answer: crate::config::CustomNoCodeAnswerSource,
+    ) -> crate::config::CustomNoCodeTaskConfig {
+        crate::config::CustomNoCodeTaskConfig::MultipleChoice {
             prompt_template_file: "unused.txt".to_owned(),
-            choice_labels: Some(["A", "B", "C", "D"].map(str::to_owned).to_vec()),
-            ..crate::config::CustomNoCodeQaConfig::default()
+            choices,
+            answer,
+            choice_labels: ["A", "B", "C", "D"].map(str::to_owned).to_vec(),
+            shuffle: None,
         }
     }
 
     #[test]
     fn prepares_medqa_object_choices() {
-        let config = crate::config::CustomNoCodeQaConfig {
-            choices_column: Some("options".to_owned()),
-            golden_column: Some("answer_idx".to_owned()),
-            ..multiple_choice_config()
-        };
+        let config = multiple_choice_config(
+            crate::config::CustomNoCodeChoiceSource::Column(
+                crate::config::CustomNoCodeChoiceColumn {
+                    column: "options".to_owned(),
+                },
+            ),
+            crate::config::CustomNoCodeAnswerSource::LabelColumn(
+                crate::config::CustomNoCodeLabelAnswer {
+                    label_column: "answer_idx".to_owned(),
+                },
+            ),
+        );
         let row = json!({
             "options": {"A": "alpha", "B": "beta", "C": "gamma", "D": "delta"},
             "answer_idx": "C"
@@ -573,11 +617,18 @@ mod tests {
 
     #[test]
     fn prepares_mmlu_pro_array_choices() {
-        let config = crate::config::CustomNoCodeQaConfig {
-            choices_column: Some("options".to_owned()),
-            golden_column: Some("answer".to_owned()),
-            ..multiple_choice_config()
-        };
+        let config = multiple_choice_config(
+            crate::config::CustomNoCodeChoiceSource::Column(
+                crate::config::CustomNoCodeChoiceColumn {
+                    column: "options".to_owned(),
+                },
+            ),
+            crate::config::CustomNoCodeAnswerSource::LabelColumn(
+                crate::config::CustomNoCodeLabelAnswer {
+                    label_column: "answer".to_owned(),
+                },
+            ),
+        );
         let row = json!({"options": ["alpha", "beta", "gamma"], "answer": "B"});
 
         let prepared = prepare_row(0, &row, &config).unwrap();
@@ -587,11 +638,19 @@ mod tests {
 
     #[test]
     fn prepares_medmcqa_indexed_choice_columns() {
-        let config = crate::config::CustomNoCodeQaConfig {
-            choice_columns: Some(["opa", "opb", "opc", "opd"].map(str::to_owned).to_vec()),
-            golden_index_column: Some("cop".to_owned()),
-            ..multiple_choice_config()
-        };
+        let config = multiple_choice_config(
+            crate::config::CustomNoCodeChoiceSource::Columns(
+                crate::config::CustomNoCodeChoiceColumns {
+                    columns: ["opa", "opb", "opc", "opd"].map(str::to_owned).to_vec(),
+                },
+            ),
+            crate::config::CustomNoCodeAnswerSource::IndexColumn(
+                crate::config::CustomNoCodeIndexAnswer {
+                    index_column: "cop".to_owned(),
+                    index_base: 0,
+                },
+            ),
+        );
         let row = json!({"opa": "alpha", "opb": "beta", "opc": "gamma", "opd": "delta", "cop": 1});
 
         let prepared = prepare_row(0, &row, &config).unwrap();
@@ -601,21 +660,29 @@ mod tests {
 
     #[test]
     fn prepares_gpqa_with_deterministic_shuffle() {
-        let config = crate::config::CustomNoCodeQaConfig {
-            choice_columns: Some(
-                [
-                    "Correct Answer",
-                    "Incorrect Answer 1",
-                    "Incorrect Answer 2",
-                    "Incorrect Answer 3",
-                ]
-                .map(str::to_owned)
-                .to_vec(),
+        let config = crate::config::CustomNoCodeTaskConfig::MultipleChoice {
+            prompt_template_file: "unused.txt".to_owned(),
+            choices: crate::config::CustomNoCodeChoiceSource::Columns(
+                crate::config::CustomNoCodeChoiceColumns {
+                    columns: [
+                        "Correct Answer",
+                        "Incorrect Answer 1",
+                        "Incorrect Answer 2",
+                        "Incorrect Answer 3",
+                    ]
+                    .map(str::to_owned)
+                    .to_vec(),
+                },
             ),
-            correct_choice_column: Some("Correct Answer".to_owned()),
-            shuffle_choices: true,
-            shuffle_seed_column: Some("Record ID".to_owned()),
-            ..multiple_choice_config()
+            answer: crate::config::CustomNoCodeAnswerSource::CorrectChoiceColumn(
+                crate::config::CustomNoCodeCorrectChoiceAnswer {
+                    correct_choice_column: "Correct Answer".to_owned(),
+                },
+            ),
+            choice_labels: ["A", "B", "C", "D"].map(str::to_owned).to_vec(),
+            shuffle: Some(crate::config::CustomNoCodeShuffleConfig {
+                seed_column: "Record ID".to_owned(),
+            }),
         };
         let row = json!({
             "Correct Answer": "correct",
@@ -652,8 +719,8 @@ mod tests {
         std::fs::write(&template_path, "{{ unclosed").unwrap();
 
         let input_json = serde_json::to_string(&json!({
-            "style": "qa",
-            "dataset": "fixture/qa",
+            "style": "exact_match",
+            "dataset": {"name": "fixture/qa"},
             "prompt_template_file": template_path.to_str().unwrap(),
             "golden_column": "a",
         }))
@@ -740,8 +807,8 @@ mod tests {
 
         // Assemble the input JSON that execute() expects.
         let input_json = serde_json::to_string(&json!({
-            "style": "qa",
-            "dataset": "fixture/qa",
+            "style": "exact_match",
+            "dataset": {"name": "fixture/qa"},
             "model": "random",
             "prompt_template_file": template_path.to_str().unwrap(),
             "golden_column": "answer",

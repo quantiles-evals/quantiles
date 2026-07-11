@@ -8,7 +8,7 @@ You need a config file when you want to do one or more of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
 - Define custom evaluations (`type = "custom_code"`)
-- Define no-code QA benchmarks (`type = "custom_nocode"`, `style = "qa"`)
+- Define no-code QA benchmarks (`type = "custom_nocode"`)
 - Resume custom evaluations later with `qt resume <run_id>`
 
 You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
@@ -100,13 +100,13 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_nocode`
 
-No-code benchmarks are configured in TOML and run natively inside the CLI, without a custom Python or TypeScript evaluation program. The initial supported style is `qa`, which renders a prompt from a dataset row, calls a model, and scores the response with exact-match accuracy against the configured golden answer column.
+No-code benchmarks are configured in TOML and run natively inside the CLI, without a custom Python or TypeScript evaluation program. The `exact_match` style scores an open answer or label against a golden answer column. The `multiple_choice` style normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
 
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"
-style = "qa"
-dataset = "quantiles/simpleqa-verified"
+style = "exact_match"
+dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
 golden_column = "answer"
@@ -124,22 +124,26 @@ For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./
 | Field | Type | Required | Description |
 |--|--|--|--|
 | `type` | string | yes | Must be `"custom_nocode"`. |
-| `style` | string | yes | Must be `"qa"`. |
-| `dataset` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
-| `dataset_config` | string | no | Hugging Face dataset configuration or subset. |
-| `split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
-| `revision` | string | no | Dataset revision. |
+| `style` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
+| `dataset` | table | yes | Hugging Face dataset coordinates. |
+| `dataset.name` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `dataset.config_name` | string | no | Hugging Face dataset configuration or subset. |
+| `dataset.split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
+| `dataset.revision` | string | no | Dataset revision. |
 | `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
 | `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
-| `golden_column` | string | conditional | Dataset column containing the golden answer text or label. Exactly one golden answer source is required. |
-| `golden_index_column` | string | conditional | Dataset column containing the golden choice index. |
-| `golden_index_base` | integer | no | Index base for `golden_index_column`. Defaults to `0`. |
-| `correct_choice_column` | string | conditional | Choice column known to contain the correct answer, useful when choices are shuffled. |
-| `choices_column` | string | no | Dataset column containing choices as an array or label-keyed object. |
-| `choice_columns` | array of strings | no | Dataset columns containing choices in their original order. |
+| `golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
+| `choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `choices.column` or `choices.columns`. |
+| `choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
+| `choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
+| `answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
+| `answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
+| `answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
+| `answer.index_base` | integer | no | Index base for `answer.index_column`. Defaults to `0`. |
+| `answer.correct_choice_column` | string | conditional | Member of `choices.columns` known to contain the correct answer. |
 | `choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
-| `shuffle_choices` | boolean | no | Deterministically shuffle choices. Defaults to `false`. |
-| `shuffle_seed_column` | string | conditional | Stable row identifier used when `shuffle_choices = true`. |
+| `shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
+| `shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `shuffle` is present. |
 | `limit` | integer | no | Number of dataset rows to evaluate. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
 
