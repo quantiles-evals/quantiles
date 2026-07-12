@@ -100,9 +100,7 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_nocode`
 
-No-code evals are configured in TOML and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
-
-When you use a `"random"` model (`model = "random"`) with an `exact_match` eval, your eval will use the built-in "model" that generates random text, so you'll likely to get very low accuracy numbers. When you configure a `multiple_choice` eval with the `"random"` model, the built-in "model" will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, this model is intended for testing your benchmark. We do not recommend relying on it for any real ML evaluation work.
+No-code evals are configured in `quantiles.toml` and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
 
 ```toml
 [benchmarks.nocode_custom]
@@ -120,7 +118,9 @@ Run it with:
 qt run nocode_custom
 ```
 
-For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml).
+>Note: when you configure `model = "random"` with `"exact_match"` evals will use the built-in sampler that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in sampler will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
+
+The following fields are expected in `custom_nocode` configuration sections:
 
 | Field | Type | Required | Description |
 |--|--|--|--|
@@ -157,7 +157,7 @@ Each run emits these aggregate metrics:
 - `parsed_response_count`, `unparsed_response_count`, and `parse_rate`
 - `mean_latency_ms`, `median_latency_ms`, `p95_latency_ms`, `p99_latency_ms`, `min_latency_ms`, and `max_latency_ms`
 
-Multiple-choice runs also emit classification aggregates:
+Multiple-choice runs also emit the following aggregate metrics:
 
 - `macro_precision`, `macro_recall`, and `macro_f1` are the arithmetic means of the corresponding per-label metrics. Every configured label has equal weight, regardless of how often it appears as the golden answer.
 - `weighted_precision`, `weighted_recall`, and `weighted_f1` average the corresponding per-label metrics using each label's golden-answer support (e.g. the number of samples whose correct/"golden" answer is that label). These metrics therefore account for imbalanced label frequencies.
@@ -189,7 +189,7 @@ Templates access dataset fields directly. A multiple-choice template can iterate
 {% endfor %}
 ```
 
-See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for runnable MedQA, MedMCQA, MMLU-Pro, and GPQA configurations.
+See [the `quantiles.toml` sample configuration file](./custom-nocode-examples/quantiles.toml) for examples of real, published benchmarks built with `custom_nocode` sections.
 
 ### `custom_code`
 
