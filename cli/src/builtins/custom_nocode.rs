@@ -49,36 +49,39 @@ struct PreparedRow {
     golden: String,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ExactMatchSampleResultParams {
+    is_correct: bool,
+}
+
+#[derive(Clone, Debug)]
+struct MultipleChoiceSampleResultParams {
+    is_correct: bool,
+    golden_label: String,
+    /// The configured label parsed from the response, or `None` when parsing fails.
+    /// Unparsed predictions show up in the 'unparsed' column in the confusion matrix,
+    /// and surface accordingly in classification metrics.
+    predicted_label: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 enum SampleResult {
-    ExactMatch {
-        is_correct: bool,
-    },
-    MultipleChoice {
-        is_correct: bool,
-        golden_label: String,
-        /// The configured label parsed from the response, or `None` when parsing fails.
-        /// Unparsed predictions show up in the 'unparsed' column in the confusion matrix,
-        /// and surface accordingly in classification metrics.
-        predicted_label: Option<String>,
-    },
+    ExactMatch(ExactMatchSampleResultParams),
+    MultipleChoice(MultipleChoiceSampleResultParams),
 }
 
 impl SampleResult {
     const fn is_correct(&self) -> bool {
         match self {
-            Self::ExactMatch { is_correct } | Self::MultipleChoice { is_correct, .. } => {
-                *is_correct
-            }
+            Self::ExactMatch(params) => params.is_correct,
+            Self::MultipleChoice(params) => params.is_correct,
         }
     }
 
     const fn response_parsed(&self) -> bool {
         match self {
-            Self::ExactMatch { .. } => true,
-            Self::MultipleChoice {
-                predicted_label, ..
-            } => predicted_label.is_some(),
+            Self::ExactMatch(_) => true,
+            Self::MultipleChoice(params) => params.predicted_label.is_some(),
         }
     }
 }
@@ -199,15 +202,17 @@ impl CustomNoCodeBuiltin {
         }
 
         Ok(match args.style {
-            crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => SampleResult::ExactMatch {
-                is_correct: output.is_correct,
-            },
+            crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => {
+                SampleResult::ExactMatch(ExactMatchSampleResultParams {
+                    is_correct: output.is_correct,
+                })
+            }
             crate::config::CustomNoCodeStyleConfig::MultipleChoice { .. } => {
-                SampleResult::MultipleChoice {
+                SampleResult::MultipleChoice(MultipleChoiceSampleResultParams {
                     is_correct: output.is_correct,
                     golden_label: output.golden,
                     predicted_label: output.parsed_response,
-                }
+                })
             }
         })
     }
@@ -360,8 +365,22 @@ async fn emit_custom_nocode_aggregate_metrics(
         .await;
 
     if let Some(choice_labels) = choice_labels {
-        emit_multiple_choice_aggregate_metrics(metrics_store, run_id, results, choice_labels)
-            .await?;
+        let multiple_choice_results = results
+            .iter()
+            .map(|result| match result {
+                SampleResult::MultipleChoice(params) => Ok(params.clone()),
+                SampleResult::ExactMatch(_) => {
+                    bail!("multiple-choice aggregate received an exact-match sample")
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        emit_multiple_choice_aggregate_metrics(
+            metrics_store,
+            run_id,
+            &multiple_choice_results,
+            choice_labels,
+        )
+        .await?;
     }
 
     let latency_values = metrics_store
@@ -388,7 +407,7 @@ async fn emit_custom_nocode_aggregate_metrics(
 }
 
 fn build_confusion_matrix(
-    results: &[SampleResult],
+    results: &[MultipleChoiceSampleResultParams],
     choice_labels: &[String],
 ) -> Result<Vec<Vec<usize>>> {
     if choice_labels.is_empty() {
@@ -403,18 +422,11 @@ fn build_confusion_matrix(
     let mut matrix = vec![vec![0usize; choice_labels.len() + 1]; choice_labels.len()];
 
     for result in results {
-        let SampleResult::MultipleChoice {
-            golden_label,
-            predicted_label,
-            ..
-        } = result
-        else {
-            bail!("multiple-choice aggregate received an exact-match sample");
-        };
         let golden_index = *label_indices
-            .get(golden_label.as_str())
-            .with_context(|| format!("unknown golden choice label `{golden_label}`"))?;
-        let predicted_index = predicted_label
+            .get(result.golden_label.as_str())
+            .with_context(|| format!("unknown golden choice label `{}`", result.golden_label))?;
+        let predicted_index = result
+            .predicted_label
             .as_deref()
             .map(|label| {
                 label_indices
@@ -434,7 +446,7 @@ fn build_confusion_matrix(
 async fn emit_multiple_choice_aggregate_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
-    results: &[SampleResult],
+    results: &[MultipleChoiceSampleResultParams],
     choice_labels: &[String],
 ) -> Result<()> {
     let confusion_matrix = build_confusion_matrix(results, choice_labels)?;
@@ -938,21 +950,21 @@ mod tests {
                 .await;
         }
         let results = [
-            SampleResult::MultipleChoice {
+            SampleResult::MultipleChoice(MultipleChoiceSampleResultParams {
                 is_correct: true,
                 golden_label: "A".to_owned(),
                 predicted_label: Some("A".to_owned()),
-            },
-            SampleResult::MultipleChoice {
+            }),
+            SampleResult::MultipleChoice(MultipleChoiceSampleResultParams {
                 is_correct: false,
                 golden_label: "A".to_owned(),
                 predicted_label: Some("B".to_owned()),
-            },
-            SampleResult::MultipleChoice {
+            }),
+            SampleResult::MultipleChoice(MultipleChoiceSampleResultParams {
                 is_correct: false,
                 golden_label: "B".to_owned(),
                 predicted_label: None,
-            },
+            }),
         ];
         let choice_labels = ["A".to_owned(), "B".to_owned()];
 
