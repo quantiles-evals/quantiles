@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
+use self::data::{DatasetRow, prepare_row};
 use self::evaluation::{EvaluateRowArgs, evaluate_row};
 use self::metrics::emit_aggregate_metrics;
 use self::runtime::{load_template, parse_input, resolve_dataset_limit, resolve_sampler_for_style};
@@ -78,7 +79,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let results = DatasetRunner::new(&manager, &dataset, &info, limit)
             .desc(&name)
             .set_quiet(ctx.quiet)
-            .for_each_concurrent(max_workers, move |i, row| {
+            .for_each_deserialized(max_workers, move |i, row: DatasetRow| {
                 let llm = Arc::clone(&llm);
                 let db = db.clone();
                 let model_name = model_name.clone();
@@ -86,10 +87,11 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let style = Arc::clone(&style);
                 let env = env.clone();
                 async move {
+                    let prepared = prepare_row(i, &row, &style)?;
                     let args = EvaluateRowArgs {
                         i,
                         row: &row,
-                        style: &style,
+                        prepared,
                         template_str: &template_str,
                         env: &env,
                         model_name: &model_name,

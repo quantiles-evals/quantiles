@@ -1,5 +1,6 @@
 use anyhow::Result;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tqdm::pbar;
 
@@ -115,13 +116,45 @@ impl<'a> DatasetRunner<'a> {
 
         Ok(results)
     }
+
+    /// Deserialize each raw JSON row before invoking the concurrent row callback, and return
+    /// an error when any deserialization or callback fails.
+    ///
+    /// All deserialization error will include the dataset's row index for hopefully-easier
+    /// debugging.
+    pub(crate) async fn for_each_deserialized<Row, F, Fut, T>(
+        self,
+        max_workers: usize,
+        process_row: F,
+    ) -> Result<Vec<T>>
+    where
+        Row: DeserializeOwned,
+        F: Fn(usize, Row) -> Fut + Clone,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        self.for_each_concurrent(max_workers, move |i, row| {
+            let process_row = process_row.clone();
+            async move {
+                let row = serde_json::from_value(row)
+                    .map_err(|error| anyhow::anyhow!("row {i}: invalid row data: {error}"))?;
+                process_row(i, row).await
+            }
+        })
+        .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::dataset::cache::{self, DatasetCache};
+    use serde::Deserialize;
     use serde_json::json;
+
+    #[derive(Deserialize)]
+    struct FixtureRow {
+        index: i64,
+    }
 
     async fn setup_fixture(
         cache: &DatasetCache,
@@ -182,5 +215,53 @@ mod tests {
             assert_eq!(*global_idx, i);
             assert_eq!(*row_idx, i as i64);
         }
+    }
+
+    #[tokio::test]
+    async fn for_each_deserialized_passes_typed_rows_to_callback() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let manager = DatasetManager::new_with_cache_dir(tmpdir.path().to_path_buf()).unwrap();
+        let rows: Vec<Value> = (0..3).map(|i| json!({"index": i})).collect();
+
+        setup_fixture(&manager.cache, "fixture/typed", "cfg", "train", 0, 3, rows).await;
+
+        let info = fixture_info(3, "cfg", "train");
+        let results = DatasetRunner::new(&manager, "fixture/typed", &info, 3)
+            .for_each_deserialized(2, |i, row: FixtureRow| async move { Ok((i, row.index)) })
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 3);
+        assert!(
+            results
+                .iter()
+                .all(|(i, value)| i64::try_from(*i) == Ok(*value))
+        );
+    }
+
+    #[tokio::test]
+    async fn for_each_deserialized_reports_invalid_row_index() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let manager = DatasetManager::new_with_cache_dir(tmpdir.path().to_path_buf()).unwrap();
+        let rows = vec![json!({"index": "not-an-integer"})];
+
+        setup_fixture(
+            &manager.cache,
+            "fixture/invalid",
+            "cfg",
+            "train",
+            0,
+            1,
+            rows,
+        )
+        .await;
+
+        let info = fixture_info(1, "cfg", "train");
+        let error = DatasetRunner::new(&manager, "fixture/invalid", &info, 1)
+            .for_each_deserialized(1, |_, row: FixtureRow| async move { Ok(row.index) })
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("row 0: invalid row data"));
     }
 }

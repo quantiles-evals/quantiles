@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::data::prepare_row;
+use super::data::{DatasetRow, PreparedRow};
 use super::metrics::SampleResult;
 use crate::builtins::common::{hash_input, run_timed_step};
 
@@ -17,8 +17,8 @@ struct RowOutput {
 
 pub(super) struct EvaluateRowArgs<'a> {
     pub(super) i: usize,
-    pub(super) row: &'a serde_json::Value,
-    pub(super) style: &'a crate::config::CustomNoCodeStyleConfig,
+    pub(super) row: &'a DatasetRow,
+    pub(super) prepared: PreparedRow,
     pub(super) template_str: &'a str,
     pub(super) env: &'a jinja::Environment<'a>,
     pub(super) model_name: &'a str,
@@ -34,19 +34,20 @@ pub(super) async fn evaluate_row(
     benchmark_name: &str,
     args: EvaluateRowArgs<'_>,
 ) -> Result<SampleResult> {
-    let prepared = prepare_row(args.i, args.row, args.style)?;
+    let prepared = args.prepared;
 
     let rendered = args
         .env
         .render_str(
             args.template_str,
-            jinja::context!(row => args.row, choices => &prepared.choices),
+            jinja::context!(row => args.row, choices => prepared.choices()),
         )
         .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
+    let golden = prepared.golden().to_owned();
     let input_hash = hash_input(&format!(
         "{rendered}\ngolden={}\nmodel={}\nworkflow={benchmark_name}",
-        prepared.golden, args.model_name
+        golden, args.model_name
     ));
     let step_key = format!("row-{}", args.i);
 
@@ -63,21 +64,17 @@ pub(super) async fn evaluate_row(
                 .await
                 .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
 
-            let parsed_response = match args.style {
-                crate::config::CustomNoCodeStyleConfig::MultipleChoice {
-                    choice_labels, ..
-                } => extract_choice_label(&model_response, choice_labels),
-                crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => {
-                    Some(model_response.trim().to_owned())
-                }
+            let parsed_response = match prepared.response_labels() {
+                Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
+                None => Some(model_response.trim().to_owned()),
             };
-            let is_correct = parsed_response.as_deref() == Some(prepared.golden.trim());
+            let is_correct = parsed_response.as_deref() == Some(golden.trim());
 
             Ok(RowOutput {
                 input: rendered.clone(),
                 response: model_response,
                 parsed_response,
-                golden: prepared.golden,
+                golden: golden.clone(),
                 is_correct,
             })
         },
@@ -109,11 +106,9 @@ pub(super) async fn evaluate_row(
             .await;
     }
 
-    Ok(match args.style {
-        crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => {
-            SampleResult::exact_match(output.is_correct)
-        }
-        crate::config::CustomNoCodeStyleConfig::MultipleChoice { .. } => {
+    Ok(match prepared {
+        PreparedRow::ExactMatch { .. } => SampleResult::exact_match(output.is_correct),
+        PreparedRow::MultipleChoice { .. } => {
             SampleResult::multiple_choice(output.is_correct, output.golden, output.parsed_response)
         }
     })
