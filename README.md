@@ -6,7 +6,7 @@ It includes a CLI (called `qt`), SDKs, built-in benchmarks, local run history, a
 
 ## ![NEW!](./docs/assets/new-badge.svg) What's New
 
-**[2026.07.07]** Added `custom_nocode` QA benchmarks, which let users configure a dataset-backed question-answering benchmark in `quantiles.toml` without writing custom evaluation code. See [No-code QA benchmarks](./cli/src/builtins/custom_nocode.rs) for more details.
+**[2026.07.07]** Added `custom_nocode` evals, which let users configure a dataset-backed question-answering benchmark in `quantiles.toml` without writing custom evaluation code. See [custom no-code evals](./cli/src/builtins/custom_nocode.rs) for more details.
 
 ## Why Quantiles
 
@@ -121,20 +121,22 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 
 ## Built-in Benchmarks
 
-Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Use them when you want a standardized evaluation that provides a common reference point, a repeatable baseline, or a well-defined implementation of an industry benchmark.
+Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. These benchmarks are built into the CLI and require no configuration. They're intended to help you quickly get started with the Quantiles stack or run a standardized evaluation for a common reference point or repeatable baseline.
 
-For dataset-backed QA checks that do not need custom Python or TypeScript code, use a `custom_nocode` benchmark in `quantiles.toml`. A `custom_nocode` QA benchmark points to a dataset, renders a Jinja prompt from the complete dataset row, and supports exact-answer and multiple-choice scoring. See [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml) for runnable SimpleQA Verified, MedQA, MedMCQA, MMLU-Pro, and GPQA configurations.
-
-| Code | When to use |
-| --- | --- |
-| `qt run $BENCHMARK` | Run a built-in benchmark against the demo model to inspect sample-level inputs and outputs, scoring behavior, workflow steps, and aggregate metrics |
-| `qt run $BENCHMARK --input '{"model":"$MODEL_NAME"}'` | Run a built-in benchmark against your model |
-
-Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering built-in benchmarks, understanding their evaluation setup, and reviewing common metrics used across AI evaluation workflows.
+Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering more benchmarks, including the built-in ones, and understanding their evaluation setup and reviewing common metrics used across AI evaluation workflows.
 
 ## Custom Evaluations
 
-A custom evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](http://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Your code owns the evaluation logic like loading data, calling a model or agent, scoring outputs, computing metrics, and returning a summary. Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
+Quantiles provides two kinds of custom evaluations:
+
+- `custom_nocode` - build a custom eval from configuration only, without writing any custom code. See the [custom no-code evals documentation](./cli/README.md#no-code-qa-benchmarks) for more details.
+- `custom_code` - build highly specialized, custom evals by writing Python code. See below for details.
+
+### `custom_code` evaluation
+
+A `custom_code` evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](http://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Use custom evaluations when you need to measure behavior that is highly specific to your product, workflow, prompt, dataset, rubric, or release process.
+
+With help from the [Quantiles Python SDK](https://quantiles.io/documentation/reference/python-sdk), you build evaluation logic like loading data, calling models or agents, scoring outputs, computing metrics, and returning a summary, and Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
 
 Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
 
@@ -147,9 +149,11 @@ command = ["python", "my_eval.py"]
 dataset = "my_dataset.jsonl"
 ```
 
-Run the evaluation with `qt run my-eval`. If it fails, resume it later with `qt resume <run_id>` — the CLI re-reads the command and stored input automatically.
+You would run this evaluation with the following command:
 
-Use custom evaluations when you need to measure behavior that is specific to your product, workflow, prompt, dataset, rubric, or release process.
+```shell
+qt run my-eval
+```
 
 Read more about how to build and run custom evaluations at [quantiles.io/documentation/custom-evaluations](https://quantiles.io/documentation/custom-evaluations).
 

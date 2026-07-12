@@ -53,7 +53,7 @@ See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_co
 
 ## Configuration files and customization
 
-You can customize how the CLI executes built-in benchmarks, custom code evaluations, and no-code QA benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
+You can customize how the CLI executes built-in benchmarks, custom code evaluations, and custom no-code evals using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
 - [`../CONFIG.md`](../CONFIG.md): for a guide and reference.
 - [`./examples/configs`](./examples/configs) for complete working examples.
@@ -71,29 +71,52 @@ max_workers = 100
 
 >Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
 
-### No-code QA benchmarks
+### Custom no-code evals
 
-For dataset-backed QA checks that do not need custom evaluation code, set `type = "custom_nocode"`. Set `style.type` to `"exact_match"` for benchmarks that test an exact match to a golden answer, or `"multiple_choice"` for choice-based benchmarks. Style-specific dataset columns belong inside the `style` table. The benchmark runs inside the CLI, renders each prompt with the configured Jinja template, calls the configured model, and scores each row against the configured answer source.
+For evals that do not need custom evaluation code, set `type = "custom_nocode"` in your configuration file. These evals point to a dataset, render a prompt (using the [Jinja templating language](https://jinja.palletsprojects.com/en/stable/)) for each sample, send the prompt to your model, and score the result by matching exact answers or multiple choice answers.
 
-With `model = "random"`, exact-match benchmarks generate demo random text and multiple-choice benchmarks uniformly select from `style.choice_labels`.
-
-Samples emit correctness, response-parsing, and latency metrics. Runs aggregate accuracy and counts, parse success, and mean, median, p95, p99, minimum, and maximum latency. Multiple-choice runs additionally emit macro, weighted, and per-label precision, recall, and F1 metrics, plus confusion-matrix cells indexed by `style.choice_labels` with an explicit unparsed-response column.
+The [example configuration file in the `custom-nocode-examples/` directory](./custom-nocode-examples/quantiles.toml) shows runnable SimpleQA Verified, MedQA, MedMCQA, MMLU-Pro, and GPQA configurations. A sample `custom_nocode` configuration is below:
 
 ```toml
-[benchmarks.nocode_custom]
+[benchmarks.my_custom_eval]
 type = "custom_nocode"
+# style.type can be set to "exact_match" or "multiple_choice". Depending
+# on the type, there are other required fields. See the configuration documentation in
+# CONFIG.md for reference:
+# 
+# https://github.com/quantiles-evals/quantiles/blob/main/CONFIG.md#custom_nocode
 style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
+# when the model is set to "random", `exact_match` benchmarks generate random text,
+# and multiple_choice benchmarks uniformly select from the `style.choice_labels` array
 model = "random"
-prompt_template_file = "prompts/qa.txt"
+# this file should be a jinja template that can render the prompt from any row
+# in the dataset
+prompt_template_file = "prompts/my_custom_eval.txt"
 limit = 10
 ```
 
-```bash
-qt run nocode_custom
+With this configuration saved to a `quantiles.toml` file, you can run the eval with:
+
+```shell
+qt run my_custom_eval
 ```
 
-See [`../custom-nocode-examples/quantiles.toml`](../custom-nocode-examples/quantiles.toml) for a complete minimal example.
+With this configuration, each sample will automatically emit correctness, response-parsing, and latency metrics, and every eval will show the following aggregate metrics:
+
+- Accuracy and pass/fail counts
+- Response parsing success
+- Mean, median, p95, p99, and minimum/maximum latency
+
+When `style.type` is set to `multiple_choice`, the eval run will also emit the following metrics:
+
+- Macro, weighted, and per-label precision, recall, and F1 metrics
+- A confusion-matrix indexed by `style.choice_labels`, with an additional column for unparsed responses
+
+See the following resources for more details:
+
+- An [example `quantiles.toml` file with real, runnable evals](../custom-nocode-examples/quantiles.toml)
+- [Reference documentation](../CONFIG.md#custom_nocode) for `custom_nocode` configurations
 
 ### Custom code evals
 
