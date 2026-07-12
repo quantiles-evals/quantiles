@@ -13,54 +13,34 @@ curl -fsSL https://cli.quantiles.io/install.sh | bash
 A few commands to see `qt` in action:
 
 ```bash
-# 1. Initialize a workspace
-qt init
-
-# 2. Run a built-in eval
+# 1. Run a built-in evaluation using a demo model that does
+# not incur any usage charges.
 #
-# Note that you can also build and run your own custom evals
-# with the `qt` CLI. See the following "Custom evaluations" section
-# for details.
-qt run pubmedqa
+# You can also build and run your own custom evaluations.
+# See the following "No-code custom" and "Custom code" sections.
+qt run simpleqa-verified
 
-# 3. List and inspect what happened
+# 2. See a list of all your evaluation runs and their run IDs.
 qt list
-qt show 1
+
+# 3. Inspect and analyze the results of your evaluation run.
+qt show <run_id>
 ```
 
 > See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
-### Custom evaluations
-
-Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `--input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
-
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-input = {dataset = "my_dataset.jsonl"}
-```
-
-```bash
-# Run the custom evaluation
-qt run my-eval
-
-# If it fails, resume with only the run ID
-qt resume <run_id>
-```
-
-See the [custom-code configuration example](./examples/configs/custom_code/quantiles.toml) for a complete working configuration.
+> Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your LLM provider. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations below illustrate how to do so.
 
 ## Configuration files and customization
 
-You can customize how the CLI executes built-in benchmarks, custom code evaluations, and custom no-code evals using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
+You can customize how the CLI executes built-in benchmarks, custom code evaluations, and custom no-code evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
 - [Configuration reference](../CONFIG.md) for configuration guidance and supported options.
 - [Configuration examples](./examples/configs) for complete working configurations.
 
-### Built-in benchmarks
+## Built-in benchmarks
 
-For built-in benchmarks, configure settings like `samples`, `model`, and `max_workers`:
+For built-in benchmarks, configure `samples`, `model`, and `max_workers`:
 
 ```toml
 [benchmarks.pubmedqa]
@@ -69,82 +49,88 @@ model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
-> Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+## Custom no-code evaluations
 
-### Custom no-code evals
+No-code custom evaluations are configured entirely in `quantiles.toml` and require no Python implementation. These evaluations load samples from a dataset, render a prompt for each sample using the [Jinja templating language](https://jinja.palletsprojects.com/en/stable/), send each prompt to the configured model, and score responses using exact-match or multiple-choice scoring.
 
-For evals that do not need custom evaluation code, set `type = "custom_nocode"` in your configuration file. These evals point to a dataset, render a prompt (using the [Jinja templating language](https://jinja.palletsprojects.com/en/stable/)) for each sample, send the prompt to your model, and score the result by matching exact answers or multiple choice answers.
-
-The [example configuration file in the `custom-nocode-examples/` directory](./custom-nocode-examples/quantiles.toml) shows runnable SimpleQA Verified, MedQA, MedMCQA, MMLU-Pro, and GPQA configurations. A sample `custom_nocode` configuration is below:
+See the [no-code custom evaluation examples](./custom-nocode-examples/quantiles.toml) for runnable configurations for SimpleQA-Verified, MMLU-Pro, and more. The following example shows the `custom_nocode` configuration structure for SimpleQA Verified:
 
 ```toml
 [benchmarks.my_custom_eval]
 type = "custom_nocode"
-# style.type can be set to "exact_match" or "multiple_choice". Depending
-# on the type, there are other required fields. See the configuration documentation in
-# CONFIG.md for reference:
-# 
+
+# style.type can be set to "exact_match" or "multiple_choice".
+# Depending on the type, there are other required fields.
+# See the configuration documentation innCONFIG.md for reference:
 # https://github.com/quantiles-evals/quantiles/blob/main/CONFIG.md#custom_nocode
 style = { type = "exact_match", golden_column = "answer" }
+
 dataset = { name = "quantiles/simpleqa-verified" }
-# when the model is set to "random", `exact_match` benchmarks generate random text,
-# and multiple_choice benchmarks uniformly select from the `style.choice_labels` array
+
+# when the model is set to "random",
+#`exact_match` benchmarks generate random text
+# and multiple_choice benchmarks uniformly select
+# from the `style.choice_labels` array
 model = "random"
-# this file should be a jinja template that can render the prompt from any row
-# in the dataset
+
+# the prompt_template_file should be a jinja template
+# that can render the prompt from any row in the dataset
 prompt_template_file = "prompts/my_custom_eval.txt"
+
 limit = 10
 ```
 
-With this configuration saved to a `quantiles.toml` file, you can run the eval with:
+After adding the configuration to `quantiles.toml`, run the evaluation using:
 
 ```shell
 qt run my_custom_eval
 ```
 
-With this configuration, each sample will automatically emit correctness, response-parsing, and latency metrics, and every eval will show the following aggregate metrics:
+For each sample, this configuration automatically records correctness, response-parsing, and latency metrics. Each evaluation run also reports the following aggregate metrics:
 
 - Accuracy and pass/fail counts
 - Response parsing success
 - Mean, median, p95, p99, and minimum/maximum latency
 
-When `style.type` is set to `multiple_choice`, the eval run will also emit the following metrics:
+When `style.type` is set to `multiple_choice`, the evaluation run also reports the following aggregate metrics:
 
 - Macro, weighted, and per-label precision, recall, and F1 metrics
 - A confusion-matrix indexed by `style.choice_labels`, with an additional column for unparsed responses
 
-See the following resources for more details:
+Additional examples and configuration details are available in:
 
-- An [example `quantiles.toml` file with real, runnable evals](../custom-nocode-examples/quantiles.toml)
-- [Reference documentation](../CONFIG.md#custom_nocode) for `custom_nocode` configurations
+- [Runnable no-code evaluation examples](../custom-nocode-examples/quantiles.toml)
+- [Custom no-code evaluation configuration reference](../CONFIG.md#custom_nocode)
 
-### Custom code evals
+## Custom code evaluations
 
-For custom evaluations, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as a JSON dictionary.
+A `custom_code` evaluation is a [Python-based evaluation](https://quantiles.io/documentation/reference/python-sdk) that you implement for behavior specific to your product, workflow, prompts, datasets, scoring rubrics, or release process. Unlike no-code custom evaluations, it supports fully customizable evaluation logic but requires you to write and maintain the Python implementation.
 
 ```toml
-[benchmarks.my-eval]
+# Custom-code evaluation
+[benchmarks.customcode_eval]
 type = "custom_code"
+
+# The `command` array tells the CLI how
+# to execute your eval code.
 command = ["python", "my_eval.py"]
-input = { foo = "foo_val" }
+
+# The optional `input` table is merged with
+# any values passed through the `--input`
+# flag on the command line, then passed
+# to your script as JSON in the `QUANTILES_INPUT`
+# environment variable. The Quantiles Python
+# SDK transparently parses this value for you.
+input = {dataset = "my_dataset.jsonl"}
 ```
 
-## Comparing runs
-
-After iterating on an eval, you can compare two runs to see exactly what changed:
+After adding the configuration to `quantiles.toml`, run the evaluation using:
 
 ```bash
-# Run A — baseline
-qt run my-eval
-
-# Run B — your latest iteration
-qt run my-eval
-
-# See what changed between them
-qt compare 1 2
+qt run customcode_eval
 ```
 
-`qt compare` exits with code 1 if the runs differ, making it useful in CI scripts.
+See the [custom-code configuration example](./examples/configs/custom_code/quantiles.toml) for a complete working configuration.
 
 ## Architecture
 
