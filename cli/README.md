@@ -1,6 +1,6 @@
 # Quantiles CLI
 
-This directory holds the source code for the `qt` CLI. It is built with [Rust](https://rust-lang.org/) to help it efficiently use the resources of the local machine, to help ensure safety, and to provide strong lints and type-system invariants for humans and agents to work with.
+This directory contains the source code for the `qt` CLI. It is implemented in [Rust](https://rust-lang.org/) to use local machine resources efficiently, improve safety, and provide strong lints and type-system invariants for humans and agents.
 
 ## Install
 
@@ -17,9 +17,9 @@ A few commands to see `qt` in action:
 qt init
 
 # 2. Run a built-in eval
-# 
+#
 # Note that you can also build and run your own custom evals
-# with the `qt` CLI. See the below "Custom evaluations" section
+# with the `qt` CLI. See the following "Custom evaluations" section
 # for details.
 qt run pubmedqa
 
@@ -28,11 +28,11 @@ qt list
 qt show 1
 ```
 
->See [quantiles.io/documentation/reference/cli](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
+> See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 ### Custom evaluations
 
-Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed in the `qt run --input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below
+Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `--input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
 
 ```toml
 [benchmarks.my-eval]
@@ -49,14 +49,14 @@ qt run my-eval
 qt resume <run_id>
 ```
 
-See [`examples/configs/custom_code/quantiles.toml`](./examples/configs/custom_code/quantiles.toml) for a complete working example.
+See the [custom-code configuration example](./examples/configs/custom_code/quantiles.toml) for a complete working configuration.
 
 ## Configuration files and customization
 
 You can customize how the CLI executes built-in benchmarks, custom code evaluations, and custom no-code evals using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
 
-- [`../CONFIG.md`](../CONFIG.md): for a guide and reference.
-- [`./examples/configs`](./examples/configs) for complete working examples.
+- [Configuration reference](../CONFIG.md) for configuration guidance and supported options.
+- [Configuration examples](./examples/configs) for complete working configurations.
 
 ### Built-in benchmarks
 
@@ -65,11 +65,11 @@ For built-in benchmarks, configure settings like `samples`, `model`, and `max_wo
 ```toml
 [benchmarks.pubmedqa]
 samples = 50
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
->Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
+> Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
 
 ### Custom no-code evals
 
@@ -156,14 +156,14 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 +-------------------+------------------+
                     │
                     │  HTTP / JSON
-                    |
+                    │
                     ▼
 +--------------------------------------+
 |            Quantiles Server          |
 +-------------------+------------------+
                     │
                     │  SQLite
-                    |
+                    │
                     ▼
 +------------------------------------------------+
 |     .quantiles/quantiles.sqlite (local DB)     |

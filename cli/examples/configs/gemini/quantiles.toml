@@ -11,7 +11,7 @@
 # usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
 samples = 50
 
-# The below model is good for demonstrating PubMedQA benchmarks without very high costs,
+# The following model is good for demonstrating PubMedQA benchmarks without very high costs,
 # since it's relatively cheap and fast. Details on the model can be found at:
 #
 # https://ai.google.dev/gemini-api/docs/models/gemini#gemini-3.1-flash-lite

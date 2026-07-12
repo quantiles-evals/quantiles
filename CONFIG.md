@@ -11,11 +11,11 @@ You need a config file when you want to do one or more of the following:
 - Build custom evaluations with code (`type = "custom_code"` in the `quantiles.toml` configuration file)
 - Resume custom evaluations later with `qt resume <run_id>`
 
-You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
+You do not need a configuration file to run built-in benchmarks. For example, `qt run pubmedqa` works out of the box.
 
 ## File location and name
 
-If you want to make a configuration file, create either a `quantiles.toml` or `.quantiles.toml` file in the current working directory. You can only have one or the other -- if both exist, the CLI exits with an ambiguity error.
+To configure Quantiles, create either `quantiles.toml` or `.quantiles.toml` in the current working directory. Use only one filename; if both files are present, the CLI exits with an ambiguity error.
 
 ## Top-level structure
 
@@ -24,33 +24,11 @@ Every benchmark lives under its own `[benchmarks.<eval_name>]` section. The sect
 For example, if you want to override default parameters for the built-in PubMedQA benchmark, add the following section to your config file:
 
 ```toml
-# This is configuration for the PubMedQA benchmark that is built into the `qt` CLI.
-# 
-# When you run `qt run pubmedqa`, the CLI will look here for how exactly to run PubMedQA.
+# Configure the model and sample limit for the built-in PubMedQA benchmark.
+
 [benchmarks.pubmedqa]
-# Limit to the first 50 samples of the benchmark
 samples = 50
-# Customize the model to test
-model = "openai:gpt-5.4-nano"
-# see below for the full reference
-```
-
-Alternatively, if you want to build your own custom evaluation using the Quantiles Python SDK, define that custom eval as follows:
-
-```toml
-# This is configuration for a custom code benchmark called my-eval.
-# 
-# When you run `qt run my-eval`, the CLI will look here for how exactly to run your custom
-# benchmark.
-[benchmarks.my-eval]
-# This `type` parameter defaults to "builtin". for custom evals, be sure to override
-# the default with "custom_code" here.
-type = "custom_code"
-# This is the command that the CLI will execute to run your custom eval code. We recommend
-# using the `uv` tool to configure and manage your Python evals, but this field can be any
-# command, so you're free to use any tools you want.
-command = ["uv", "run", "my_eval.py"]
-# see below for the full reference
+model = "openai:gpt-5.6"
 ```
 
 ## Benchmark types
@@ -65,7 +43,7 @@ Built-in benchmarks run natively inside the CLI, without any custom code. Below 
 |--|--|--|--|
 | `type` | string | no | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
 | `samples` | integer | no | Number of dataset rows to evaluate. |
-| `model` | string or table | no | Model sampler. See [model naming](#model-naming). |
+| `model` | string or table | no | Model sampler. See [model naming](#model-naming) for details. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
 
 If none of these fields are customized, the built-in benchmark uses the following defaults:
@@ -77,10 +55,10 @@ If none of these fields are customized, the built-in benchmark uses the followin
 
 #### `model` naming
 
-The above `model` field accepts a provider-prefixed string, for example
+The `model` field described above accepts a provider-prefixed string, for example:
 
 ```toml
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 ```
 
 Supported provider prefixes are listed below:
@@ -93,10 +71,10 @@ Supported provider prefixes are listed below:
 You can pass a TOML table instead of such a prefixed string:
 
 ```toml
-model = { provider = "openai", model_id = "gpt-5.4-nano" }
+model = { provider = "openai", model_id = "gpt-5.6" }
 ```
 
-Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in [`cli/examples/configs`](./cli/examples/configs).
+Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in the [provider configuration examples](./cli/examples/configs).
 
 ### `custom_nocode`
 
@@ -195,13 +173,13 @@ See [the `quantiles.toml` sample configuration file](./custom-nocode-examples/qu
 
 Custom evaluations are external programs built with the Quantiles Python SDK. Their config sections contain the following fields:
 
-| Field | Type | Required | Description |
-|--|--|--|--|
-| `type` | string | yes | Must be `"custom_code"`. |
-| `command` | array of strings | yes | Command and arguments to execute. |
-| `input` | table | no | Structured input passed to the child as `QUANTILES_INPUT`. |
+| Field     | Type             | Required | Description                                                |
+| --------- | ---------------- | -------- | ---------------------------------------------------------- |
+| `type`    | string           | yes      | Must be `"custom_code"`.                                   |
+| `command` | array of strings | yes      | Command and arguments to execute.                          |
+| `input`   | table            | no       | Structured input passed to the child as `QUANTILES_INPUT`. |
 
-Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python/examples/pubmedqa.py) for details on customizing the model in `custom_code` benchmarks.
+Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` benchmarks.
 
 #### The `input` table
 
@@ -272,10 +250,10 @@ When you run `qt resume <run_id>`, the CLI looks up the stored eval name and inp
 
 ```toml
 [benchmarks.pubmedqa]
-model = "openai:gpt-5.4-nano"
+model = "openai:gpt-5.6"
 ```
 
-### Built-in using demo model, and restricting samples
+### Built-in using the demo model with a sample limit
 
 ```toml
 [benchmarks.simpleqa-verified]
@@ -293,4 +271,4 @@ input = { greeting = "world" }
 
 ### Custom evaluation with failure simulation
 
-See [`cli/examples/configs/custom_code/quantiles.toml`](./cli/examples/configs/custom_code/quantiles.toml) for a complete, commented example including a sample Python script.
+See the complete [custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) for an annotated configuration and sample Python script.
