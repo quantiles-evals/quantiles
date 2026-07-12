@@ -228,18 +228,20 @@ mod tests {
         let bench = qt::config::BenchmarkConfig::CustomNoCode(Box::new(
             qt::config::CustomNoCodeBenchmarkConfig {
                 type_: "custom_nocode".to_owned(),
-                dataset: qt::config::CustomNoCodeDatasetConfig {
-                    name: "quantiles/simpleqa-verified".to_owned(),
-                    config_name: None,
-                    split: None,
-                    revision: None,
-                },
-                model: Some(qt::llm::Sampler::Random {}),
-                prompt_template_file: file.path().to_str().unwrap().to_owned(),
-                limit: None,
-                max_workers: None,
-                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
-                    golden_column: "answer".to_owned(),
+                params: qt::config::CustomNoCodeParams {
+                    dataset: qt::config::CustomNoCodeDatasetConfig {
+                        name: "quantiles/simpleqa-verified".to_owned(),
+                        config_name: None,
+                        split: None,
+                        revision: None,
+                    },
+                    model: Some(qt::llm::Sampler::Random {}),
+                    prompt_template_file: file.path().to_str().unwrap().to_owned(),
+                    limit: None,
+                    max_workers: None,
+                    style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                        golden_column: "answer".to_owned(),
+                    },
                 },
             },
         ));

@@ -16,18 +16,6 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
-/// Input deserialized from the JSON assembled by `commands::run`.
-#[derive(Debug, Deserialize)]
-struct CustomNoCodeInput {
-    dataset: crate::config::CustomNoCodeDatasetConfig,
-    #[serde(default)]
-    model: Option<crate::llm::Sampler>,
-    limit: Option<usize>,
-    max_workers: Option<usize>,
-    prompt_template_file: String,
-    style: crate::config::CustomNoCodeStyleConfig,
-}
-
 /// Per-row step output stored as JSON in the step record.
 #[derive(Debug, Serialize, Deserialize)]
 struct RowOutput {
@@ -556,8 +544,8 @@ fn resolve_custom_nocode_sampler(
     resolve_sampler(model, || Arc::new(RandomSampler::new(80)))
 }
 
-fn parse_input(input: Option<&str>) -> Result<CustomNoCodeInput> {
-    let config: CustomNoCodeInput = input
+fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNoCodeParams> {
+    let config: crate::config::CustomNoCodeParams = input
         .map(serde_json::from_str)
         .transpose()
         .context("invalid builtin input JSON")?

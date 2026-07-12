@@ -75,24 +75,54 @@ pub struct CustomNoCodeShuffleConfig {
     pub seed_column: String,
 }
 
-/// No-code custom benchmark configuration.
-#[derive(Debug, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
+/// No-code custom benchmark configuration, including its benchmark-type discriminator.
+#[derive(Debug, Clone)]
 pub struct CustomNoCodeBenchmarkConfig {
-    #[serde(rename = "type")]
     pub type_: String,
+    /// Parameters shared with the runtime input consumed by the no-code builtin.
+    pub params: CustomNoCodeParams,
+}
+
+/// Parameters used to configure and execute a no-code custom benchmark.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct CustomNoCodeParams {
     /// Hugging Face dataset coordinates.
     pub dataset: CustomNoCodeDatasetConfig,
     /// Model sampler to use.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<Sampler>,
     /// Path to a Jinja template file for rendering prompts.
     pub prompt_template_file: String,
     /// Number of dataset rows to evaluate.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
     /// Maximum concurrent workers.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_workers: Option<usize>,
     /// Scoring style and its required dataset-column configuration.
     pub style: CustomNoCodeStyleConfig,
+}
+
+impl<'de> Deserialize<'de> for CustomNoCodeBenchmarkConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut value = serde_json::Value::deserialize(deserializer)?;
+        let object = value
+            .as_object_mut()
+            .ok_or_else(|| serde::de::Error::custom("expected a custom_nocode config table"))?;
+        let type_ = object
+            .remove("type")
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("`type` must be a string"))?
+            .to_owned();
+        let params = CustomNoCodeParams::deserialize(value).map_err(serde::de::Error::custom)?;
+
+        Ok(Self { type_, params })
+    }
 }
 
 /// Hugging Face dataset coordinates for a no-code benchmark.
@@ -183,13 +213,13 @@ mod tests {
         let bench = config.benchmarks.get("nocode_custom").unwrap();
         assert!(matches!(bench, BenchmarkConfig::CustomNoCode(_)));
         if let BenchmarkConfig::CustomNoCode(c) = bench {
-            assert_eq!(c.dataset.name, "quantiles/simpleqa-verified");
-            assert_eq!(c.model, Some(Sampler::Random));
-            assert_eq!(c.limit, Some(10));
-            let CustomNoCodeStyleConfig::ExactMatch { golden_column } = &c.style else {
+            assert_eq!(c.params.dataset.name, "quantiles/simpleqa-verified");
+            assert_eq!(c.params.model, Some(Sampler::Random));
+            assert_eq!(c.params.limit, Some(10));
+            let CustomNoCodeStyleConfig::ExactMatch { golden_column } = &c.params.style else {
                 panic!("expected exact-match task");
             };
-            assert_eq!(c.prompt_template_file, "prompts/qa.txt");
+            assert_eq!(c.params.prompt_template_file, "prompts/qa.txt");
             assert_eq!(golden_column, "answer");
         }
     }
@@ -225,18 +255,20 @@ mod tests {
     fn validate_rejects_missing_template_file() {
         let bench = BenchmarkConfig::CustomNoCode(Box::new(CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            dataset: CustomNoCodeDatasetConfig {
-                name: "quantiles/simpleqa-verified".to_owned(),
-                config_name: None,
-                split: None,
-                revision: None,
-            },
-            model: Some(Sampler::Random),
-            prompt_template_file: "does_not_exist.txt".to_owned(),
-            limit: None,
-            max_workers: None,
-            style: CustomNoCodeStyleConfig::ExactMatch {
-                golden_column: "answer".to_owned(),
+            params: CustomNoCodeParams {
+                dataset: CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: Some(Sampler::Random),
+                prompt_template_file: "does_not_exist.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                style: CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         }));
         let err = bench.validate().unwrap_err();
@@ -248,18 +280,20 @@ mod tests {
         let file = tempfile::NamedTempFile::new().unwrap();
         let bench = BenchmarkConfig::CustomNoCode(Box::new(CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            dataset: CustomNoCodeDatasetConfig {
-                name: "quantiles/simpleqa-verified".to_owned(),
-                config_name: None,
-                split: None,
-                revision: None,
-            },
-            model: Some(Sampler::Random),
-            prompt_template_file: file.path().to_str().unwrap().to_owned(),
-            limit: None,
-            max_workers: None,
-            style: CustomNoCodeStyleConfig::ExactMatch {
-                golden_column: "answer".to_owned(),
+            params: CustomNoCodeParams {
+                dataset: CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: Some(Sampler::Random),
+                prompt_template_file: file.path().to_str().unwrap().to_owned(),
+                limit: None,
+                max_workers: None,
+                style: CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         }));
         bench.validate().unwrap();
@@ -286,11 +320,11 @@ mod tests {
             panic!("missing MedMCQA example");
         };
         assert!(matches!(
-            medmcqa.style,
+            medmcqa.params.style,
             CustomNoCodeStyleConfig::MultipleChoice { .. }
         ));
-        assert_eq!(medmcqa.dataset.name, "quantiles/medmcqa");
-        assert_eq!(medmcqa.dataset.split.as_deref(), Some("validation"));
+        assert_eq!(medmcqa.params.dataset.name, "quantiles/medmcqa");
+        assert_eq!(medmcqa.params.dataset.split.as_deref(), Some("validation"));
     }
 
     #[test]

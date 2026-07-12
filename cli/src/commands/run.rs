@@ -150,21 +150,6 @@ fn assemble_builtin_input(
     }
 }
 
-/// Config input shape for `custom_nocode` benchmarks auto-generated from
-/// `quantiles.toml` `[benchmarks.*]`.
-#[derive(Serialize)]
-struct CustomNoCodeConfigInput<'a> {
-    dataset: &'a qt::config::CustomNoCodeDatasetConfig,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    model: &'a Option<qt::llm::Sampler>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_workers: Option<usize>,
-    prompt_template_file: &'a str,
-    style: &'a qt::config::CustomNoCodeStyleConfig,
-}
-
 pub(super) fn assemble_custom_nocode_input(
     bench: &qt::config::CustomNoCodeBenchmarkConfig,
     cli_input: Option<&str>,
@@ -173,16 +158,7 @@ pub(super) fn assemble_custom_nocode_input(
         return cli_str.to_owned();
     }
 
-    let input = CustomNoCodeConfigInput {
-        dataset: &bench.dataset,
-        model: &bench.model,
-        limit: bench.limit,
-        max_workers: bench.max_workers,
-        prompt_template_file: &bench.prompt_template_file,
-        style: &bench.style,
-    };
-
-    serde_json::to_string(&input).expect("infallible serialization")
+    serde_json::to_string(&bench.params).expect("infallible serialization")
 }
 
 fn merge_inputs(
@@ -751,18 +727,20 @@ mod tests {
     fn assemble_custom_nocode_input_from_config() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            dataset: qt::config::CustomNoCodeDatasetConfig {
-                name: "quantiles/simpleqa-verified".to_owned(),
-                config_name: Some("default".to_owned()),
-                split: Some("test".to_owned()),
-                revision: Some("main".to_owned()),
-            },
-            model: Some(qt::llm::Sampler::Random {}),
-            prompt_template_file: "prompts/qa.txt".to_owned(),
-            limit: Some(10),
-            max_workers: Some(4),
-            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
-                golden_column: "answer".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: Some("default".to_owned()),
+                    split: Some("test".to_owned()),
+                    revision: Some("main".to_owned()),
+                },
+                model: Some(qt::llm::Sampler::Random {}),
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: Some(10),
+                max_workers: Some(4),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, None);
@@ -785,18 +763,20 @@ mod tests {
     fn assemble_custom_nocode_input_omits_none_fields() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            dataset: qt::config::CustomNoCodeDatasetConfig {
-                name: "quantiles/simpleqa-verified".to_owned(),
-                config_name: None,
-                split: None,
-                revision: None,
-            },
-            model: None,
-            prompt_template_file: "prompts/qa.txt".to_owned(),
-            limit: None,
-            max_workers: None,
-            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
-                golden_column: "answer".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, None);
@@ -812,18 +792,20 @@ mod tests {
     fn assemble_custom_nocode_input_with_cli_override() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            dataset: qt::config::CustomNoCodeDatasetConfig {
-                name: "quantiles/simpleqa-verified".to_owned(),
-                config_name: None,
-                split: None,
-                revision: None,
-            },
-            model: None,
-            prompt_template_file: "prompts/qa.txt".to_owned(),
-            limit: None,
-            max_workers: None,
-            style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
-                golden_column: "answer".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":5}"#));

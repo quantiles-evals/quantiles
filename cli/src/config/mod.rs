@@ -32,13 +32,13 @@ impl BenchmarkConfig {
                 Ok(())
             }
             BenchmarkConfig::CustomNoCode(c) => {
-                if !std::path::Path::new(&c.prompt_template_file).is_file() {
+                if !std::path::Path::new(&c.params.prompt_template_file).is_file() {
                     bail!(
                         "custom_nocode benchmark config `prompt_template_file` must point to an existing file. File `{}` was not found",
-                        c.prompt_template_file
+                        c.params.prompt_template_file
                     );
                 }
-                c.style.validate()?;
+                c.params.style.validate()?;
                 Ok(())
             }
         }
