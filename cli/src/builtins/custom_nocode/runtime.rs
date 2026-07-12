@@ -8,6 +8,7 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
+/// Resolve the configured sampler, using configured choice labels for random multiple-choice runs.
 pub(super) fn resolve_sampler_for_style(
     model: Option<&crate::llm::Sampler>,
     style: &crate::config::CustomNoCodeStyleConfig,
@@ -21,6 +22,7 @@ pub(super) fn resolve_sampler_for_style(
     resolve_sampler(model, || Arc::new(RandomSampler::new(80)))
 }
 
+/// Deserialize and validate the runtime input required by a custom no-code benchmark.
 pub(super) fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNoCodeParams> {
     let config: crate::config::CustomNoCodeParams = input
         .map(serde_json::from_str)
@@ -35,6 +37,7 @@ pub(super) fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNo
     Ok(config)
 }
 
+/// Read a prompt template and validate its Jinja syntax against the available variables.
 pub(super) fn load_template(path: &str) -> Result<(String, jinja::Environment<'_>)> {
     let template_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read prompt template file `{path}`"))?;
@@ -47,6 +50,7 @@ pub(super) fn load_template(path: &str) -> Result<(String, jinja::Environment<'_
     Ok((template_str, env))
 }
 
+/// Initialize the configured dataset and clamp the requested limit to its available row count.
 pub(super) async fn resolve_dataset_limit(
     dataset: &str,
     dataset_config: Option<&str>,
@@ -71,6 +75,7 @@ pub(super) async fn resolve_dataset_limit(
 mod tests {
     use super::*;
 
+    /// Build a standard four-label style for sampler-selection tests.
     fn multiple_choice_style() -> crate::config::CustomNoCodeStyleConfig {
         crate::config::CustomNoCodeStyleConfig::MultipleChoice {
             choices: crate::config::CustomNoCodeChoiceSource::Column(
@@ -89,6 +94,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Verifies implicit and explicit random models sample only configured choice labels.
     async fn multiple_choice_random_sampler_uses_configured_labels() {
         let style = multiple_choice_style();
         let configured_random = crate::llm::Sampler::Random;
@@ -103,6 +109,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Verifies exact-match runs retain the generic random-text sampler.
     async fn exact_match_random_sampler_remains_alphanumeric() {
         let style = crate::config::CustomNoCodeStyleConfig::ExactMatch {
             golden_column: "answer".to_owned(),

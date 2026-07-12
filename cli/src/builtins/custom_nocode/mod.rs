@@ -126,12 +126,14 @@ mod tests {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
+    /// Verifies the builtin exposes the benchmark name supplied at construction.
     fn builtin_name_returns_configured_name() {
         let builtin = CustomNoCodeBuiltin::new("my-benchmark".to_owned());
         assert_eq!(builtin.name(), "my-benchmark");
     }
 
     #[tokio::test]
+    /// Verifies execution fails before dataset access when the prompt template is invalid.
     async fn execute_rejects_invalid_jinja_template() {
         let tmpdir = tempfile::tempdir().unwrap();
         let root = tmpdir.path();
@@ -178,6 +180,7 @@ mod tests {
     #[expect(clippy::too_many_lines)]
     #[expect(clippy::cast_possible_truncation)]
     #[tokio::test]
+    /// Verifies end-to-end execution, metric persistence, and cached-step reuse.
     async fn execute_records_metrics_and_steps_with_fixture() {
         let server = MockServer::start().await;
         let tmpdir = tempfile::tempdir().unwrap();

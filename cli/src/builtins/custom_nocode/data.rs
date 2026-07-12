@@ -14,6 +14,8 @@ pub(super) struct PreparedRow {
     pub(super) golden: String,
 }
 
+/// Normalize one dataset row into the golden answer and labeled choices required for evaluation.
+/// Exact-match rows have no choices; multiple-choice rows may be deterministically shuffled.
 pub(super) fn prepare_row(
     row_index: usize,
     row: &serde_json::Value,
@@ -92,6 +94,7 @@ pub(super) fn prepare_row(
     }
 }
 
+/// Read multiple-choice values from either a single array/object column or several scalar columns.
 fn extract_choices(
     row_index: usize,
     row: &serde_json::Value,
@@ -142,6 +145,7 @@ fn extract_choices(
     }
 }
 
+/// Resolve the zero-based position of the correct choice using the configured answer source.
 fn resolve_correct_index(
     row_index: usize,
     row: &serde_json::Value,
@@ -210,10 +214,12 @@ fn resolve_correct_index(
     }
 }
 
+/// Extract a scalar field from a row and convert it to its textual representation.
 fn extract_scalar(row: &serde_json::Value, key: &str) -> Option<String> {
     row.get(key).and_then(value_to_scalar)
 }
 
+/// Convert a JSON string, number, or boolean to text, rejecting compound and null values.
 fn value_to_scalar(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::String(value) => Some(value.clone()),
@@ -223,6 +229,7 @@ fn value_to_scalar(value: &serde_json::Value) -> Option<String> {
     }
 }
 
+/// Shuffle values reproducibly using a stable hash of the configured row seed.
 fn deterministic_shuffle<T>(values: &mut [T], seed: &str) {
     for upper in (1..values.len()).rev() {
         let hash = hash_input(&format!("custom-nocode-choice-shuffle-v1:{seed}:{upper}"));
@@ -238,6 +245,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Build a four-label multiple-choice configuration for row-preparation tests.
     fn multiple_choice_config(
         choices: crate::config::CustomNoCodeChoiceSource,
         answer: crate::config::CustomNoCodeAnswerSource,
@@ -251,6 +259,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies object-backed `MedQA` choices and label answers are normalized correctly.
     fn prepares_medqa_object_choices() {
         let config = multiple_choice_config(
             crate::config::CustomNoCodeChoiceSource::Column(
@@ -275,6 +284,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies array-backed MMLU-Pro choices are assigned their configured labels.
     fn prepares_mmlu_pro_array_choices() {
         let config = multiple_choice_config(
             crate::config::CustomNoCodeChoiceSource::Column(
@@ -296,6 +306,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies `MedMCQA`'s separate choice columns and zero-based answer index are supported.
     fn prepares_medmcqa_indexed_choice_columns() {
         let config = multiple_choice_config(
             crate::config::CustomNoCodeChoiceSource::Columns(
@@ -318,6 +329,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies GPQA shuffling is deterministic and preserves the correct choice mapping.
     fn prepares_gpqa_with_deterministic_shuffle() {
         let config = crate::config::CustomNoCodeStyleConfig::MultipleChoice {
             choices: crate::config::CustomNoCodeChoiceSource::Columns(

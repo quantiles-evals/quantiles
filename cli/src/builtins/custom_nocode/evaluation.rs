@@ -28,6 +28,8 @@ pub(super) struct EvaluateRowArgs<'a> {
     pub(super) run_id: i64,
 }
 
+/// Render, sample, score, and record one normalized dataset row.
+/// Returns the style-specific sample result used for aggregate metrics.
 pub(super) async fn evaluate_row(
     benchmark_name: &str,
     args: EvaluateRowArgs<'_>,
@@ -117,6 +119,7 @@ pub(super) async fn evaluate_row(
     })
 }
 
+/// Extract a configured choice label from a direct response or its final few tokens.
 fn extract_choice_label(response: &str, labels: &[String]) -> Option<String> {
     let trimmed = response.trim();
     if let Some(label) = labels
@@ -145,6 +148,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    /// Verifies templates can access arbitrary fields through the `row` variable.
     fn render_template_with_row_variable() {
         let template = "Answer this: {{ row.question }}";
         let env = jinja::Environment::new();
@@ -158,6 +162,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies prompt rendering preserves intentional line boundaries.
     fn render_template_preserves_newlines() {
         let template = "Question:\n{{ row.question }}\nAnswer:";
         let env = jinja::Environment::new();
@@ -171,6 +176,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies direct, formatted, and invalid multiple-choice responses are parsed correctly.
     fn extracts_multiple_choice_labels() {
         let labels = vec!["A".to_owned(), "B".to_owned(), "C".to_owned()];
         assert_eq!(extract_choice_label("B", &labels).as_deref(), Some("B"));

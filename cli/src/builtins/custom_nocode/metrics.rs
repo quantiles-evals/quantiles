@@ -29,12 +29,14 @@ enum SampleResultKind {
 pub(super) struct SampleResult(SampleResultKind);
 
 impl SampleResult {
+    /// Construct an exact-match result from its correctness value.
     pub(super) const fn exact_match(is_correct: bool) -> Self {
         Self(SampleResultKind::ExactMatch(ExactMatchSampleResultParams {
             is_correct,
         }))
     }
 
+    /// Construct a multiple-choice result with its golden and optionally parsed labels.
     pub(super) fn multiple_choice(
         is_correct: bool,
         golden_label: String,
@@ -49,6 +51,7 @@ impl SampleResult {
         ))
     }
 
+    /// Return whether this sample's parsed response matched its golden answer.
     const fn is_correct(&self) -> bool {
         match &self.0 {
             SampleResultKind::ExactMatch(params) => params.is_correct,
@@ -56,6 +59,7 @@ impl SampleResult {
         }
     }
 
+    /// Return whether the response could be parsed for this scoring style.
     const fn response_parsed(&self) -> bool {
         match &self.0 {
             SampleResultKind::ExactMatch(_) => true,
@@ -65,6 +69,7 @@ impl SampleResult {
 }
 
 #[expect(clippy::cast_precision_loss)]
+/// Emit correctness, parsing, latency, and optional classification aggregates for a run.
 pub(super) async fn emit_aggregate_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
@@ -163,6 +168,7 @@ pub(super) async fn emit_aggregate_metrics(
     Ok(())
 }
 
+/// Build a golden-label-by-predicted-label count matrix with a final unparsed column.
 fn build_confusion_matrix(
     results: &[MultipleChoiceSampleResultParams],
     choice_labels: &[String],
@@ -200,6 +206,7 @@ fn build_confusion_matrix(
 }
 
 #[expect(clippy::cast_precision_loss)]
+/// Emit per-label, macro, weighted, and confusion-matrix metrics for multiple-choice results.
 async fn emit_multiple_choice_aggregate_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
@@ -292,6 +299,7 @@ async fn emit_multiple_choice_aggregate_metrics(
     Ok(())
 }
 
+/// Divide two metric values, returning zero when the denominator is effectively zero.
 fn safe_ratio(numerator: f64, denominator: f64) -> f64 {
     if denominator.abs() < f64::EPSILON {
         0.0
@@ -305,6 +313,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// Verifies all aggregate metric families and their expected values are emitted.
     async fn emits_extended_aggregate_metrics() {
         let tmpdir = tempfile::tempdir().unwrap();
         let metrics_store =
