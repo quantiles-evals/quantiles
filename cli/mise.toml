@@ -40,10 +40,16 @@ run = [
 [tasks.run-http-client-example]
 run="cargo run --example http_client"
 
-# build the CLI for ARM Mac, package the binaries, and publish the archives,
-# checksums, and install script to the quantiles-cli R2 bucket
+# build the CLI for ARM Mac and expect a linux binary to be available.
+# then, package both binaries, publish them to R2 and update the stable
+# channel
 [tasks.publish-cli-r2]
 run="bash scripts/publish-cli-r2.sh"
+
+# build the CLI for ARM mac, package the binary, then publish it to R2 and
+# update the beta channel.
+[tasks.publish-cli-r2-beta]
+run="bash scripts/publish-cli-r2-beta.sh"
 
 # upload only the install script to R2; use this when installer logic changes
 # but the already-published CLI release artifact does not need to be rebuilt
