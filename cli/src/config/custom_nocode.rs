@@ -187,7 +187,7 @@ impl CustomNoCodeStyleConfig {
 
 #[expect(
     clippy::trivially_copy_pass_by_ref,
-    reason = "serde skip_serializing_if predicates receive references"
+    reason = "serde skip_serializing_if predicates must receive references"
 )]
 const fn is_zero(value: &usize) -> bool {
     *value == 0
