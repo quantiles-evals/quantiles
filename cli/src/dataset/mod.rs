@@ -14,12 +14,11 @@ pub struct DatasetInfo {
     pub available_splits: Vec<String>,
     pub selected_split: String,
     pub config: String,
-    /// dataset revision requested from the source, such as a branch, tag, or commit.
+    /// Dataset revision requested from the source, such as a branch, tag, or commit.
     ///
     /// If this is passed as `None`, the following behavior applies:
     ///
-    /// - For huggingface datasets, no revision parameter is sent to the API, and HuggingFace
-    /// uses the default revision.
+    /// - For Hugging Face datasets, no revision parameter is sent to the API, and Hugging Face uses the default revision.
     pub revision: Option<String>,
 }
 

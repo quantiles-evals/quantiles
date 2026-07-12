@@ -191,7 +191,7 @@ fn infer_type(values: &[&Value]) -> DataType {
 
 /// Builds an Arrow array from the JSON `values` in a row.
 ///
-/// Returns an ArrayRef specific to the given `dtype`. For example, if `dtype` is passed as `DataType::Boolean`, returns a `BooleanArray`, and if
+/// Returns an `ArrayRef` specific to the given `dtype`. For example, if `dtype` is passed as `DataType::Boolean`, returns a `BooleanArray`, and if
 /// it's passed as `DataType::Utf8`, returns a `StringArray`. If any element in the given `values` array is incompatible with the given `dtype`,
 /// it appears as `Null` in the returned array.
 ///
