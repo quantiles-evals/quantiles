@@ -237,14 +237,14 @@ mod tests {
         assert_eq!(extract_text(&row, "field"), expected.map(String::from));
     }
 
-    #[rstest]
+    #[test]
     fn test_extract_text_missing_key() {
         use serde_json::json;
         let row = json!({ "other": "data" });
         assert_eq!(extract_text(&row, "field"), None);
     }
 
-    #[rstest]
+    #[test]
     fn test_extract_text_non_string_value() {
         use serde_json::json;
         let row = json!({ "field": 42 });
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(a.len(), 16, "hash should be 16 hex chars");
     }
 
-    #[rstest]
+    #[test]
     fn test_hash_input_different_inputs() {
         let a = hash_input("foo");
         let b = hash_input("bar");
@@ -291,7 +291,7 @@ mod tests {
         );
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_single_value() {
         let stats = compute_statistics(&[42.0]);
         assert!((stats.mean - 42.0).abs() < 1e-10);
@@ -302,7 +302,7 @@ mod tests {
         assert!(stats.variance < 1e-10);
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_known_values() {
         let stats = compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0]);
         assert!((stats.mean - 3.0).abs() < 1e-10);
@@ -315,7 +315,7 @@ mod tests {
         assert!(stats.p95 >= stats.median);
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_monotonic_percentiles() {
         let stats = compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
         assert!(stats.min <= stats.p95);
@@ -325,7 +325,6 @@ mod tests {
         assert!(stats.median <= stats.max);
     }
 
-    #[rstest]
     #[tokio::test]
     async fn test_resolve_sampler_uses_default_when_none() {
         let result = resolve_sampler(None, || {
@@ -336,7 +335,6 @@ mod tests {
         assert!(!result.sample("test").await.unwrap().is_empty());
     }
 
-    #[rstest]
     #[tokio::test]
     async fn test_resolve_sampler_resolves_configured_sampler() {
         let sampler = crate::llm::Sampler::Random {};
@@ -348,7 +346,7 @@ mod tests {
         assert!(!result.sample("test").await.unwrap().is_empty());
     }
 
-    #[rstest]
+    #[test]
     fn test_emit_accuracy_metrics_empty() {
         let tmpdir = tempfile::tempdir().unwrap();
         let metrics_store =
@@ -366,7 +364,7 @@ mod tests {
         });
     }
 
-    #[rstest]
+    #[test]
     fn test_emit_accuracy_metrics_all_correct() {
         let tmpdir = tempfile::tempdir().unwrap();
         let metrics_store =
@@ -392,7 +390,7 @@ mod tests {
         });
     }
 
-    #[rstest]
+    #[test]
     fn test_emit_accuracy_metrics_mixed() {
         let tmpdir = tempfile::tempdir().unwrap();
         let metrics_store =
