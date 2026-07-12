@@ -89,7 +89,7 @@ You can pass a TOML table instead of such a prefixed string:
 model = { provider = "openai", model_id = "gpt-5.6" }
 ```
 
-Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in [`cli/examples/configs`](./cli/examples/configs).
+Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in the [provider configuration examples](./cli/examples/configs).
 
 ### `custom_code`
 
@@ -195,4 +195,4 @@ input = { greeting = "world" }
 
 ### Custom evaluation with failure simulation
 
-See [`cli/examples/configs/custom_code/quantiles.toml`](./cli/examples/configs/custom_code/quantiles.toml) for a complete, commented example including a sample Python script.
+See the complete [custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) for an annotated configuration and sample Python script.
