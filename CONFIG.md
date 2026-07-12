@@ -1,21 +1,21 @@
 # Configuration Guide
 
-Quantiles uses a single TOML configuration file in the current working directory to describe how benchmarks and custom evaluations are executed.
+Quantiles uses a single `quantiles.toml` file in the current working directory to configure built-in benchmarks and define custom evaluations. The file specifies how evaluations are loaded and executed, including their datasets, models, prompts, scoring methods, inputs, and runtime settings.
 
-## When you need a config file
+## When a configuration file is needed
 
-You need a config file when you want to do one or more of the following:
+Create or configure a `quantiles.toml` configuration file when you want to do any of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
-- Build custom evaluations without writing or maintaining code (`type = "custom_nocode"` in the `quantiles.toml` configuration file)
-- Build custom evaluations with code (`type = "custom_code"` in the `quantiles.toml` configuration file)
+- Build custom no-code evaluations (`type = "custom_nocode"` in the configuration file)
+- Build custom evaluations with Python code (`type = "custom_code"` in the configuration file)
 - Resume custom evaluations later with `qt resume <run_id>`
 
-You do not need a configuration file to run built-in benchmarks. For example, `qt run pubmedqa` works out of the box.
+> Note: Built-in benchmarks can run without a configuration file using their default settings. For example, `qt run simpleqa-verified` runs the full SimpleQA Verified benchmark with the demo model.
 
 ## File location and name
 
-To configure Quantiles, create either `quantiles.toml` or `.quantiles.toml` in the current working directory. Use only one filename; if both files are present, the CLI exits with an ambiguity error.
+Create either `quantiles.toml` or `.quantiles.toml` in the current working directory to configure Quantiles. Only one configuration file may be present. If both exist, the CLI exits with an ambiguity error.
 
 ## Top-level structure
 
@@ -39,12 +39,12 @@ Every benchmark section has a `type` field. Valid values are `"builtin"` (defaul
 
 Built-in benchmarks run natively inside the CLI, without any custom code. Below is a list of parameters that can be customized for built-in benchmarks:
 
-| Field | Type | Required | Description |
-|--|--|--|--|
-| `type` | string | no | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
-| `samples` | integer | no | Number of dataset rows to evaluate. |
-| `model` | string or table | no | Model sampler. See [model naming](#model-naming) for details. |
-| `max_workers` | integer | no | Maximum concurrent workers. |
+| Field         | Type            | Required | Description                                                      |
+| ------------- | --------------- | -------- | ---------------------------------------------------------------- |
+| `type`        | string          | no       | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
+| `samples`     | integer         | no       | Number of dataset rows to evaluate.                              |
+| `model`       | string or table | no       | Model sampler. See [model naming](#model-naming) for details.    |
+| `max_workers` | integer         | no       | Maximum concurrent workers.                                      |
 
 If none of these fields are customized, the built-in benchmark uses the following defaults:
 
@@ -96,36 +96,36 @@ Run it with:
 qt run nocode_custom
 ```
 
->Note: when you configure `model = "random"` with `"exact_match"` evals will use the built-in sampler that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in sampler will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
+> Note: when you configure `model = "random"` with `"exact_match"` evals will use the built-in sampler that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in sampler will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
 
 The following fields are expected in `custom_nocode` configuration sections:
 
-| Field | Type | Required | Description |
-|--|--|--|--|
-| `type` | string | yes | Must be `"custom_nocode"`. |
-| `style` | table | yes | Scoring style and its style-specific configuration. |
-| `style.type` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
-| `dataset` | table | yes | Hugging Face dataset coordinates. |
-| `dataset.name` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
-| `dataset.config_name` | string | no | Hugging Face dataset configuration or subset. |
-| `dataset.split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
-| `dataset.revision` | string | no | Dataset revision. |
-| `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
-| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
-| `style.golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
-| `style.choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`. |
-| `style.choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
-| `style.choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
-| `style.answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
-| `style.answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
-| `style.answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
-| `style.answer.index_base` | integer | no | Index base for `style.answer.index_column`. Defaults to `0`. |
-| `style.answer.correct_choice_column` | string | conditional | Member of `style.choices.columns` known to contain the correct answer. |
-| `style.choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
-| `style.shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
-| `style.shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present. |
-| `limit` | integer | no | Number of dataset rows to evaluate. |
-| `max_workers` | integer | no | Maximum concurrent workers. |
+| Field                                | Type             | Required    | Description                                                                                                                                       |
+| ------------------------------------ | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`                               | string           | yes         | Must be `"custom_nocode"`.                                                                                                                        |
+| `style`                              | table            | yes         | Scoring style and its style-specific configuration.                                                                                               |
+| `style.type`                         | string           | yes         | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks.                                         |
+| `dataset`                            | table            | yes         | Hugging Face dataset coordinates.                                                                                                                 |
+| `dataset.name`                       | string           | yes         | Dataset identifier, for example `"quantiles/simpleqa-verified"`.                                                                                  |
+| `dataset.config_name`                | string           | no          | Hugging Face dataset configuration or subset.                                                                                                     |
+| `dataset.split`                      | string           | no          | Dataset split. When omitted, Quantiles selects a standard evaluation split.                                                                       |
+| `dataset.revision`                   | string           | no          | Dataset revision.                                                                                                                                 |
+| `model`                              | string or table  | no          | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming).                                                            |
+| `prompt_template_file`               | string           | yes         | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
+| `style.golden_column`                | string           | conditional | Dataset column containing the golden answer. Required for `exact_match`.                                                                          |
+| `style.choices`                      | table            | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`.                        |
+| `style.choices.column`               | string           | conditional | Dataset column containing choices as an array or label-keyed object.                                                                              |
+| `style.choices.columns`              | array of strings | conditional | Dataset columns containing choices in their original order.                                                                                       |
+| `style.answer`                       | table            | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form.                                                  |
+| `style.answer.label_column`          | string           | conditional | Dataset column containing the golden choice label.                                                                                                |
+| `style.answer.index_column`          | string           | conditional | Dataset column containing the golden choice index.                                                                                                |
+| `style.answer.index_base`            | integer          | no          | Index base for `style.answer.index_column`. Defaults to `0`.                                                                                      |
+| `style.answer.correct_choice_column` | string           | conditional | Member of `style.choices.columns` known to contain the correct answer.                                                                            |
+| `style.choice_labels`                | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels.                   |
+| `style.shuffle`                      | table            | no          | Enables deterministic choice shuffling for `multiple_choice`.                                                                                     |
+| `style.shuffle.seed_column`          | string           | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present.                                             |
+| `limit`                              | integer          | no          | Number of dataset rows to evaluate.                                                                                                               |
+| `max_workers`                        | integer          | no          | Maximum concurrent workers.                                                                                                                       |
 
 Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
 
