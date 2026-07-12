@@ -150,24 +150,7 @@ fn assemble_builtin_input(
     }
 }
 
-/// Config input shape for `custom_nocode` benchmarks auto-generated from
-/// `quantiles.toml` `[benchmarks.*]`.
-#[derive(Serialize)]
-struct CustomNoCodeConfigInput<'a> {
-    style: &'a str,
-    dataset: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    model: &'a Option<qt::llm::Sampler>,
-    prompt_template_file: &'a str,
-    prompt_column: &'a str,
-    golden_column: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_workers: Option<usize>,
-}
-
-fn assemble_custom_nocode_input(
+pub(super) fn assemble_custom_nocode_input(
     bench: &qt::config::CustomNoCodeBenchmarkConfig,
     cli_input: Option<&str>,
 ) -> String {
@@ -175,18 +158,7 @@ fn assemble_custom_nocode_input(
         return cli_str.to_owned();
     }
 
-    let input = CustomNoCodeConfigInput {
-        style: "qa",
-        dataset: &bench.dataset,
-        model: &bench.model,
-        prompt_template_file: &bench.qa.prompt_template_file,
-        prompt_column: &bench.qa.prompt_column,
-        golden_column: &bench.qa.golden_column,
-        limit: bench.qa.limit,
-        max_workers: bench.qa.max_workers,
-    };
-
-    serde_json::to_string(&input).expect("infallible serialization")
+    serde_json::to_string(&bench.params).expect("infallible serialization")
 }
 
 fn merge_inputs(
@@ -321,7 +293,7 @@ pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
     } else {
         print_aggregate_metrics_table(&aggregate);
         println!(
-            "\nRun `qt show {} --verbose` for sample-level details.",
+            "\nRun `qt show {} --json` for sample-level details.",
             args.run_id
         );
     }
@@ -755,25 +727,32 @@ mod tests {
     fn assemble_custom_nocode_input_from_config() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            style: qt::config::CustomNoCodeStyle::Qa,
-            dataset: "quantiles/simpleqa-verified".to_owned(),
-            model: Some(qt::llm::Sampler::Random {}),
-            qa: qt::config::CustomNoCodeQaConfig {
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: Some("default".to_owned()),
+                    split: Some("test".to_owned()),
+                    revision: Some("main".to_owned()),
+                },
+                model: Some(qt::llm::Sampler::Random {}),
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                prompt_column: "problem".to_owned(),
-                golden_column: "answer".to_owned(),
                 limit: Some(10),
                 max_workers: Some(4),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, None);
         let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
-        assert_eq!(parsed["style"], "qa");
-        assert_eq!(parsed["dataset"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["style"]["type"], "exact_match");
+        assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["dataset"]["config_name"], "default");
+        assert_eq!(parsed["dataset"]["split"], "test");
+        assert_eq!(parsed["dataset"]["revision"], "main");
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["prompt_template_file"], "prompts/qa.txt");
-        assert_eq!(parsed["prompt_column"], "problem");
-        assert_eq!(parsed["golden_column"], "answer");
+        assert_eq!(parsed["style"]["golden_column"], "answer");
         assert_eq!(parsed["limit"], 10);
         assert_eq!(parsed["max_workers"], 4);
     }
@@ -784,15 +763,20 @@ mod tests {
     fn assemble_custom_nocode_input_omits_none_fields() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            style: qt::config::CustomNoCodeStyle::Qa,
-            dataset: "quantiles/simpleqa-verified".to_owned(),
-            model: None,
-            qa: qt::config::CustomNoCodeQaConfig {
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                prompt_column: "problem".to_owned(),
-                golden_column: "answer".to_owned(),
                 limit: None,
                 max_workers: None,
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, None);
@@ -808,15 +792,20 @@ mod tests {
     fn assemble_custom_nocode_input_with_cli_override() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
             type_: "custom_nocode".to_owned(),
-            style: qt::config::CustomNoCodeStyle::Qa,
-            dataset: "quantiles/simpleqa-verified".to_owned(),
-            model: None,
-            qa: qt::config::CustomNoCodeQaConfig {
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                prompt_column: "problem".to_owned(),
-                golden_column: "answer".to_owned(),
                 limit: None,
                 max_workers: None,
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
             },
         };
         let input = super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":5}"#));

@@ -17,9 +17,12 @@ pub struct RandomLabelSampler {
 
 impl RandomLabelSampler {
     #[must_use]
-    pub(crate) fn new(labels: &[&str]) -> Self {
+    pub(crate) fn new<S: AsRef<str>>(labels: &[S]) -> Self {
         Self {
-            labels: labels.iter().map(|&s| s.to_string()).collect(),
+            labels: labels
+                .iter()
+                .map(|label| label.as_ref().to_owned())
+                .collect(),
         }
     }
 }

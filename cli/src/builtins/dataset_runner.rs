@@ -81,7 +81,7 @@ impl<'a> DatasetRunner<'a> {
                     &self.info.selected_split,
                     offset,
                     batch_limit,
-                    None,
+                    self.info.revision.as_deref(),
                 )
                 .await?;
 
@@ -143,6 +143,7 @@ mod tests {
             available_splits: vec![split.to_string()],
             selected_split: split.to_string(),
             config: config.to_string(),
+            revision: None,
         }
     }
 

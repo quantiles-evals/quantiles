@@ -14,6 +14,12 @@ pub struct DatasetInfo {
     pub available_splits: Vec<String>,
     pub selected_split: String,
     pub config: String,
+    /// Dataset revision requested from the source, such as a branch, tag, or commit.
+    ///
+    /// If this is passed as `None`, the following behavior applies:
+    ///
+    /// - For Hugging Face datasets, no revision parameter is sent to the API, and Hugging Face uses the default revision.
+    pub revision: Option<String>,
 }
 
 /// Central manager that coordinates fetching from huggingface and local caching.
@@ -105,6 +111,7 @@ impl DatasetManager {
             available_splits: splits,
             selected_split,
             config,
+            revision: revision.map(str::to_owned),
         })
     }
 

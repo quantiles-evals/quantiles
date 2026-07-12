@@ -13,7 +13,7 @@ use crate::llm::Sampler;
 pub enum BenchmarkConfig {
     Builtin(BuiltinBenchmarkConfig),
     CustomCode(CustomCodeBenchmarkConfig),
-    CustomNoCode(CustomNoCodeBenchmarkConfig),
+    CustomNoCode(Box<CustomNoCodeBenchmarkConfig>),
 }
 
 impl BenchmarkConfig {
@@ -32,12 +32,13 @@ impl BenchmarkConfig {
                 Ok(())
             }
             BenchmarkConfig::CustomNoCode(c) => {
-                if !std::path::Path::new(&c.qa.prompt_template_file).is_file() {
+                if !std::path::Path::new(&c.params.prompt_template_file).is_file() {
                     bail!(
                         "custom_nocode benchmark config `prompt_template_file` must point to an existing file. File `{}` was not found",
-                        c.qa.prompt_template_file
+                        c.params.prompt_template_file
                     );
                 }
+                c.params.style.validate()?;
                 Ok(())
             }
         }
@@ -69,7 +70,7 @@ impl<'de> Deserialize<'de> for BenchmarkConfig {
                         "failed to deserialize custom_nocode benchmark config: {e}"
                     ))
                 })?;
-                Ok(BenchmarkConfig::CustomNoCode(config))
+                Ok(BenchmarkConfig::CustomNoCode(Box::new(config)))
             }
             Some("builtin") | None => {
                 let config = BuiltinBenchmarkConfig::deserialize(value).map_err(|e| {

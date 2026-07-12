@@ -184,6 +184,33 @@ impl MetricsStore {
         self.query_metrics(run_id, true).await
     }
 
+    /// Return sample-level values for one metric from persisted and currently buffered points.
+    /// Aggregate points with the same name are excluded.
+    pub(crate) async fn sample_metric_values(
+        &self,
+        run_id: i64,
+        metric_name: &str,
+    ) -> Result<Vec<f64>> {
+        let mut values: Vec<f64> = self
+            .list_for_run(run_id)
+            .await?
+            .into_iter()
+            .filter(|metric| metric.step_id.is_some() && metric.metric_name.as_str() == metric_name)
+            .map(|metric| metric.metric_value)
+            .collect();
+
+        let buffer = self.buffer.lock().await;
+        values.extend(
+            buffer
+                .get(&run_id)
+                .into_iter()
+                .flatten()
+                .filter(|metric| metric.step_id.is_some() && metric.metric_name == metric_name)
+                .map(|metric| metric.metric_value),
+        );
+        Ok(values)
+    }
+
     async fn query_metrics(
         &self,
         run_id: i64,
@@ -322,6 +349,32 @@ mod tests {
 
         let metrics = store.list_for_run(9999).await?;
         assert!(metrics.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sample_metric_values_combines_persisted_and_buffered_points() -> Result<()> {
+        let tmpdir = tempfile::tempdir()?;
+        let root = tmpdir.path();
+        init_workspace(root).await?;
+        let db = open_workspace(root).await?;
+        let store = MetricsStore::new(crate::db::metrics_dir(root))?;
+
+        let run_id = create_run(&db, "demo", None).await?;
+        store
+            .emit(run_id, Some(1), "latency_ms", 10.0, Some("ms"))
+            .await;
+        store
+            .emit(run_id, None, "latency_ms", 999.0, Some("ms"))
+            .await;
+        store.flush(run_id).await?;
+        store
+            .emit(run_id, Some(2), "latency_ms", 20.0, Some("ms"))
+            .await;
+
+        let values = store.sample_metric_values(run_id, "latency_ms").await?;
+        assert_eq!(values, vec![10.0, 20.0]);
 
         Ok(())
     }

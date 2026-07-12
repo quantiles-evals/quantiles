@@ -7,8 +7,8 @@ Quantiles uses a single TOML configuration file in the current working directory
 You need a config file when you want to do one or more of the following:
 
 - Override built-in benchmark defaults (e.g. model, sample limit)
-- Define custom evaluations (`type = "custom_code"`)
-- Define no-code QA benchmarks (`type = "custom_nocode"`, `style = "qa"`)
+- Build custom evaluations without writing or maintaining code (`type = "custom_nocode"` in the `quantiles.toml` configuration file)
+- Build custom evaluations with code (`type = "custom_code"` in the `quantiles.toml` configuration file)
 - Resume custom evaluations later with `qt resume <run_id>`
 
 You don't, however, need any configuration when you want to run built-in benchmarks. `qt run pubmedqa`, for example, works out of the box.
@@ -100,17 +100,15 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_nocode`
 
-No-code benchmarks are configured in TOML and run natively inside the CLI, without a custom Python or TypeScript evaluation program. The initial supported style is `qa`, which renders a prompt from a dataset row, calls a model, and scores the response with exact-match accuracy against the configured golden answer column.
+No-code evals are configured in `quantiles.toml` and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
 
 ```toml
 [benchmarks.nocode_custom]
 type = "custom_nocode"
-style = "qa"
-dataset = "quantiles/simpleqa-verified"
+style = { type = "exact_match", golden_column = "answer" }
+dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-prompt_column = "problem"
-golden_column = "answer"
 limit = 10
 ```
 
@@ -120,19 +118,78 @@ Run it with:
 qt run nocode_custom
 ```
 
-For a complete minimal example, see [`custom-nocode-examples/quantiles.toml`](./custom-nocode-examples/quantiles.toml).
+>Note: when you configure `model = "random"` with `"exact_match"` evals will use the built-in sampler that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in sampler will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
+
+The following fields are expected in `custom_nocode` configuration sections:
 
 | Field | Type | Required | Description |
 |--|--|--|--|
 | `type` | string | yes | Must be `"custom_nocode"`. |
-| `style` | string | yes | Must be `"qa"`. |
-| `dataset` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `style` | table | yes | Scoring style and its style-specific configuration. |
+| `style.type` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
+| `dataset` | table | yes | Hugging Face dataset coordinates. |
+| `dataset.name` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `dataset.config_name` | string | no | Hugging Face dataset configuration or subset. |
+| `dataset.split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
+| `dataset.revision` | string | no | Dataset revision. |
 | `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
-| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives `prompt` from the configured prompt column. |
-| `prompt_column` | string | yes | Dataset column containing the prompt text. |
-| `golden_column` | string | yes | Dataset column containing the golden answer. |
+| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
+| `style.golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
+| `style.choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`. |
+| `style.choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
+| `style.choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
+| `style.answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
+| `style.answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
+| `style.answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
+| `style.answer.index_base` | integer | no | Index base for `style.answer.index_column`. Defaults to `0`. |
+| `style.answer.correct_choice_column` | string | conditional | Member of `style.choices.columns` known to contain the correct answer. |
+| `style.choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
+| `style.shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
+| `style.shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present. |
 | `limit` | integer | no | Number of dataset rows to evaluate. |
 | `max_workers` | integer | no | Maximum concurrent workers. |
+
+Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
+
+Each run emits these aggregate metrics:
+
+- `accuracy`, `correct_count`, `incorrect_count`, and `total_count`
+- `parsed_response_count`, `unparsed_response_count`, and `parse_rate`
+- `mean_latency_ms`, `median_latency_ms`, `p95_latency_ms`, `p99_latency_ms`, `min_latency_ms`, and `max_latency_ms`
+
+Multiple-choice runs also emit the following aggregate metrics:
+
+- `macro_precision`, `macro_recall`, and `macro_f1` are the arithmetic means of the corresponding per-label metrics. Every configured label has equal weight, regardless of how often it appears as the golden answer.
+- `weighted_precision`, `weighted_recall`, and `weighted_f1` average the corresponding per-label metrics using each label's golden-answer support (e.g. the number of samples whose correct/"golden" answer is that label). These metrics therefore account for imbalanced label frequencies.
+- Per-label `precision_label_N`, `recall_label_N`, and `f1_label_N` evaluate label `N` as the positive class against all other labels. `support_label_N` is the number of samples whose golden answer is that label, and `N` is the label's index in `style.choice_labels`.
+- `confusion_matrix_G_P` is the number of samples whose golden label has index `G` and whose parsed prediction has index `P`. These cells form the parsed-label columns of the run's confusion matrix.
+- `confusion_matrix_G_unparsed` is the number of samples whose golden label has index `G` but whose response could not be parsed as a configured label. These cells form the confusion matrix's additional unparsed-prediction column.
+
+Precision, recall, and F1 use `0` when their denominator is zero. The confusion matrix uses golden labels as rows and predicted labels, plus the unparsed bucket, as columns.
+
+Multiple-choice configuration keeps its choice and answer sources inside `style`:
+
+```toml
+[benchmarks.medqa]
+type = "custom_nocode"
+style = { type = "multiple_choice", choices = { column = "options" }, choice_labels = ["A", "B", "C", "D"], answer = { label_column = "answer_idx" } }
+dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
+model = "random"
+prompt_template_file = "prompts/medqa.txt"
+limit = 10
+```
+
+Templates access dataset fields directly. A multiple-choice template can iterate the normalized choices:
+
+```jinja
+{{ row.question }}
+
+{% for choice in choices %}
+{{ choice.label }}. {{ choice.text }}
+{% endfor %}
+```
+
+See [the `quantiles.toml` sample configuration file](./custom-nocode-examples/quantiles.toml) for examples of real, published benchmarks built with `custom_nocode` sections.
 
 ### `custom_code`
 
