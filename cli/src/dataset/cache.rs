@@ -135,10 +135,10 @@ fn json_to_arrow(rows: &[Value]) -> Result<RecordBatch> {
             .map(|r| r.get(&key).unwrap_or(&Value::Null))
             .collect();
         let dtype = infer_type(&values);
-        let mut field = Field::new(key.clone(), dtype.clone(), true);
         let json_encoded = values
             .iter()
             .any(|value| matches!(value, Value::Array(_) | Value::Object(_)));
+        let mut field = Field::new(key.clone(), dtype.clone(), true);
         if json_encoded {
             field = field.with_metadata(HashMap::from([(
                 JSON_ENCODED_METADATA_KEY.to_owned(),
