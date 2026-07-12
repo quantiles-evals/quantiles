@@ -77,7 +77,7 @@ For dataset-backed QA checks that do not need custom evaluation code, set `type 
 
 With `model = "random"`, exact-match benchmarks generate demo random text and multiple-choice benchmarks uniformly select from `style.choice_labels`.
 
-Samples emit correctness, response-parsing, and latency metrics. Runs aggregate accuracy and counts, parse success, and mean, median, p95, p99, minimum, and maximum latency.
+Samples emit correctness, response-parsing, and latency metrics. Runs aggregate accuracy and counts, parse success, and mean, median, p95, p99, minimum, and maximum latency. Multiple-choice runs additionally emit macro, weighted, and per-label precision, recall, and F1 metrics, plus confusion-matrix cells indexed by `style.choice_labels` with an explicit unparsed-response column.
 
 ```toml
 [benchmarks.nocode_custom]
