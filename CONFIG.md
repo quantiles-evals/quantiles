@@ -1,8 +1,10 @@
 # Configuration Guide
 
-Quantiles uses a single `quantiles.toml` file in the current working directory to configure built-in benchmarks and define custom evaluations. The file specifies how evaluations are loaded and executed, including their datasets, models, prompts, scoring methods, inputs, and runtime settings.
+Quantiles uses a single `quantiles.toml` or `.quantiles.toml` file in the current working directory to configure built-in benchmarks and define custom evaluations. The file specifies how evaluations are loaded and executed, including their datasets, models, prompts, scoring methods, inputs, and runtime settings.
 
-## When a configuration file is needed
+> Only one of the two filenames can exist in the same directory. If both exist, the CLI will exit with an error.
+
+## When to use a configuration file
 
 Create or configure a `quantiles.toml` configuration file when you want to do any of the following:
 
@@ -21,7 +23,7 @@ Create either `quantiles.toml` or `.quantiles.toml` in the current working direc
 
 Every benchmark lives under its own `[benchmarks.<eval_name>]` section. The section name is the eval name that you will pass to `qt run <eval_name>`.
 
-For example, if you want to override default parameters for the built-in PubMedQA benchmark, add the following section to your config file:
+For example, if you want to override default parameters for the built-in PubMedQA benchmark, add the following section to your configuration file:
 
 ```toml
 # Configure the model and sample limit for the built-in PubMedQA benchmark.
@@ -31,9 +33,9 @@ samples = 50
 model = "openai:gpt-5.6"
 ```
 
-## Benchmark types
+## Evaluation types
 
-Every benchmark section has a `type` field. Valid values are `"builtin"` (default when absent), `"custom_code"`, and `"custom_nocode"`.
+Every evaluation section has a `type` field. Valid values are `"builtin"` (default when absent), `"custom_code"`, and `"custom_nocode"`.
 
 ### `builtin`
 
@@ -78,7 +80,7 @@ Note that models require specific configuration based on the provider. For detai
 
 ### `custom_nocode`
 
-No-code evals are configured in `quantiles.toml` and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
+Custom no-code evaluations are configured in `quantiles.toml` and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
 
 ```toml
 [benchmarks.nocode_custom]
@@ -96,7 +98,7 @@ Run it with:
 qt run nocode_custom
 ```
 
-> Note: when you configure `model = "random"` with `"exact_match"` evals will use the built-in sampler that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in sampler will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
+> Note: When you configure `model = "random"` with `"exact_match"`, evals will use the built-in model that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in model will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
 
 The following fields are expected in `custom_nocode` configuration sections:
 
@@ -179,11 +181,11 @@ Custom evaluations are external programs built with the Quantiles Python SDK. Th
 | `command` | array of strings | yes      | Command and arguments to execute.                          |
 | `input`   | table            | no       | Structured input passed to the child as `QUANTILES_INPUT`. |
 
-Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` benchmarks.
+Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` evaluations.
 
 #### The `input` table
 
-For `custom_code` benchmarks, `input` is an arbitrary TOML table that becomes a Python `dict` in your custom eval:
+For `custom_code` evaluations, `input` is an arbitrary TOML table that becomes a Python `dict` in your custom eval:
 
 ```toml
 [benchmarks.my-eval]
@@ -210,16 +212,16 @@ This produces:
 
 #### CLI `--input` overrides
 
-You can override or extend config input at runtime:
+Pass `--input` to override or extend the configured inputs at runtime. These values are not persisted and apply only to the current `qt run` invocation. Define recurring inputs in `quantiles.toml`.
 
 ```bash
-qt run my-eval --input '{"max_samples":50}'
+qt run my-eval --input '{"model":"openai:gpt-5.6"}'
 ```
 
 The CLI merges the `--input` JSON object into the config `input` table. If a key exists in both, the CLI value wins and a warning is printed:
 
 ```
-Warning: --input overrides config input for keys: max_samples
+Warning: --input overrides config input for keys: model
 ```
 
 In `--json` mode, the warning is included in the JSON output under the `warning` key.
@@ -234,11 +236,35 @@ The CLI validates benchmark configs before execution:
   - They may not contain `builtin`-only fields like `samples` or `model`.
 - The `type` field must be set to `builtin` or `custom_code`.
 
+## Config validation
+
+The CLI validates benchmark configs before execution:
+
+- `built-in` sections:
+  - May not contain `command` or `input` fields.
+  - May include built-in fields such as `samples`, `model`, and `max_workers`.
+
+- `custom_code` sections:
+  - The `type` field must be set `custom_code`.
+  - Must have a non-empty `command` array.
+  - May not contain built-in-only fields such as `samples` or `model`.
+
+- `custom_nocode` sections:
+  - The `type` field must be set to `custom_nocode`.
+  - Must include `dataset`, `style`, and `prompt_template_file`.
+  - `prompt_template_file` must point to an existing file.
+  - Must use a supported style: `exact_match` or `multiple_choice`.
+  - `exact_match` requires a non-empty `golden_column`.
+  - `multiple_choice` requires a valid choice source, answer source, and a non-empty list of unique `choice_labels`.
+  - May not contain `command`, `input`, or other unsupported fields.
+
+> For custom evaluations, explicitly set the `type` field. If omitted, type defaults to `builtin`.
+
 Validation failures produce clear error messages before any run is created.
 
-## `qt resume` and the config file
+## `qt resume` and the configuration file
 
-When you run `qt resume <run_id>`, the CLI looks up the stored eval name and input from the database, then re-reads the command from the current config file. This means:
+When you run `qt resume <run_id>`, the CLI looks up the stored evaluation name and input from the database, then re-reads the command from the current config file. This means:
 
 - `qt resume` provides no `--input` flag, and you do not need to re-submit input parameters on resume.
 - If you edited the config file between `qt run` and `qt resume`, the resumed run uses the _updated_ command.
@@ -246,24 +272,35 @@ When you run `qt resume <run_id>`, the CLI looks up the stored eval name and inp
 
 ## Complete examples
 
-### Built-in with model override
+### Built-in benchmark with model override
 
 ```toml
 [benchmarks.pubmedqa]
 model = "openai:gpt-5.6"
 ```
 
-### Built-in using the demo model with a sample limit
+### Built-in benchmark using the demo model with a sample limit
 
 ```toml
 [benchmarks.simpleqa-verified]
 samples = 10
 ```
 
-### Custom evaluation
+### Custom no-code evaluation
 
 ```toml
-[benchmarks.hello]
+[benchmarks.custom_nocode_eval]
+type = "custom_nocode"
+style = { type = "exact_match", golden_column = "answer" }
+dataset = { name = "quantiles/custom-nocode-dataset" }
+model = "openai:gpt-5.6"
+prompt_template_file = "prompts/custom_nocode_prompt.txt"
+```
+
+### Custom code evaluation
+
+```toml
+[benchmarks.custom_code_eval]
 type = "custom_code"
 command = ["python3", "hello.py"]
 input = { greeting = "world" }
