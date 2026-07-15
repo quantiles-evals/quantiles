@@ -17,7 +17,7 @@ Create or configure a `quantiles.toml` configuration file when you want to do an
 
 ## File location and name
 
-Create either `quantiles.toml` or `.quantiles.toml` in the current working directory to configure Quantiles. Only one configuration file may be present. If both exist, the CLI exits with an ambiguity error.
+The qt CLI looks for either quantiles.toml or .quantiles.toml in the current working directory. If neither exists, it searches ancestor directories and uses the first matching file it finds. The `qt` CLI looks for either `quantiles.toml` or `.quantiles.toml` in the current working directory. If neither exists, it searches ancestor directories and uses the first matching file it finds. To configure Quantiles for your project, we recommend adding one of these files to the project's working directory.
 
 ## Top-level structure
 
