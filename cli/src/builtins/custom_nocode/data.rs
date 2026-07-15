@@ -104,7 +104,7 @@ enum IndexValue {
 ///
 /// Ensures that evaluation logic can't confuse exact-match and multiple-choice row data.
 ///
-/// NOTE: there is near-duplicated code in builtins/custom_nocode/metrics.rs, but it's used
+/// NOTE: there is near-duplicated code in `builtins/custom_nocode/metrics.rs`, but it's used
 /// for metrics, so it makes some sense to not build and share custom structs to hold
 /// these data.
 #[derive(Debug)]
