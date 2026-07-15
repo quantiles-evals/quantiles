@@ -35,25 +35,22 @@ model = "openai:gpt-5.6"
 
 ## Evaluation types
 
-Every evaluation section has a `type` field. Valid values are `"builtin"` (default when absent), `"custom_code"`, and `"custom_nocode"`.
+Every evaluation section has an optional `type` field. Valid values are as listed below:
+
+- `"builtin"` (default)
+- `"custom_code"` - write your custom evaluation in Python, using the [Python SDK](https://quantiles.io/documentation/reference/python-sdk)
+- `"custom_nocode"` - build a custom evaluation completely from inside the configuration file, without writing or maintaining any code
 
 ### `builtin`
 
 Built-in benchmarks run natively inside the CLI, without any custom code. Below is a list of parameters that can be customized for built-in benchmarks:
 
-| Field         | Type            | Required | Description                                                      |
-| ------------- | --------------- | -------- | ---------------------------------------------------------------- |
-| `type`        | string          | no       | Defaults to `"builtin"`. May be omitted for built-in benchmarks. |
-| `samples`     | integer         | no       | Number of dataset rows to evaluate.                              |
-| `model`       | string or table | no       | Model sampler. See [model naming](#model-naming) for details.    |
-| `max_workers` | integer         | no       | Maximum concurrent workers.                                      |
-
-If none of these fields are customized, the built-in benchmark uses the following defaults:
-
-- `type`: `builtin`
-- `samples`: All samples available in the benchmark's dataset, in order
-- `model`: The "demo" model, which outputs random values
-- `max_workers`: The default parallelism provided by the Rust [Tokio runtime](https://tokio.rs/)
+| Field | Type | Required | Description | Default |
+| --- | --- | --- | --- | --- |
+| `type` | string | no | The type of the benchmark. See above for valid values. | `builtin` |
+| `samples` | integer | no | Number of dataset rows to evaluate. | All samples avaliable in the benchmark's dataset in the order they appear |
+| `model` | string or table | no | The model to use. See [model naming](#model-naming) for details on configuring your model | `random` (the built-in random sampler) |
+| `max_workers` | integer | no | Maximum concurrent workers. | The default parallelism provided by the Rust [Tokio runtime](https://tokio.rs/) |
 
 #### `model` naming
 
@@ -63,27 +60,27 @@ The `model` field described above accepts a provider-prefixed string, for exampl
 model = "openai:gpt-5.6"
 ```
 
-Supported provider prefixes are listed below:
+Supported provider prefixes are:
 
 - `openai:`
 - `anthropic:`
 - `gemini:`
 - `cloudflare:`
 
-You can pass a TOML table instead of such a prefixed string:
+We recommend using the compound string, but if needed, you can pass a TOML table to describe your model:
 
 ```toml
 model = { provider = "openai", model_id = "gpt-5.6" }
 ```
 
-Note that models require specific configuration based on the provider. For details, see the `quantiles.toml` file under the provider of your choice in the [provider configuration examples](./cli/examples/configs).
+Most models require specific configuration based on the provider. For provider-specific details, see the `quantiles.toml` file under the provider of your choice in the [provider configuration examples](./cli/examples/configs).
 
-### `custom_nocode`
+### `custom_nocode` Evaluations
 
-Custom no-code evaluations are configured in `quantiles.toml` and run natively inside the CLI, without any custom Python code. These evals are defined with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column.
+Custom no-code run natively inside the CLI and are configured in `quantiles.toml`. They do not require any custom Python code. Define one of these evaluations with `type = "custom_nocode"` and a `style` parameter. The `style = "exact_match"` configuration creates an eval that scores an open answer or label against a golden answer column. The `style = "multiple_choice"` configuration normalizes choices, extracts the selected label from the response, and scores it against a configured label, index, or correct-choice column. Below is an example of an `exact_match` no-code evaluation:
 
 ```toml
-[benchmarks.nocode_custom]
+[benchmarks.my_custom_nocode_eval]
 type = "custom_nocode"
 style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
@@ -95,39 +92,39 @@ limit = 10
 Run it with:
 
 ```bash
-qt run nocode_custom
+qt run my_custom_nocode_eval
 ```
 
-> Note: When you configure `model = "random"` with `"exact_match"`, evals will use the built-in model that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in model will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
+>Note: When you configure `model = "random"` with `"exact_match"`, evals will use the built-in model that generates random text, so you'll likely to get very low accuracy numbers. Similarly, when you configure `model = "random"` with `multiple_choice` evals, the built-in model will uniformly sample from one of the the configured `style.choice_labels`, so you can expect higher accuracies than with `exact_match`. In both cases, `model = "random" is intended for testing your benchmark.
 
 The following fields are expected in `custom_nocode` configuration sections:
 
-| Field                                | Type             | Required    | Description                                                                                                                                       |
-| ------------------------------------ | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`                               | string           | yes         | Must be `"custom_nocode"`.                                                                                                                        |
-| `style`                              | table            | yes         | Scoring style and its style-specific configuration.                                                                                               |
-| `style.type`                         | string           | yes         | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks.                                         |
-| `dataset`                            | table            | yes         | Hugging Face dataset coordinates.                                                                                                                 |
-| `dataset.name`                       | string           | yes         | Dataset identifier, for example `"quantiles/simpleqa-verified"`.                                                                                  |
-| `dataset.config_name`                | string           | no          | Hugging Face dataset configuration or subset.                                                                                                     |
-| `dataset.split`                      | string           | no          | Dataset split. When omitted, Quantiles selects a standard evaluation split.                                                                       |
-| `dataset.revision`                   | string           | no          | Dataset revision.                                                                                                                                 |
-| `model`                              | string or table  | no          | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming).                                                            |
-| `prompt_template_file`               | string           | yes         | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
-| `style.golden_column`                | string           | conditional | Dataset column containing the golden answer. Required for `exact_match`.                                                                          |
-| `style.choices`                      | table            | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`.                        |
-| `style.choices.column`               | string           | conditional | Dataset column containing choices as an array or label-keyed object.                                                                              |
-| `style.choices.columns`              | array of strings | conditional | Dataset columns containing choices in their original order.                                                                                       |
-| `style.answer`                       | table            | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form.                                                  |
-| `style.answer.label_column`          | string           | conditional | Dataset column containing the golden choice label.                                                                                                |
-| `style.answer.index_column`          | string           | conditional | Dataset column containing the golden choice index.                                                                                                |
-| `style.answer.index_base`            | integer          | no          | Index base for `style.answer.index_column`. Defaults to `0`.                                                                                      |
-| `style.answer.correct_choice_column` | string           | conditional | Member of `style.choices.columns` known to contain the correct answer.                                                                            |
-| `style.choice_labels`                | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels.                   |
-| `style.shuffle`                      | table            | no          | Enables deterministic choice shuffling for `multiple_choice`.                                                                                     |
-| `style.shuffle.seed_column`          | string           | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present.                                             |
-| `limit`                              | integer          | no          | Number of dataset rows to evaluate.                                                                                                               |
-| `max_workers`                        | integer          | no          | Maximum concurrent workers.                                                                                                                       |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | yes | Must be `"custom_nocode"`. |
+| `style` | table | yes | Scoring style and its style-specific configuration. |
+| `style.type` | string | yes | `"exact_match"` for open-answer or label exact match, or `"multiple_choice"` for choice-based benchmarks. |
+| `dataset` | table | yes | Hugging Face dataset coordinates. |
+| `dataset.name` | string | yes | Dataset identifier, for example `"quantiles/simpleqa-verified"`. |
+| `dataset.config_name` | string | no | Hugging Face dataset configuration or subset. |
+| `dataset.split` | string | no | Dataset split. When omitted, Quantiles selects a standard evaluation split. |
+| `dataset.revision` | string | no | Dataset revision. |
+| `model` | string or table | no | Model sampler. Defaults to the demo random sampler. See [model naming](#model-naming). |
+| `prompt_template_file` | string | yes | Path to a Jinja prompt template file. The template receives the complete dataset `row` and, for multiple-choice benchmarks, normalized `choices`. |
+| `style.golden_column` | string | conditional | Dataset column containing the golden answer. Required for `exact_match`. |
+| `style.choices` | table | conditional | Choice source. Required for `multiple_choice`. Configure exactly one of `style.choices.column` or `style.choices.columns`. |
+| `style.choices.column` | string | conditional | Dataset column containing choices as an array or label-keyed object. |
+| `style.choices.columns` | array of strings | conditional | Dataset columns containing choices in their original order. |
+| `style.answer` | table | conditional | Correct-answer source. Required for `multiple_choice`. Configure exactly one answer-source form. |
+| `style.answer.label_column` | string | conditional | Dataset column containing the golden choice label. |
+| `style.answer.index_column` | string | conditional | Dataset column containing the golden choice index. |
+| `style.answer.index_base` | integer | no | Index base for `style.answer.index_column`. Defaults to `0`. |
+| `style.answer.correct_choice_column` | string | conditional | Member of `style.choices.columns` known to contain the correct answer. |
+| `style.choice_labels` | array of strings | conditional | Labels assigned to choices in order. Required for multiple choice; array-backed rows may use a prefix of the configured labels. |
+| `style.shuffle` | table | no | Enables deterministic choice shuffling for `multiple_choice`. |
+| `style.shuffle.seed_column` | string | conditional | Stable row identifier used to seed deterministic shuffling. Required when `style.shuffle` is present. |
+| `limit` | integer | no | Number of dataset rows to evaluate. |
+| `max_workers` | integer | no | Maximum concurrent workers. |
 
 Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
 
@@ -173,22 +170,21 @@ See [the `quantiles.toml` sample configuration file](./custom-nocode-examples/qu
 
 ### `custom_code`
 
-Custom evaluations are external programs built with the Quantiles Python SDK. Their config sections contain the following fields:
+Custom evaluations are external programs built with the [Quantiles Python SDK](https://quantiles.io/documentation/reference/python-sdk). Their configuration sections contain the following fields:
 
-| Field     | Type             | Required | Description                                                |
-| --------- | ---------------- | -------- | ---------------------------------------------------------- |
-| `type`    | string           | yes      | Must be `"custom_code"`.                                   |
-| `command` | array of strings | yes      | Command and arguments to execute.                          |
-| `input`   | table            | no       | Structured input passed to the child as `QUANTILES_INPUT`. |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | yes | Must be `"custom_code"`. |
+| `command` | array of strings | yes | Command and arguments to execute. |
+| `input` | table | no | Structured input passed to your code in the `QUANTILES_INPUT`. environment variable |
 
-Note that custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` evaluations.
+Custom code evaluations can customize the model in code. See the [PubMedQA custom code example](./python-examples/src/pubmedqa.py) for details on customizing the model in `custom_code` 
+evaluations.
 
-#### The `input` table
-
-For `custom_code` evaluations, `input` is an arbitrary TOML table that becomes a Python `dict` in your custom eval:
+Below is an example of a `custom_code` evaluation in the configuration file:
 
 ```toml
-[benchmarks.my-eval]
+[benchmarks.my-custom-eval]
 type = "custom_code"
 command = ["python", "eval.py"]
 input = {
@@ -198,9 +194,29 @@ input = {
 }
 ```
 
-This produces:
+Run it with:
 
-```json
+```shell
+qt run my-custom-eval
+```
+
+
+#### The `input` table
+
+For `custom_code` evaluations, `input` is an arbitrary TOML table that becomes a Python `dict` in your custom eval. In the example from the previous section, the following input was defined:
+
+
+```toml
+input = {
+    dataset = "my_data.jsonl",
+    max_samples = 100,
+    nested = { foo = "bar" }
+}
+```
+
+Given these inputs, your Python code would be passed a dictionary that looks like the following:
+
+```python
 {
   "dataset": "my_data.jsonl",
   "max_samples": 100,
@@ -212,13 +228,13 @@ This produces:
 
 #### CLI `--input` overrides
 
-Pass `--input` to override or extend the configured inputs at runtime. These values are not persisted and apply only to the current `qt run` invocation. Define recurring inputs in `quantiles.toml`.
+You can pass an `--input` flag to `qt run` to override or extend configured inputs at runtime. These values are persisted to the local database but not written to the configuration file. They apply only to the current `qt run` invocation, so we recommend that you define inputs that should apply to all runs in your `quantiles.toml` file. Below is an example showing how to use the `--input` flag to override the model to use:
 
 ```bash
 qt run my-eval --input '{"model":"openai:gpt-5.6"}'
 ```
 
-The CLI merges the `--input` JSON object into the config `input` table. If a key exists in both, the CLI value wins and a warning is printed:
+The CLI merges the `--input` JSON object into the configuration file's`input` table. If a key exists in both, the CLI value wins and a warning is printed that looks like the following:
 
 ```
 Warning: --input overrides config input for keys: model
@@ -226,39 +242,25 @@ Warning: --input overrides config input for keys: model
 
 In `--json` mode, the warning is included in the JSON output under the `warning` key.
 
-## Config validation
+## Configuration validation
 
-The CLI validates benchmark configs before execution:
-
-- `builtin` sections may not contain `command` or `input` fields.
-- `custom_code` sections must adhere to the following rules:
-  - They must have a non-empty `command` array.
-  - They may not contain `builtin`-only fields like `samples` or `model`.
-- The `type` field must be set to `builtin` or `custom_code`.
-
-## Config validation
-
-The CLI validates benchmark configs before execution:
+The CLI validates benchmark configuration sections before execution:
 
 - `built-in` sections:
   - May not contain `command` or `input` fields.
   - May include built-in fields such as `samples`, `model`, and `max_workers`.
 
 - `custom_code` sections:
-  - The `type` field must be set `custom_code`.
   - Must have a non-empty `command` array.
   - May not contain built-in-only fields such as `samples` or `model`.
 
 - `custom_nocode` sections:
-  - The `type` field must be set to `custom_nocode`.
   - Must include `dataset`, `style`, and `prompt_template_file`.
   - `prompt_template_file` must point to an existing file.
-  - Must use a supported style: `exact_match` or `multiple_choice`.
-  - `exact_match` requires a non-empty `golden_column`.
-  - `multiple_choice` requires a valid choice source, answer source, and a non-empty list of unique `choice_labels`.
+  - Must set `style.type` to either `exact_match` or `multiple_choice`.
+  - When `style.type = "exact_match"`, a non-empty `style.golden_column` field must be present.
+  - When `style.type = "multiple_choice:"`, a valid choice source, answer source, and a non-empty list of unique `choice_labels` must be present in the `style` dictionary.
   - May not contain `command`, `input`, or other unsupported fields.
-
-> For custom evaluations, explicitly set the `type` field. If omitted, type defaults to `builtin`.
 
 Validation failures produce clear error messages before any run is created.
 
@@ -266,9 +268,9 @@ Validation failures produce clear error messages before any run is created.
 
 When you run `qt resume <run_id>`, the CLI looks up the stored evaluation name and input from the database, then re-reads the command from the current config file. This means:
 
-- `qt resume` provides no `--input` flag, and you do not need to re-submit input parameters on resume.
-- If you edited the config file between `qt run` and `qt resume`, the resumed run uses the _updated_ command.
-- If the config section is removed after a `qt run`, resuming a `custom_code` benchmark fails with "no config section found".
+- `qt resume` provides no `--input` flag, and on resume, you do not need to re-submit parameters originally passed in the `--input` flag.
+- For `custom_code` evaluations, if you edited the `command` field in your configuration file between `qt run` and `qt resume`, the resumed run uses the _updated_ command.
+- If you removed your evaluation's configuration section after a `qt run`, then run a `qt resume` for that evaluation, the run fails with an error indicating the evaluation doesn't exist.
 
 ## Complete examples
 
