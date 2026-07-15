@@ -4,23 +4,22 @@ Quantiles is open-source, local-first evaluation infrastructure for applied AI s
 
 Use the `qt` CLI and Python SDK to create, run, analyze, and compare evaluations for models, prompts, and agents with resource-efficient local execution. Quantiles records metrics, sample-level results, execution history, and evaluation traces so you can measure system behavior, detect regressions, validate changes, and ship higher-quality, more reliable AI systems.
 
-## ![NEW!](./docs/assets/new-badge.svg) What's New
+Quantiles centralizes its components in this monorepo so developers, researchers, and coding agents can use, inspect, modify, test, and extend the system. Its reusable skills and instruction files work with Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other compatible agents.
+
+## ![New](./docs/assets/new-badge.svg) What's New
 
 **[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml`, without writing/maintaining any code. See [documentation](./cli/README.md#custom-no-code-evals) for more details.
-
-## Why Quantiles
-Quantiles centralizes its components in this monorepo so developers, researchers, and coding agents can use, inspect, modify, test, and extend the system. Its reusable skills and instruction files work with Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and other compatible agents.
 
 ## Why use Quantiles?
 
 Evaluation workflows quickly outgrow one-off scripts once teams need caching, retries, dataset handling, metrics capture, and run comparison. Quantiles gives teams those primitives so they don't have to build them from scratch:
 
-- Write standard Python, with familiar developer patterns
 - Run workflows locally from the CLI
-- Automatically record runs, steps, metrics, events, inputs, and final outputs
+- Automatically record evaluationn runs, steps, metrics, events, inputs, and final outputs
 - Store execution history locally in open data formats
 - Debug individual samples with full step-by-step traces, inputs, and outputs
 - Inspect and compare runs directly from the same `qt` CLI
+- Write standard Python, with familiar developer patterns
 - Resilient execution by default with caching and restartable failed runs
 
 Quantiles borrows concepts from durable workflow execution systems to make evaluation runs resilient to crashes and restarts, while adding a high-throughput execution engine, rich observability, metrics, and eval reproducibility. Use it to run custom eval code or built-in benchmarks, then inspect what changed across runs, all without notebooks, pipelines, manual comparisons, or cloud services.
@@ -39,7 +38,7 @@ Run the [SimpleQA Verified](https://quantiles.io/benchmark-hub/benchmark/simpleq
 qt run simpleqa-verified
 ```
 
-> Important note: this `qt run` command will run the [`simpleqa-verified`](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) benchmark against a "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from this command.
+> Important note: this `qt run` command will run the [`simpleqa-verified`](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) benchmark against a demo "model" that simply generates random text. This functionality is intended to quickly show you how to run evals with the `qt` tool, without requiring you to set up API keys or spend money on tokens. Do not expect to draw conclusions from the results returned from using the demo model.
 
 Inspect the recorded run:
 
@@ -72,45 +71,45 @@ qt show <run_id>
 qt compare <run_id_a> <run_id_b>
 ```
 
-> Note: you can pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
+> Note: Pass the `--json` flag to any of the above commands, to output machine and agent-friendly JSON instead of human-formatted output.
 
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for available commands, options, and usage details.
 
 ### Configuration file and customization
 
-You can customize how the CLI executes benchmarks using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory.
+You can customize how the CLI executes [built-in-benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-nocode-evaluations), and [custom evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. The CLI uses this configuration each time you run the benchmark with `qt run`.
 
-For **built-in benchmarks**, configure settings like `samples`, `model`, and `max_workers`:
-
-```toml
-[benchmarks.pubmedqa]
-samples = 50
-model = "openai:gpt-5.6"
-max_workers = 100
-```
-
-For **custom evaluations**, set `type = "custom_code"` and provide the `command` to run:
-
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-
-[benchmarks.my-eval.input]
-foo = "foo_val"
-bar = "bar_val"
-```
-
-The CLI will execute the command with `QUANTILES_RUN_ID`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT` environment variables injected. If the run fails, you can resume it later with `qt resume <run_id>`.
+The CLI will execute the command with `QUANTILES_RUN_ID`, `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT` environment variables injected. If the run is interrupted, you can resume it later with `qt resume <run_id>`.
 
 See the following resources for more details:
 
 - [Configuration guide](./CONFIG.md) - Detailed configuration instructions and reference documentation.
 - [Complete configuration examples](./cli/examples/configs) - Complete examples, including a [custom-code benchmark configuration](./cli/examples/configs/custom_code/quantiles.toml)
 
+#### Built-in Benchmarks
+
+[Built-in-benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. Configuration is optional and can be used to override execution settings, including the model. They're intended to get started quickly with the Quantiles stack or run a standardized evaluation for a common reference point or repeatable baseline.
+
+Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering more benchmarks, including the built-in ones, and understanding their evaluation setup and reviewing common metrics used across AI evaluation workflows.
+
+> If there is an open-source benchmark you would like to add as a built-in benchmark, please [file an issue](https://github.com/quantiles-evals/quantiles/issues) with the benchmark name, source dataset/repository and any reference implementation if one is available.
+
+#### Custom Evaluations
+
+Quantiles provides two kinds of custom evaluations:
+
+- [`custom_nocode`](https://quantiles.io/documentation/custom-nocode-evaluations) - A custom evaluation from configuration only, without writing any custom code.
+- [`custom_code`](https://quantiles.io/documentation/custom-code-evaluations) - A highly specialized, custom evaluation built with [Python](https://quantiles.io/documentation/reference/python-sdk). Use custom evaluations when you need to measure behavior that is highly specific to your product, workflow, prompt, dataset, rubric, or release process.
+
+#### Python SDK
+
+Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording, and analyzing benchmarks.
+
+The [Python SDK source code](./python) is available in this repository. See the [Python SDK reference](https://quantiles.io/documentation/reference/python-sdk) for usage and API documentation.
+
 ## Local-First and Offline by Default
 
-Quantiles is built as a local-first, offline system that keeps benchmark execution, metadata, metrics, and analysis on your computer by default.
+Quantiles is built as a [local-first, offline system](https://quantiles.io/documentation/local-first-offline) that keeps benchmark execution, metadata, metrics, and analysis on your computer by default.
 
 The Quantiles toolchain, including the `qt` CLI, SDKs, on-disk data formats, and REST API, is optimized to use your local computing power by default instead of relying on cloud or other non-local resources.
 
@@ -121,52 +120,6 @@ Both the CLI and Python SDK support offline benchmark workflows, including the f
 - Metadata are recorded to a local, on-disk database
 - Metrics and evaluation outputs are recorded to local, on-disk files
 - `qt show`, `qt list` and `qt compare` commands access only local metadata and analytics databases
-
-## Built-in Benchmarks
-
-Built-in benchmarks are ready-to-run evaluations with predefined datasets, scoring methodologies, and metrics. These benchmarks are built into the CLI and require no configuration. They're intended to help you quickly get started with the Quantiles stack or run a standardized evaluation for a common reference point or repeatable baseline.
-
->If there is an open-source benchmark you would like to add as a built-in benchmark, please [file an issue](https://github.com/quantiles-evals/quantiles/issues) with the benchmark name, source dataset/repository and any reference implementation if one is available.
-
-Quantiles also provides a [benchmark hub](https://quantiles.io/benchmark-hub) for discovering more benchmarks, including the built-in ones, and understanding their evaluation setup and reviewing common metrics used across AI evaluation workflows.
-
-## Custom Evaluations
-
-Quantiles provides two kinds of custom evaluations:
-
-- `custom_nocode` - build a custom eval from configuration only, without writing any custom code. See the [custom no-code evals documentation](./cli/README.md#no-code-qa-benchmarks) for more details.
-- `custom_code` - build highly specialized, custom evals by writing Python code. See below for details.
-
-### `custom_code` evaluation
-
-A `custom_code` evaluation is a [Python](https://quantiles.io/documentation/reference/python-sdk) program that is run by the `qt` CLI and uses its [local storage](http://quantiles.io/documentation/local-first-offline) and [durable workflow engine](https://quantiles.io/documentation/workflows-and-steps) to run efficiently and reliably. Use custom evaluations when you need to measure behavior that is highly specific to your product, workflow, prompt, dataset, rubric, or release process.
-
-With help from the [Quantiles Python SDK](https://quantiles.io/documentation/reference/python-sdk), you build evaluation logic like loading data, calling models or agents, scoring outputs, computing metrics, and returning a summary, and Quantiles manages [durable steps, step caching, and step resume](https://quantiles.io/documentation/workflows-and-steps), metrics, inputs, outputs, and comparisons.
-
-Custom evaluations are configured in `quantiles.toml` with `type = "custom_code"`:
-
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-
-[benchmarks.my-eval.input]
-dataset = "my_dataset.jsonl"
-```
-
-You would run this evaluation with the following command:
-
-```shell
-qt run my-eval
-```
-
-See the [custom evaluations guide](https://quantiles.io/documentation/custom-evaluations) for instructions on building and running custom evaluations.
-
-### Python SDK
-
-Use the official Quantiles Python SDK to build your custom evaluations with primitives like durable steps, structured inputs/outputs, and metrics emission, using patterns and practices native to Python. The SDK integrates tightly with the `qt` CLI’s local API for running, recording, and analyzing benchmarks.
-
-The [Python SDK source code](./python) is available in this repository. See the [Python SDK reference](https://quantiles.io/documentation/reference/python-sdk) for usage and API documentation.
 
 ## Coding Agents
 
