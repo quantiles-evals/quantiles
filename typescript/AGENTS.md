@@ -8,7 +8,7 @@ These instructions apply to the Quantiles TypeScript SDK. For changes outside th
 
 ## Project Overview
 
-`@quantiles/sdk`, the Quantiles TypeScript SDK, is an ESM TypeScript SDK for authoring and running local AI workload workflows against the Quantiles local observability server. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, a low-level `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types. The SDK talks to the local Quantiles server by default at `http://127.0.0.1:8765`, records runs, step outputs, and metrics through the CLI/server API, and is meant to make TypeScript eval and agent-loop workloads observable from the start.
+`@quantiles/sdk`, the Quantiles TypeScript SDK, is an unreleased ESM SDK for authoring and running local evaluation and agent-loop workflows against the Quantiles server. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, and `emit`, along with a low-level `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types. The SDK connects to `http://127.0.0.1:8765` by default and records runs, step outputs, and metrics through the CLI/server API.
 
 ## Working in This Repository
 
