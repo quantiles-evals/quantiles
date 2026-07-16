@@ -6,7 +6,7 @@ These instructions apply to the Quantiles Python SDK. For changes outside the SD
 
 ## Project Overview
 
-`quantiles`, the Quantiles Python SDK, is a Python 3.12 SDK for authoring and running local AI workload workflows against the Quantiles local observability server. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, typed dataset iteration, async concurrency helpers, statistical metrics, and a small LLM helper. The SDK talks to the local Quantiles server by default at `http://127.0.0.1:8765`, records runs, step outputs, metrics, and dataset batches through the CLI/server API, and is meant to make Python eval and agent-loop workloads observable from the start.
+`quantiles`, the Quantiles Python SDK, is a Python 3.12 SDK for authoring and running local AI evaluation, benchmarks, and agent-loop workflows against the Quantiles server. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, and `emit`, along with typed dataset iteration, async concurrency helpers, statistical metrics, and an LLM helper. The SDK connects to `http://127.0.0.1:8765` by default and records runs, step outputs, metrics, and dataset batches through the CLI/server API.
 
 ## Working in This Repository
 
@@ -14,7 +14,6 @@ These instructions apply to the Quantiles Python SDK. For changes outside the SD
 - Use idiomatic async Python. Avoid blocking calls in workflow, dataset, client, and concurrency code unless they are deliberately isolated.
 - Keep JSON values compatible with the recursive `JsonValue` type and use Pydantic models where the existing code expects typed validation.
 - Follow the repository style: Python 3.12 syntax, 2-space indentation, double quotes, type annotations, and concrete types instead of `typing.Any`.
-- ASK AARON - is this better than above (Codex said 2-space indentation is unusual and may conflict with Ruff formatting): - Follow the repository style: Python 3.12 syntax, Ruff formatting, double quotes where configured, type annotations, and concrete types instead of `typing.Any`.
 - Avoid broad refactors while implementing narrow behavior changes.
 
 ## Non-Negotiable Invariants

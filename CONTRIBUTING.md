@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Quantiles open source!
 
-Quantiles open source projects provide local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, and benchmark and evaluation support.
+The Quantiles open-source project provides local-first evaluation infrastructure for AI systems. We welcome contributions that improve reliability, reproducibility, developer ergonomics, agent workflows, documentation, benchmarks, and custom evaluations.
 
 ## Before You Start
 
@@ -31,7 +31,7 @@ git clone https://github.com/quantiles-evals/quantiles.git
 cd quantiles
 ```
 
-For the [CLI directory](./cli), ensure you have Rust installed and use the `mise.toml` file in that directory to run common build/lint/check/test commands. For the [Python SDK directory](./python), use the [`uv`](https://docs.astral.sh/uv/) tool for similar commands. The [TypeScript SDK directory](./typescript) holds the yet-unreleased, unsupported TypeScript SDK.
+For the [CLI directory](./cli), ensure Rust is installed and use its `mise.toml` tasks to build, check, lint, and test the code. For the [Python SDK directory](./python), use [`uv`](https://docs.astral.sh/uv/) through the package's `mise.toml` tasks. The [TypeScript SDK directory](./typescript) contains an unreleased and unsupported SDK.
 
 ## Security
 

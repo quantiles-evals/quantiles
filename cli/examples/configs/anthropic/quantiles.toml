@@ -1,25 +1,23 @@
-# This config file sets up PubMedQA to use Anthropic's Claude model, and sets up the SimpleQA-verified
-# benchmark to use the internal demo model.
+# This config file sets up PubMedQA to use an Anthropic Claude model.
 #
 # The PubMedQA benchmark reads the API key from the `ANTHROPIC_API_KEY` environment
 # variable. To get an API key, go to https://platform.claude.com/settings/workspaces/default/keys
 
 [benchmarks.pubmedqa]
-# The full expert-labeled PubMedQA benchmark has 1000 samples. Since Anthropic charges for
-# usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
+# The full expert-labeled PubMedQA benchmark has 1,000 samples. Because Anthropic charges for
+# usage, this example limits the run to 50 samples to control costs. Omit `samples` to run the
+# full benchmark.
 samples = 50
 
-# The following model is good for demonstrating PubMedQA benchmarks without very high costs,
-# since it's relatively cheap and fast. Details on the model can be found at:
+# This example uses a relatively low-cost, fast model. Model details are available at:
 #
 # https://platform.claude.com/docs/en/about-claude/models/overview#latest-models-comparison
 #
 # That page also has a list of other Anthropic models that you can use.
 model = "anthropic:claude-haiku-4-5-20251001"
 
-# If you run this or other benchmarks with more samples, you may also need to increase this
-# `max_workers` parameter to improve throughput. If you do so, however, you will likely
-# run into rate limits, because Anthropic's default rate limits are relatively strict.
+# If you run this or other benchmarks with more samples, you may need to increase
+# `max_workers` to improve throughput. Higher concurrency may trigger Anthropic rate limits.
 #
 # If this happens, you may need to upgrade your rate limit tier on this page:
 #

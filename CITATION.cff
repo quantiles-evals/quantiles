@@ -6,9 +6,7 @@ message: >-
 title: "Quantiles: Local-first AI evaluation infrastructure"
 
 abstract: >-
-  Quantiles is an agent-native CLI and SDKs for local-first AI evaluation workflows,
-  helping teams run benchmarks and evaluations, inspect sample-level outputs, and
-  compare eval runs.
+  Quantiles is agent-native, local-first infrastructure for running AI evaluations and benchmarks, inspecting sample-level outputs, and comparing evaluation runs through its CLI and SDKs.
 
 type: software
 

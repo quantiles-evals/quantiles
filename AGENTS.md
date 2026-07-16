@@ -2,9 +2,9 @@
 
 This file is for coding assistants such as Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, OpenCode, and similar tools. It gives agents a short, public-safe map of the Quantiles repository and the rules for making focused, reviewable changes.
 
-Use the [`SKILL.md` file](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) at [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill) for guidance and details on common Quantiles workflows, including running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs. For a concise, public, LLM-readable overview of Quantiles with links to agent guides and related documentation, see [quantiles.io/llms.txt](https://quantiles.io/llms.txt).
+See the Quantiles agent skill's [`SKILL.md`](https://github.com/quantiles-evals/skill/blob/main/SKILL.md) for guidance on running evaluations, inspecting sample-level results, comparing runs, and interpreting outputs. For a concise, public, LLM-readable overview with links to agent guides and related documentation, see [quantiles.io/llms.txt](https://quantiles.io/llms.txt).
 
-To become familiar with this repository, and before attempting to complete tasks, read these files:
+Before attempting tasks in this repository, read these files:
 
 - [`README.md`](./README.md): public product overview, quickstart, CLI examples, SDK summary, docs links, and agent guidance.
 - [`CONFIG.md`](./CONFIG.md): how to write configuration files for the `qt` CLI.
@@ -24,9 +24,9 @@ Common subdirectories include:
 
 - `cli`: Rust `qt` CLI, local server, and local run/metrics storage.
 - `python`: The `quantiles` Python SDK.
-- `typescript`: The `@quantiles` TypeScript SDK. (in development and unsupported)
+- `typescript`: The unreleased and unsupported `@quantiles/sdk` TypeScript SDK.
 
-Note there is a separate repository, [github.com/quantiles-evals/skill](https://github.com/quantiles-evals/skill), that contains the agent skill.
+The agent skill is maintained separately at [Quantiles agent skill repository](https://github.com/quantiles-evals/skill).
 
 ## Agent Working Rules
 
@@ -73,13 +73,13 @@ Avoid adding implementation-specific claims to the root repository unless they a
 
 ### `cli/` directory
 
-The `cli/` directory contains the source code for the `qt` CLI. It creates local SQLite and metrics database state under the `.quantiles/` directory, and provides core CLI commands for running and inspecting evals.
+The `cli/` directory contains the source code for the `qt` CLI. It stores run data in SQLite and metrics in Parquet under the `.quantiles/` directory and provides core commands for running and inspecting evaluations.
 
 When editing the CLI, preserve local-first behavior, SQLite data model assumptions, clear Rust error handling, and stable command behavior.
 
 ### `python/` directory
 
-The `python/` directory contains the Quantiles Python SDK, which allows users to author custom local AI evals using the local Quantiles server and Python 3.12+. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, `emit`, dataset iteration, async helpers, metrics, and LLM helpers.
+The `python/` directory contains the Quantiles Python SDK, which allows users to author custom local AI evaluations using the local Quantiles server and Python 3.12 or later. It exposes workflow primitives such as `workflow`, `entrypoint`, `step`, and `emit`, along with dataset iteration, async helpers, metrics, and LLM helpers.
 
 When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON payloads, replay semantics, and public API exports.
 
@@ -87,7 +87,7 @@ When editing the Python SDK subdirectory, preserve `async` behavior, stable JSON
 
 > **Not released**. The TypeScript SDK is currently unsupported and unreleased.
 
-The `typescript/` directory contains the Quantiles TypeScript SDK, which allows users to author custom local AI evals with the Quantiles stack using TypeScript. It exposes workflow primitives such as `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
+The `typescript/` directory contains an unreleased Quantiles TypeScript SDK for authoring custom local AI evaluations. It exposes `workflow`, `entrypoint`, `step`, and `emit`, along with `QuantilesClient`, `QuantilesRun`, stable JSON utilities, and shared SDK types.
 
 When editing the TypeScript SDK subdirectory, preserve strict typing, JSON-serializable public surfaces, ESM behavior, and documented package exports.
 
@@ -109,10 +109,10 @@ Provider-backed model inputs should use provider-prefixed model names, for examp
 
 Preserve Quantiles as local-first infrastructure. Follow the guidelines below to ensure the project maintains safety, security, and privacy:
 
-- The CLI and local server should store Quantiles state locally by default
-- Evaluation workflows may call remote model providers, hosted judges, datasets, APIs, or external tools only when explicitly configured by the user
+- The CLI and local server should store Quantiles state locally by default.
+- Evaluation workflows may call remote model providers, hosted judges, APIs, or external tools only when configured by the user. Selected benchmarks and evaluation configurations may also download remote datasets.
 - Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
-- Never commit the `.quantiles/` directory, SQLite or metrics databases, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
+- Never commit the `.quantiles/` directory, SQLite databases, Parquet metrics, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
 - Keep public docs customer-safe. Avoid exposing secrets, API keys, and non-public security information.
 
@@ -125,14 +125,14 @@ Use these terms consistently in public docs:
 - `Quantiles`: the open-source Quantiles project.
 - `qt`: the Quantiles CLI.
 - `quantiles`: the Python SDK package.
-- `@quantiles`: the TypeScript SDK package.
+- `@quantiles/sdk`: the unreleased TypeScript SDK package.
 - `evaluation`: user-authored evaluation or agent-loop code.
 - `benchmark`: a repeatable evaluation harness with a defined dataset, scoring method, and result shape.
 - `run`: one recorded execution of an evaluation or benchmark.
 - `step`: a durable recorded unit of an evaluation execution.
 - `metric`: a measured value emitted during a run.
 - `event`: recorded observability data from an evaluation.
-- `.quantiles/`: local Quantiles workspace state, including SQLite database and metrics Parquet files.
+- `.quantiles/`: local Quantiles workspace state, including a SQLite database and metrics Parquet files.
 
 Prefer `local-first` and `offline by default` for open-source behavior.
 

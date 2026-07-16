@@ -13,12 +13,11 @@ model = "random"
 prompt_template_file = "prompts/medqa.txt"
 limit = 10
 
-    [benchmarks.medqa.style]
-    type = "multiple_choice"
-    choices = { column = "options" }
-    choice_labels = ["A", "B", "C", "D"]
-    answer = { label_column = "answer_idx" }
-
+[benchmarks.medqa.style]
+type = "multiple_choice"
+choices = { column = "options" }
+choice_labels = ["A", "B", "C", "D"]
+answer = { label_column = "answer_idx" }
 
 [benchmarks.medmcqa]
 type = "custom_nocode"
@@ -27,11 +26,11 @@ model = "random"
 prompt_template_file = "prompts/medmcqa.txt"
 limit = 100
 
-    [benchmarks.medmcqa.style]
-    type = "multiple_choice"
-    choices = { columns = ["opa", "opb", "opc", "opd"] }
-    choice_labels = ["A", "B", "C", "D"]
-    answer = { index_column = "cop", index_base = 0 }
+[benchmarks.medmcqa.style]
+type = "multiple_choice"
+choices = { columns = ["opa", "opb", "opc", "opd"] }
+choice_labels = ["A", "B", "C", "D"]
+answer = { index_column = "cop", index_base = 0 }
 
 [benchmarks.mmlu-pro]
 type = "custom_nocode"
@@ -40,11 +39,11 @@ model = "random"
 prompt_template_file = "prompts/mmlu-pro.txt"
 limit = 1000
 
-    [benchmarks.mmlu-pro.style]
-    type = "multiple_choice"
-    choices = { column = "options" }
-    choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-    answer = { label_column = "answer" }
+[benchmarks.mmlu-pro.style]
+type = "multiple_choice"
+choices = { column = "options" }
+choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+answer = { label_column = "answer" }
 
 [benchmarks.gpqa]
 type = "custom_nocode"
@@ -52,9 +51,9 @@ model = "random"
 prompt_template_file = "prompts/gpqa.txt"
 dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
 
-    [benchmarks.gpqa.style]
-    type = "multiple_choice"
-    choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }
-    choice_labels = ["A", "B", "C", "D"]
-    answer = { correct_choice_column = "Correct Answer" }
-    shuffle = { seed_column = "Record ID" }
+[benchmarks.gpqa.style]
+type = "multiple_choice"
+choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }
+choice_labels = ["A", "B", "C", "D"]
+answer = { correct_choice_column = "Correct Answer" }
+shuffle = { seed_column = "Record ID" }
