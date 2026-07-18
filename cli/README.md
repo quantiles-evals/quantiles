@@ -30,6 +30,8 @@ qt show 1
 
 > See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
+Print the installed CLI version with `qt --version`.
+
 ### Custom evaluations
 
 Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `--input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:

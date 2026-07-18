@@ -1,13 +1,22 @@
 use clap::{Parser, Subcommand};
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug, Parser)]
-#[command(name = "qt")]
+#[command(
+    name = "qt",
+    disable_version_flag = true,
+    arg_required_else_help = true
+)]
 #[command(
     about = "A full-featured local-native toolchain for running and analyzing AI evals at scale"
 )]
 pub struct Cli {
+    /// Print the qt version.
+    #[arg(long, exclusive = true)]
+    pub version: bool,
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Subcommand)]

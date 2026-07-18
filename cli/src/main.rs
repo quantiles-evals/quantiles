@@ -21,7 +21,12 @@ fn main() -> Result<()> {
 async fn async_main(process_start: Instant) -> Result<()> {
     let cli = cli::Cli::parse();
 
-    match cli.command {
+    if cli.version {
+        println!("{}", cli::VERSION);
+        return Ok(());
+    }
+
+    match cli.command.expect("clap requires a subcommand") {
         cli::Command::Init => commands::init().await,
         cli::Command::List { json } => commands::list(json).await,
         cli::Command::Compare { run_a, run_b, json } => commands::compare(run_a, run_b, json).await,
