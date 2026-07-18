@@ -5,6 +5,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Parser)]
 #[command(
     name = "qt",
+    // By default, clap builds in a `--version` flag that produces output with the version number
+    // prefixed by the binary name. For example:
+    //
+    // qt v0.1.2.
+    //
+    // This setting disables this default output, so we can manually output _just_ the actual version
+    // number, so that agents and scripts don't have to parse out the `qt...` prefix.
     disable_version_flag = true,
     arg_required_else_help = true
 )]
