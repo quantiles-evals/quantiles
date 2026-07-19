@@ -10,7 +10,7 @@ uv add quantiles
 
 ## Usage
 
-Use the following code to build a custom evaluation with Python. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](../CONFIG.md).
+Use the following code to build a custom evaluation with Python. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](https://quantiles.io/documentation/configuration).
 
 ```python
 from quantiles import JsonValue, WorkflowContext, emit, entrypoint, step, workflow

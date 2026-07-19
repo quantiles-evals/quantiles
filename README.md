@@ -8,7 +8,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
-**[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [configuration guide](./CONFIG.md#custom_nocode-evaluations) for details.
+**[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-nocode-evaluations) for details.
 
 ## Why use Quantiles?
 
@@ -85,7 +85,7 @@ You can customize how the CLI executes [built-in-benchmarks](https://quantiles.i
 
 See the following resources for more details:
 
-- [Configuration guide](./CONFIG.md) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
+- [Configuration guide](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
 - [Configuration examples](./cli/examples/configs) - Complete examples, including a [custom-code evaluation](./cli/examples/configs/custom_code/quantiles.toml)
 
 #### Built-in benchmarks
@@ -100,7 +100,7 @@ The [benchmark hub](https://quantiles.io/benchmark-hub) describes available benc
 
 Custom evaluations measure behavior specific to your product, workflow, prompt, dataset, rubric, or release process. Quantiles provides two ways to build them:
 
-- [`custom_nocode`](./CONFIG.md#custom_nocode-evaluations): define a custom evaluation entirely in configuration.
+- [`custom_nocode`](https://quantiles.io/documentation/custom-nocode-evaluations): define a custom evaluation entirely in configuration.
 - [`custom_code`](https://quantiles.io/documentation/custom-evaluations): build specialized evaluation logic with [Python](https://quantiles.io/documentation/reference/python-sdk).
 
 Prefer to use `custom_nocode` evaluations wherever possible, since they're easier for humans and agents to create and maintain. When required, fall back to `custom_code` evaluations.

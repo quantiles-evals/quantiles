@@ -13,7 +13,7 @@
 #
 # To read more about custom no-code evaluations, see the following documentation:
 #
-# http://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
+# https://quantiles.io/documentation/custom-nocode-evaluations
 
 
 # The SimpleQA-verified becnhmark configured to use the random model.

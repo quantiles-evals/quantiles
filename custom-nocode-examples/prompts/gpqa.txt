@@ -1,5 +1,9 @@
 {#
-This is a prompt template file for a custom no-code benchmark. To see how this file is used, see the `quantiles.toml` file one directory up from this one, and for details on how custom no-code benchmarks work, see https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
+This is a prompt template for a custom no-code benchmark. 
+See the [`quantiles.toml`](../quantiles.toml) configuration to 
+understand how this template is used. 
+Read the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-nocode-evaluations) 
+to learn how to configure and run custom no-code evaluations.
 #}
 {{ row["Question"] }}
 
