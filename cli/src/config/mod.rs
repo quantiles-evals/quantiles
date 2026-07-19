@@ -98,7 +98,7 @@ pub struct BuiltinBenchmarkConfig {
     pub samples: Option<usize>,
     /// Which model sampler to use for this benchmark.
     pub model: Option<Sampler>,
-    /// Maximum concurrent workers for this benchmark.
+    /// Maximum number of concurrent workers for this benchmark.
     pub max_workers: Option<usize>,
 }
 

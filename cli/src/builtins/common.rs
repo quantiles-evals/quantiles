@@ -23,7 +23,7 @@ pub(crate) struct BuiltinConfig {
     /// Which model sampler to use. If omitted, the builtin chooses a sensible default.
     #[serde(default)]
     pub(crate) model: Option<Sampler>,
-    /// Maximum concurrent workers. Falls back to `QUANTILES_MAX_WORKERS` env var (default 25).
+    /// Maximum number of concurrent workers. Falls back to `QUANTILES_MAX_WORKERS` env var (default 25).
     #[serde(default)]
     pub(crate) max_workers: Option<usize>,
 }

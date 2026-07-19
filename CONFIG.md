@@ -50,7 +50,7 @@ Built-in benchmarks run directly through the CLI with the demo model by default 
 | `type`        | string          | no       | The type of the benchmark. See above for valid values.                                         | `builtin`                                                                        |
 | `samples`     | integer         | no       | Number of dataset rows to evaluate.                                                            | All samples available in the benchmark's dataset in the order they appear.       |
 | `model`       | string or table | no       | The model to use. See [model naming](#naming-the-model) for details on configuring your model. | Benchmark-specific demo model.                                                   |
-| `max_workers` | integer         | no       | Maximum concurrent workers.                                                                    | The default parallelism provided by the Rust [Tokio runtime](https://tokio.rs/). |
+| `max_workers` | integer         | no       | Maximum number of concurrent workers.                                                                    | The default parallelism provided by the Rust [Tokio runtime](https://tokio.rs/). |
 
 ### `custom_nocode` evaluations
 

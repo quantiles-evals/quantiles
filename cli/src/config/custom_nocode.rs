@@ -97,7 +97,7 @@ pub struct CustomNoCodeParams {
     /// Number of dataset rows to evaluate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
-    /// Maximum concurrent workers.
+    /// Maximum number of concurrent workers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_workers: Option<usize>,
     /// Optional aggregate metric families computed only for requested output surfaces.
