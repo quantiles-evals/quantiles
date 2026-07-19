@@ -105,7 +105,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
             };
             let custom_nocode_input = match bench_config {
                 Some(qt::config::BenchmarkConfig::CustomNoCode(config)) => {
-                    Some(super::run::assemble_custom_nocode_input(config, None))
+                    Some(super::run::assemble_custom_nocode_input(config, None)?)
                 }
                 _ => None,
             };

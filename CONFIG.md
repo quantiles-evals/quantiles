@@ -231,6 +231,16 @@ Warning: --input overrides config input for keys: model
 
 In `--json` mode, the warning is included in the JSON output under the `warning` key.
 
+For `custom_nocode` evaluations, `--input` may override only `model`, `limit`, and
+`prompt_template_file`. The CLI merges those fields with the evaluation's complete
+configuration for the current run. Any other field causes the command to fail. For
+example, this runs a configured no-code evaluation with a different model and a
+smaller sample limit while preserving its dataset and scoring configuration:
+
+```bash
+qt run gpqa --input '{"model":"openai:gpt-5.6","limit":10}'
+```
+
 ## Configuration validation
 
 The CLI validates benchmark configuration sections before execution:

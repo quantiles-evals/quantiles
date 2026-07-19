@@ -76,7 +76,7 @@ pub async fn run(
                     .await
                 }
                 qt::config::BenchmarkConfig::CustomNoCode(c) => {
-                    let input = assemble_custom_nocode_input(c, cli_input);
+                    let input = assemble_custom_nocode_input(c, cli_input)?;
 
                     let cwd = std::env::current_dir()?;
                     let root = db::resolve_workspace_root(&cwd, true).await?;
@@ -153,12 +153,41 @@ fn assemble_builtin_input(
 pub(super) fn assemble_custom_nocode_input(
     bench: &qt::config::CustomNoCodeBenchmarkConfig,
     cli_input: Option<&str>,
-) -> String {
+) -> Result<String> {
+    let mut params = bench.params.clone();
+
     if let Some(cli_str) = cli_input {
-        return cli_str.to_owned();
+        let overrides: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(cli_str)
+                .with_context(|| "failed to parse custom_nocode --input as a JSON object")?;
+
+        for (key, value) in overrides {
+            match key.as_str() {
+                "model" => {
+                    params.model = Some(
+                        serde_json::from_value(value)
+                            .with_context(|| "invalid `model` in custom_nocode --input")?,
+                    );
+                }
+                "limit" => {
+                    params.limit = Some(
+                        serde_json::from_value(value)
+                            .with_context(|| "invalid `limit` in custom_nocode --input")?,
+                    );
+                }
+                "prompt_template_file" => {
+                    params.prompt_template_file = serde_json::from_value(value).with_context(
+                        || "invalid `prompt_template_file` in custom_nocode --input",
+                    )?;
+                }
+                _ => bail!(
+                    "unsupported custom_nocode --input field `{key}`; only `model`, `limit`, and `prompt_template_file` may be overridden"
+                ),
+            }
+        }
     }
 
-    serde_json::to_string(&bench.params).expect("infallible serialization")
+    serde_json::to_string(&params).context("failed to serialize custom_nocode input")
 }
 
 fn merge_inputs(
@@ -743,7 +772,7 @@ mod tests {
                 },
             },
         };
-        let input = super::assemble_custom_nocode_input(&bench, None);
+        let input = super::assemble_custom_nocode_input(&bench, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
         assert_eq!(parsed["style"]["type"], "exact_match");
         assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
@@ -779,15 +808,15 @@ mod tests {
                 },
             },
         };
-        let input = super::assemble_custom_nocode_input(&bench, None);
+        let input = super::assemble_custom_nocode_input(&bench, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
         assert!(parsed.get("model").is_none());
         assert!(parsed.get("limit").is_none());
         assert!(parsed.get("max_workers").is_none());
     }
 
-    /// A `--input` CLI flag should take precedence over the assembled config object,
-    /// returning the raw CLI string directly.
+    /// Supported `--input` fields should override their configured values while all
+    /// other custom no-code configuration remains intact.
     #[test]
     fn assemble_custom_nocode_input_with_cli_override() {
         let bench = qt::config::CustomNoCodeBenchmarkConfig {
@@ -808,7 +837,80 @@ mod tests {
                 },
             },
         };
-        let input = super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":5}"#));
-        assert_eq!(input, r#"{"limit":5}"#);
+        let input = super::assemble_custom_nocode_input(
+            &bench,
+            Some(
+                r#"{"model":"openai:gpt-5.6-luna","limit":5,"prompt_template_file":"prompts/other.txt"}"#,
+            ),
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["style"]["type"], "exact_match");
+        assert_eq!(parsed["style"]["golden_column"], "answer");
+        assert_eq!(parsed["model"], "openai:gpt-5.6-luna");
+        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["prompt_template_file"], "prompts/other.txt");
+    }
+
+    /// Fields outside the intentionally narrow custom no-code override surface should
+    /// fail before a run is created.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_unsupported_field() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err = super::assemble_custom_nocode_input(
+            &bench,
+            Some(r#"{"dataset":{"name":"other/dataset"}}"#),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("unsupported custom_nocode --input field `dataset`")
+        );
+    }
+
+    /// Custom no-code CLI input must be a JSON object so its allowed fields can be
+    /// validated and merged predictably.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_non_object() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err = super::assemble_custom_nocode_input(&bench, Some(r#"["limit", 5]"#)).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("failed to parse custom_nocode --input as a JSON object")
+        );
+    }
+
+    /// Null is not a valid override for any supported field.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_null_override() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err =
+            super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":null}"#)).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("invalid `limit` in custom_nocode --input")
+        );
+    }
+
+    fn custom_nocode_benchmark_for_override_tests() -> qt::config::CustomNoCodeBenchmarkConfig {
+        qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        }
     }
 }
