@@ -93,6 +93,8 @@ type = "custom_nocode"
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
 dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
+# This key shows F1 aggregate metrics whether or not the `--json` flag is passed to `qt show`,
+# and shows a confusion matrix only when the `--json` flag is passed.
 metrics = [{ name = "f1", show = "all" }, { name = "confusion", show = "json" }]
 
 [benchmarks.gpqa.style]
