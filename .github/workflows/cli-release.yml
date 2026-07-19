@@ -63,6 +63,7 @@ jobs:
           cp "target/${TARGET}/release/qt" dist/package/qt
           COPYFILE_DISABLE=1 tar -czf "dist/${archive}" -C dist/package qt
           shasum -a 256 "dist/${archive}" > "dist/${archive}.sha256"
+      # TODO: upgrade upload-artifact to v7 and download-artifact to v8 together
       - uses: actions/upload-artifact@v4
         with:
           name: cli-${{ matrix.target }}
