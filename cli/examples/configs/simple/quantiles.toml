@@ -1,7 +1,7 @@
 # This config file sets up the PubMedQA and SimpleQA Verified benchmarks to use the built-in
 # demo model. The `qt` CLI automatically detects this file in the current working directory.
 #
-# The built-in demo model generate random responses and are useful only for smoke tests. Do not
+# The built-in demo model generates random responses and are useful only for smoke tests. Do not
 # use results from these runs to determine the quality of any model.
 #
 # Each benchmark entry below defines settings for a built-in benchmark. The `samples` key limits the number of
