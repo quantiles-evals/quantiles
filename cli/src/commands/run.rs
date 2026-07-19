@@ -150,6 +150,13 @@ fn assemble_builtin_input(
     }
 }
 
+/// Serialize a custom no-code configuration to JSON after applying supported overrides
+/// given on the command line from the `--input` flag in the `cli_input` parameter.
+///
+/// # Errors
+///
+/// Returns an error if `cli_input` is invalid JSON, contains an unsupported field, has an
+/// invalid override value, or the resulting configuration cannot be serialized.
 pub(super) fn assemble_custom_nocode_input(
     bench: &qt::config::CustomNoCodeBenchmarkConfig,
     cli_input: Option<&str>,
