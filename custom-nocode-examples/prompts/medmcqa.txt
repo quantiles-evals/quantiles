@@ -1,3 +1,6 @@
+{#
+This is a prompt template file for a custom no-code benchmark. To see how this file is used, see the `quantiles.toml` file one directory up from this one, and for details on how custom no-code benchmarks work, see https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
+#}
 {{ row.question }}
 
 {% for choice in choices %}{{ choice.label }}. {{ choice.text }}
