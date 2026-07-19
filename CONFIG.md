@@ -96,7 +96,7 @@ For `custom_code` benchmarks, `input` is an arbitrary TOML table that becomes a 
 type = "custom_code"
 command = ["python", "eval.py"]
 input = {
-    dataset = "my_data.jsonl",
+    dataset_path = "my_data.jsonl",
     max_samples = 100,
     nested = { foo = "bar" }
 }
@@ -106,13 +106,15 @@ This produces:
 
 ```json
 {
-  "dataset": "my_data.jsonl",
+  "dataset_path": "my_data.jsonl",
   "max_samples": 100,
   "nested": {
     "foo": "bar"
   }
 }
 ```
+
+Quantiles passes these values through to your custom program. It does not assign special meaning to `dataset_path` or load the file automatically; your custom code is responsible for opening the file directly or using the value to construct a dataset source.
 
 #### CLI `--input` overrides
 

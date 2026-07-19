@@ -147,8 +147,10 @@ type = "custom_code"
 command = ["python", "my_eval.py"]
 
 [benchmarks.my-eval.input]
-dataset = "my_dataset.jsonl"
+dataset_path = "my_dataset.jsonl"
 ```
+
+The `input` table is passed to your custom program. Quantiles does not automatically load `dataset_path`; your code decides whether to open the file directly or pass it into a custom Python `DatasetSource`.
 
 Run the evaluation with `qt run my-eval`. If it fails, resume it later with `qt resume <run_id>` — the CLI re-reads the command and stored input automatically.
 
