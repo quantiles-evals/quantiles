@@ -1,4 +1,27 @@
-[benchmarks.nocode_custom]
+# This file contains configuration to run several popular, public benchmarks as
+# custom no-code evaluations. Each benchmark below is configured to use the 'random'
+# model, which just outputs random text or randomly selects the right answer
+# from a uniform distribution of the choices, for exact_match and multiple_choice
+# benchmarks respectively.
+#
+# If you want to customize the model for any of these benchmarks, pass the `--input`
+# flag to the `qt run ...` command. For example, the below command shows how to run
+# the MMLU-pro benchmark as configured in this file, using OpenAI's gpt-5.6-luna model.
+# Make sure to run this command from the same directory as this file.
+#
+#   qt run mmlu-pro --input '{"model": "openai:gpt-5.6-luna"}'
+#
+# To read more about custom no-code evaluations, see the following documentation:
+#
+# http://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
+
+
+# The SimpleQA-verified becnhmark configured to use the random model.
+#
+# Read more about the SimpleQA-verified benchmark here:
+#
+# https://arxiv.org/abs/2509.07968
+[benchmarks.simpleqa-verified]
 type = "custom_nocode"
 style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
@@ -6,6 +29,11 @@ model = "random"
 prompt_template_file = "prompts/qa.txt"
 limit = 10
 
+# The MedQA benchmark configured to use the random model.
+#
+# Read more about the MedQA benchmark here:
+#
+# https://arxiv.org/abs/2009.13081
 [benchmarks.medqa]
 type = "custom_nocode"
 dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
@@ -19,6 +47,11 @@ choices = { column = "options" }
 choice_labels = ["A", "B", "C", "D"]
 answer = { label_column = "answer_idx" }
 
+# The MedMCQA benchmark configured as a custom_nocode benchmark, using the random model.
+#
+# Read more about the MedMCQA benchmark here:
+#
+# https://medmcqa.github.io/
 [benchmarks.medmcqa]
 type = "custom_nocode"
 dataset = { name = "quantiles/medmcqa", config_name = "default", split = "validation" }
@@ -32,6 +65,11 @@ choices = { columns = ["opa", "opb", "opc", "opd"] }
 choice_labels = ["A", "B", "C", "D"]
 answer = { index_column = "cop", index_base = 0 }
 
+# The MMLU-pro benchmark configured to use the random model by default.
+#
+# Read more about the MMLU-pro benchmark here:
+#
+# https://arxiv.org/abs/2406.01574
 [benchmarks.mmlu-pro]
 type = "custom_nocode"
 dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
@@ -40,33 +78,6 @@ prompt_template_file = "prompts/mmlu-pro.txt"
 limit = 1000
 
 [benchmarks.mmlu-pro.style]
-type = "multiple_choice"
-choices = { column = "options" }
-choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-answer = { label_column = "answer" }
-
-# The MMLU-pro benchmark configured to use OpenAI's gpt-5.6-luna model.
-#
-# You can customize any custom_nocode eval to use one of a variety of LLM providers.
-# See the following documentation for details:
-#
-# https://quantiles.io/documentation/configuration#customizing-the-model
-#
-# Read more about the gpt-5.6-luna model here:
-#
-# https://developers.openai.com/api/docs/models/gpt-5.6-luna
-#
-# And read more about the MMLU-pro benchmark here:
-#
-# https://arxiv.org/abs/2406.01574
-[benchmarks.mmlu-pro-gpt-5-6]
-type = "custom_nocode"
-dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
-model = "openai:gpt-5.6-luna"
-prompt_template_file = "prompts/mmlu-pro.txt"
-limit = 100
-
-[benchmarks.mmlu-pro-gpt-5-6.style]
 type = "multiple_choice"
 choices = { column = "options" }
 choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
