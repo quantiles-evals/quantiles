@@ -39,6 +39,7 @@ impl BenchmarkConfig {
                     );
                 }
                 c.params.style.validate()?;
+                c.params.validate_metrics()?;
                 Ok(())
             }
         }

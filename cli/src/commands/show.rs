@@ -21,10 +21,17 @@ pub async fn show(run_id: i64, json: bool) -> Result<()> {
     let root = db::resolve_workspace_root(&cwd, false).await?;
     let db = db::open_workspace(&root).await?;
     let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
-    let (run, steps, metrics) = tokio::try_join!(
+    let (run, steps, mut metrics) = tokio::try_join!(
         db::get_run(&db, run_id),
         db::list_steps_for_run(&db, run_id),
         metrics_store.list_for_run(run_id),
+    )?;
+    super::custom_nocode_metrics::append_requested_output_metrics(
+        &mut metrics,
+        run.input.as_deref(),
+        &steps,
+        json,
+        run.finished_at.unwrap_or(run.started_at),
     )?;
 
     if json {

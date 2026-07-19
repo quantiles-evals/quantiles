@@ -373,10 +373,10 @@ mod tests {
         let run_a = seed_run(&db, &metrics_store, 0.5, 10.0).await;
         let run_b = seed_run(&db, &metrics_store, 0.7, 10.0).await;
 
-        let data_a = RunData::fetch_by_id(&db, &metrics_store, run_a)
+        let data_a = RunData::fetch_by_id(&db, &metrics_store, run_a, false)
             .await
             .unwrap();
-        let data_b = RunData::fetch_by_id(&db, &metrics_store, run_b)
+        let data_b = RunData::fetch_by_id(&db, &metrics_store, run_b, false)
             .await
             .unwrap();
 

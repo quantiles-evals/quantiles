@@ -303,10 +303,20 @@ pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
         }
     }
 
-    let aggregate = args
+    let mut aggregate = args
         .metrics_store
         .list_aggregate_for_run(args.run_id)
         .await?;
+    if builtins::custom_nocode_output_metrics_requested(args.input, args.json) {
+        let steps = db::list_steps_for_run(args.db, args.run_id).await?;
+        super::custom_nocode_metrics::append_requested_output_metrics(
+            &mut aggregate,
+            args.input,
+            &steps,
+            args.json,
+            qt::time::now_utc(),
+        )?;
+    }
 
     if args.json {
         let metrics_map: HashMap<String, f64> = aggregate
@@ -767,6 +777,7 @@ mod tests {
                 prompt_template_file: "prompts/qa.txt".to_owned(),
                 limit: Some(10),
                 max_workers: Some(4),
+                metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
@@ -803,6 +814,7 @@ mod tests {
                 prompt_template_file: "prompts/qa.txt".to_owned(),
                 limit: None,
                 max_workers: None,
+                metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
@@ -832,6 +844,7 @@ mod tests {
                 prompt_template_file: "prompts/qa.txt".to_owned(),
                 limit: None,
                 max_workers: None,
+                metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
@@ -907,6 +920,7 @@ mod tests {
                 prompt_template_file: "prompts/qa.txt".to_owned(),
                 limit: None,
                 max_workers: None,
+                metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },

@@ -100,8 +100,91 @@ pub struct CustomNoCodeParams {
     /// Maximum concurrent workers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_workers: Option<usize>,
+    /// Optional aggregate metric families computed only for requested output surfaces.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub metrics: Vec<CustomNoCodeMetricSelection>,
     /// Scoring style and its required dataset-column configuration.
     pub style: CustomNoCodeStyleConfig,
+}
+
+/// Optional aggregate metric family available for custom no-code multiple-choice runs.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomNoCodeMetricName {
+    F1,
+    Confusion,
+}
+
+/// Output surfaces on which an optional aggregate metric family is shown.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomNoCodeMetricShow {
+    All,
+    Json,
+}
+
+/// Detailed optional aggregate metric configuration.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CustomNoCodeMetricConfig {
+    pub name: CustomNoCodeMetricName,
+    pub show: CustomNoCodeMetricShow,
+}
+
+/// Shorthand metric names default to JSON-only output; inline tables can choose visibility.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum CustomNoCodeMetricSelection {
+    Name(CustomNoCodeMetricName),
+    Config(CustomNoCodeMetricConfig),
+}
+
+impl CustomNoCodeMetricSelection {
+    #[must_use]
+    pub const fn name(self) -> CustomNoCodeMetricName {
+        match self {
+            Self::Name(name) => name,
+            Self::Config(config) => config.name,
+        }
+    }
+
+    #[must_use]
+    pub const fn show(self) -> CustomNoCodeMetricShow {
+        match self {
+            Self::Name(_) => CustomNoCodeMetricShow::Json,
+            Self::Config(config) => config.show,
+        }
+    }
+
+    #[must_use]
+    pub const fn requested_for(self, json: bool) -> bool {
+        matches!(self.show(), CustomNoCodeMetricShow::All) || json
+    }
+}
+
+impl CustomNoCodeParams {
+    pub(crate) fn validate_metrics(&self) -> Result<()> {
+        let mut names = std::collections::HashSet::new();
+        for selection in &self.metrics {
+            if !names.insert(selection.name()) {
+                bail!(
+                    "custom_nocode `metrics` must not contain duplicate `{}` entries",
+                    match selection.name() {
+                        CustomNoCodeMetricName::F1 => "f1",
+                        CustomNoCodeMetricName::Confusion => "confusion",
+                    }
+                );
+            }
+        }
+
+        if !self.metrics.is_empty()
+            && matches!(self.style, CustomNoCodeStyleConfig::ExactMatch { .. })
+        {
+            bail!("custom_nocode `metrics` are only supported for multiple-choice evaluations");
+        }
+
+        Ok(())
+    }
 }
 
 impl<'de> Deserialize<'de> for CustomNoCodeBenchmarkConfig {
@@ -266,6 +349,7 @@ mod tests {
                 prompt_template_file: "does_not_exist.txt".to_owned(),
                 limit: None,
                 max_workers: None,
+                metrics: Vec::new(),
                 style: CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
@@ -291,6 +375,7 @@ mod tests {
                 prompt_template_file: file.path().to_str().unwrap().to_owned(),
                 limit: None,
                 max_workers: None,
+                metrics: Vec::new(),
                 style: CustomNoCodeStyleConfig::ExactMatch {
                     golden_column: "answer".to_owned(),
                 },
@@ -306,7 +391,7 @@ mod tests {
         ))
         .unwrap();
 
-        for name in ["nocode_custom", "medqa", "medmcqa", "mmlu-pro", "gpqa"] {
+        for name in ["simpleqa-verified", "medqa", "medmcqa", "mmlu-pro", "gpqa"] {
             assert!(
                 matches!(
                     config.benchmarks.get(name),
@@ -368,5 +453,111 @@ mod tests {
 
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parses_metric_shorthand_and_detailed_config() {
+        let toml = r#"
+            [benchmarks.metrics]
+            type = "custom_nocode"
+            style = { type = "multiple_choice", choices = { column = "options" }, answer = { label_column = "answer" }, choice_labels = ["A", "B"] }
+            dataset = { name = "fixture/qa" }
+            prompt_template_file = "prompts/qa.txt"
+            metrics = ["f1", { name = "confusion", show = "all" }]
+        "#;
+
+        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
+        let Some(BenchmarkConfig::CustomNoCode(benchmark)) = config.benchmarks.get("metrics")
+        else {
+            panic!("missing custom_nocode benchmark");
+        };
+        assert_eq!(benchmark.params.metrics.len(), 2);
+        assert_eq!(
+            benchmark.params.metrics[0].show(),
+            CustomNoCodeMetricShow::Json
+        );
+        assert_eq!(
+            benchmark.params.metrics[1].show(),
+            CustomNoCodeMetricShow::All
+        );
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_metrics() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let benchmark = BenchmarkConfig::CustomNoCode(Box::new(CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: CustomNoCodeParams {
+                dataset: CustomNoCodeDatasetConfig {
+                    name: "fixture/qa".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: file.path().to_string_lossy().into_owned(),
+                limit: None,
+                max_workers: None,
+                metrics: vec![
+                    CustomNoCodeMetricSelection::Name(CustomNoCodeMetricName::F1),
+                    CustomNoCodeMetricSelection::Config(CustomNoCodeMetricConfig {
+                        name: CustomNoCodeMetricName::F1,
+                        show: CustomNoCodeMetricShow::All,
+                    }),
+                ],
+                style: CustomNoCodeStyleConfig::MultipleChoice {
+                    choices: CustomNoCodeChoiceSource::Column(CustomNoCodeChoiceColumn {
+                        column: "options".to_owned(),
+                    }),
+                    answer: CustomNoCodeAnswerSource::LabelColumn(CustomNoCodeLabelAnswer {
+                        label_column: "answer".to_owned(),
+                    }),
+                    choice_labels: vec!["A".to_owned(), "B".to_owned()],
+                    shuffle: None,
+                },
+            },
+        }));
+
+        assert!(
+            benchmark
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate `f1`")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_metrics_for_exact_match() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let benchmark = BenchmarkConfig::CustomNoCode(Box::new(CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: CustomNoCodeParams {
+                dataset: CustomNoCodeDatasetConfig {
+                    name: "fixture/qa".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: file.path().to_string_lossy().into_owned(),
+                limit: None,
+                max_workers: None,
+                metrics: vec![CustomNoCodeMetricSelection::Name(
+                    CustomNoCodeMetricName::F1,
+                )],
+                style: CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        }));
+
+        assert!(
+            benchmark
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("only supported for multiple-choice")
+        );
     }
 }

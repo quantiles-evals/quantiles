@@ -239,6 +239,7 @@ mod tests {
                     prompt_template_file: file.path().to_str().unwrap().to_owned(),
                     limit: None,
                     max_workers: None,
+                    metrics: Vec::new(),
                     style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
                         golden_column: "answer".to_owned(),
                     },
@@ -366,8 +367,8 @@ limit = 2
         let agg = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
         let names: Vec<&str> = agg.iter().map(|m| m.metric_name.as_str()).collect();
         assert!(names.contains(&"accuracy"));
-        assert!(names.contains(&"correct_count"));
-        assert!(names.contains(&"total_count"));
+        assert!(!names.contains(&"correct_count"));
+        assert!(!names.contains(&"total_count"));
 
         // Verify steps were persisted in SQLite.
         let steps = qt::db::list_steps_for_run(&db, run_id).await.unwrap();

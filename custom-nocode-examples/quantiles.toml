@@ -93,6 +93,7 @@ type = "custom_nocode"
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
 dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
+metrics = [{ name = "f1", show = "all" }, { name = "confusion", show = "json" }]
 
 [benchmarks.gpqa.style]
 type = "multiple_choice"

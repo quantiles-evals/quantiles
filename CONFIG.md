@@ -119,6 +119,8 @@ Multiple-choice runs also emit the following aggregate metrics:
 - `confusion_matrix_G_P` is the number of samples whose golden label has index `G` and whose parsed prediction has index `P`. These cells form the parsed-label columns of the run's confusion matrix.
 - `confusion_matrix_G_unparsed` is the number of samples whose golden label has index `G` but whose response could not be parsed as a configured label. These cells form the confusion matrix's additional unparsed-prediction column.
 
+Per-label precision, recall, F1, and support metrics and all confusion-matrix metrics are stored with the run but omitted from normal CLI output, `qt run --json`, and comparisons. Use `qt show <run_id> --json` to inspect them.
+
 Precision, recall, and F1 are reported as `0` when their denominator is zero. The confusion matrix uses golden labels as rows and predicted labels, plus the unparsed bucket, as columns.
 
 Multiple-choice configuration keeps its choice and answer sources inside `style`:
