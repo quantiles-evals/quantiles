@@ -4,17 +4,16 @@ use anyhow::Result;
 
 use self::data::{DatasetRow, prepare_row};
 use self::evaluation::{EvaluateRowArgs, evaluate_row};
-use self::metrics::emit_aggregate_metrics;
+use self::metrics::emit_default_aggregate_metrics;
 use self::runtime::{load_template, parse_input, resolve_dataset_limit, resolve_sampler_for_style};
 use crate::builtins::common::get_max_workers;
 use crate::builtins::dataset_runner::DatasetRunner;
-use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 
 mod data;
 mod evaluation;
-mod metrics;
+pub(crate) mod metrics;
 mod runtime;
 
 /// No-code custom benchmark builtin.
@@ -37,7 +36,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
     }
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
-        let config = parse_input(ctx.input)?;
+        let mut config = parse_input(ctx.input)?;
         let (template_str, env) = load_template(&config.prompt_template_file)?;
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler_for_style(config.model.as_ref(), &config.style)?;
@@ -50,14 +49,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             config.limit,
         )
         .await?;
-        set_builtin_run_input(
-            ctx.db,
-            ctx.run_id,
-            config.model.as_ref(),
-            limit,
-            config.max_workers,
-        )
-        .await?;
+        config.limit = Some(limit);
+        crate::db::set_run_input(ctx.db, ctx.run_id, &serde_json::to_string(&config)?).await?;
 
         let db = ctx.db.clone();
         let model_name = config
@@ -66,12 +59,6 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .map_or("random".to_string(), std::string::ToString::to_string);
         let run_id = ctx.run_id;
         let dataset = config.dataset.name.clone();
-        let choice_labels = match &config.style {
-            crate::config::CustomNoCodeStyleConfig::ExactMatch { .. } => None,
-            crate::config::CustomNoCodeStyleConfig::MultipleChoice { choice_labels, .. } => {
-                Some(choice_labels.clone())
-            }
-        };
         let style = Arc::new(config.style.clone());
         let template_str = Arc::new(template_str);
 
@@ -106,13 +93,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             .await?;
 
         let total_count = results.len();
-        emit_aggregate_metrics(
-            ctx.metrics_store,
-            ctx.run_id,
-            &results,
-            choice_labels.as_deref(),
-        )
-        .await?;
+        emit_default_aggregate_metrics(ctx.metrics_store, ctx.run_id, &results).await?;
 
         set_builtin_run_output(ctx.db, ctx.run_id, total_count).await?;
 
@@ -180,7 +161,6 @@ mod tests {
     }
 
     #[expect(clippy::too_many_lines)]
-    #[expect(clippy::cast_possible_truncation)]
     #[tokio::test]
     /// Verifies end-to-end execution, metric persistence, and cached-step reuse.
     async fn execute_records_metrics_and_steps_with_fixture() {
@@ -260,28 +240,24 @@ mod tests {
 
         let agg = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
         let names: Vec<&str> = agg.iter().map(|m| m.metric_name.as_str()).collect();
-        assert!(names.contains(&"accuracy"));
-        assert!(names.contains(&"correct_count"));
-        assert!(names.contains(&"incorrect_count"));
-        assert!(names.contains(&"total_count"));
-        assert!(names.contains(&"parsed_response_count"));
-        assert!(names.contains(&"unparsed_response_count"));
-        assert!(names.contains(&"parse_rate"));
-        assert!(names.contains(&"mean_latency_ms"));
-        assert!(names.contains(&"median_latency_ms"));
-        assert!(names.contains(&"p95_latency_ms"));
-        assert!(names.contains(&"p99_latency_ms"));
-        assert!(names.contains(&"min_latency_ms"));
-        assert!(names.contains(&"max_latency_ms"));
+        assert_eq!(
+            names,
+            [
+                "accuracy",
+                "max_latency_ms",
+                "mean_latency_ms",
+                "median_latency_ms",
+                "min_latency_ms",
+                "p95_latency_ms",
+                "p99_latency_ms",
+            ]
+        );
 
-        let total_metric = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
-        assert_eq!(total_metric.metric_value as i64, 2);
-
-        let correct_metric = agg
-            .iter()
-            .find(|m| m.metric_name == "correct_count")
-            .unwrap();
-        assert_eq!(correct_metric.metric_value as i64, 0);
+        let recorded_run = crate::db::get_run(&db, run_id).await.unwrap();
+        let recorded_input: serde_json::Value =
+            serde_json::from_str(recorded_run.input.as_deref().unwrap()).unwrap();
+        assert_eq!(recorded_input["style"]["type"], "exact_match");
+        assert_eq!(recorded_input["limit"], 2);
 
         let all_metrics = metrics_store.list_for_run(run_id).await.unwrap();
         let is_correct_count = all_metrics

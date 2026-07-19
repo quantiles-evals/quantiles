@@ -1,149 +1,58 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result, bail};
+use serde::Deserialize;
 
-use crate::builtins::common::{compute_statistics, emit_accuracy_metrics};
+use crate::builtins::common::compute_statistics;
+use crate::config::{CustomNoCodeMetricName, CustomNoCodeParams, CustomNoCodeStyleConfig};
+use crate::db::StepSummary;
 
 #[derive(Clone, Copy, Debug)]
-struct ExactMatchSampleResultParams {
+pub(super) struct SampleResult {
     is_correct: bool,
 }
 
+impl SampleResult {
+    pub(super) const fn new(is_correct: bool) -> Self {
+        Self { is_correct }
+    }
+}
+
+/// An aggregate metric computed for output without being persisted.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OutputMetric {
+    pub name: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct StoredRowOutput {
+    parsed_response: Option<String>,
+    golden: String,
+}
+
 #[derive(Clone, Debug)]
-struct MultipleChoiceSampleResultParams {
-    is_correct: bool,
+struct MultipleChoiceResult {
     golden_label: String,
-    /// The configured label parsed from the response, or `None` when parsing fails.
-    /// Unparsed predictions show up in the 'unparsed' column in the confusion matrix,
-    /// and surface accordingly in classification metrics.
     predicted_label: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-enum SampleResultKind {
-    ExactMatch(ExactMatchSampleResultParams),
-    MultipleChoice(MultipleChoiceSampleResultParams),
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct SampleResult(SampleResultKind);
-
-impl SampleResult {
-    /// Construct an exact-match result from its correctness value.
-    pub(super) const fn exact_match(is_correct: bool) -> Self {
-        Self(SampleResultKind::ExactMatch(ExactMatchSampleResultParams {
-            is_correct,
-        }))
-    }
-
-    /// Construct a multiple-choice result with its golden and optionally parsed labels.
-    pub(super) fn multiple_choice(
-        is_correct: bool,
-        golden_label: String,
-        predicted_label: Option<String>,
-    ) -> Self {
-        Self(SampleResultKind::MultipleChoice(
-            MultipleChoiceSampleResultParams {
-                is_correct,
-                golden_label,
-                predicted_label,
-            },
-        ))
-    }
-
-    /// Return whether this sample's parsed response matched its golden answer.
-    const fn is_correct(&self) -> bool {
-        match &self.0 {
-            SampleResultKind::ExactMatch(params) => params.is_correct,
-            SampleResultKind::MultipleChoice(params) => params.is_correct,
-        }
-    }
-
-    /// Return whether the response could be parsed for this scoring style.
-    const fn response_parsed(&self) -> bool {
-        match &self.0 {
-            SampleResultKind::ExactMatch(_) => true,
-            SampleResultKind::MultipleChoice(params) => params.predicted_label.is_some(),
-        }
-    }
-}
-
-#[expect(clippy::cast_precision_loss)]
-/// Emit correctness, parsing, latency, and optional classification aggregates for a run.
-pub(super) async fn emit_aggregate_metrics(
+/// Persist only the default accuracy and latency aggregates.
+pub(super) async fn emit_default_aggregate_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
     results: &[SampleResult],
-    choice_labels: Option<&[String]>,
 ) -> Result<()> {
     if results.is_empty() {
         return Ok(());
     }
 
-    emit_accuracy_metrics(
-        metrics_store,
-        run_id,
-        results.iter().map(SampleResult::is_correct),
-    )
-    .await;
-
-    let incorrect_count = results.iter().filter(|result| !result.is_correct()).count();
-    let parsed_response_count = results
-        .iter()
-        .filter(|result| result.response_parsed())
-        .count();
-    let unparsed_response_count = results.len() - parsed_response_count;
-    let parse_rate = parsed_response_count as f64 / results.len() as f64;
-
+    #[expect(clippy::cast_precision_loss)]
+    let accuracy =
+        results.iter().filter(|result| result.is_correct).count() as f64 / results.len() as f64;
     metrics_store
-        .emit(
-            run_id,
-            None,
-            "incorrect_count",
-            incorrect_count as f64,
-            None,
-        )
+        .emit(run_id, None, "accuracy", accuracy, None)
         .await;
-    metrics_store
-        .emit(
-            run_id,
-            None,
-            "parsed_response_count",
-            parsed_response_count as f64,
-            None,
-        )
-        .await;
-    metrics_store
-        .emit(
-            run_id,
-            None,
-            "unparsed_response_count",
-            unparsed_response_count as f64,
-            None,
-        )
-        .await;
-    metrics_store
-        .emit(run_id, None, "parse_rate", parse_rate, None)
-        .await;
-
-    if let Some(choice_labels) = choice_labels {
-        let multiple_choice_results = results
-            .iter()
-            .map(|result| match &result.0 {
-                SampleResultKind::MultipleChoice(params) => Ok(params.clone()),
-                SampleResultKind::ExactMatch(_) => {
-                    bail!("multiple-choice aggregate received an exact-match sample")
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-        emit_multiple_choice_aggregate_metrics(
-            metrics_store,
-            run_id,
-            &multiple_choice_results,
-            choice_labels,
-        )
-        .await?;
-    }
 
     let latency_values = metrics_store
         .sample_metric_values(run_id, "latency_ms")
@@ -168,9 +77,81 @@ pub(super) async fn emit_aggregate_metrics(
     Ok(())
 }
 
-/// Build a golden-label-by-predicted-label count matrix with a final unparsed column.
+/// Return whether the stored custom no-code input requests derived metrics for this output mode.
+#[must_use]
+pub fn output_metrics_requested(input: Option<&str>, json: bool) -> bool {
+    parse_config(input).is_some_and(|config| {
+        config
+            .metrics
+            .iter()
+            .any(|selection| selection.requested_for(json))
+    })
+}
+
+/// Compute configured aggregate metrics from durable step outputs without persisting them.
+///
+/// # Errors
+///
+/// Returns an error when a requested metric is incompatible with the stored configuration,
+/// or when a durable step output cannot be decoded into a multiple-choice result.
+pub fn compute_output_metrics(
+    input: Option<&str>,
+    steps: &[StepSummary],
+    json: bool,
+) -> Result<Vec<OutputMetric>> {
+    let Some(config) = parse_config(input) else {
+        return Ok(Vec::new());
+    };
+    let requested = config
+        .metrics
+        .iter()
+        .copied()
+        .filter(|selection| selection.requested_for(json))
+        .collect::<Vec<_>>();
+    if requested.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let CustomNoCodeStyleConfig::MultipleChoice { choice_labels, .. } = &config.style else {
+        bail!("configured output metrics require a multiple-choice evaluation");
+    };
+    let results = steps
+        .iter()
+        .filter_map(|step| step.output.as_deref().map(|output| (step, output)))
+        .map(|(step, output)| {
+            let output: StoredRowOutput = serde_json::from_str(output)
+                .with_context(|| format!("failed to parse output for step `{}`", step.step_key))?;
+            Ok(MultipleChoiceResult {
+                golden_label: output.golden,
+                predicted_label: output.parsed_response,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if results.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let matrix = build_confusion_matrix(&results, choice_labels)?;
+    let mut metrics = Vec::new();
+    for selection in requested {
+        match selection.name() {
+            CustomNoCodeMetricName::F1 => {
+                metrics.extend(compute_f1_metrics(&matrix));
+            }
+            CustomNoCodeMetricName::Confusion => {
+                metrics.extend(confusion_metrics(&matrix));
+            }
+        }
+    }
+    Ok(metrics)
+}
+
+fn parse_config(input: Option<&str>) -> Option<CustomNoCodeParams> {
+    input.and_then(|input| serde_json::from_str(input).ok())
+}
+
 fn build_confusion_matrix(
-    results: &[MultipleChoiceSampleResultParams],
+    results: &[MultipleChoiceResult],
     choice_labels: &[String],
 ) -> Result<Vec<Vec<usize>>> {
     if choice_labels.is_empty() {
@@ -206,100 +187,63 @@ fn build_confusion_matrix(
 }
 
 #[expect(clippy::cast_precision_loss)]
-/// Emit per-label, macro, weighted, and confusion-matrix metrics for multiple-choice results.
-async fn emit_multiple_choice_aggregate_metrics(
-    metrics_store: &crate::metrics_store::MetricsStore,
-    run_id: i64,
-    results: &[MultipleChoiceSampleResultParams],
-    choice_labels: &[String],
-) -> Result<()> {
-    let confusion_matrix = build_confusion_matrix(results, choice_labels)?;
-    let unparsed_index = choice_labels.len();
-    let total = results.len() as f64;
-    let mut macro_precision = 0.0;
-    let mut macro_recall = 0.0;
+fn compute_f1_metrics(matrix: &[Vec<usize>]) -> Vec<OutputMetric> {
+    let label_count = matrix.len();
+    let total = matrix.iter().flatten().sum::<usize>() as f64;
     let mut macro_f1 = 0.0;
-    let mut weighted_precision = 0.0;
-    let mut weighted_recall = 0.0;
     let mut weighted_f1 = 0.0;
+    let mut metrics = Vec::with_capacity(label_count + 2);
 
-    for label_index in 0..choice_labels.len() {
-        let true_positive = confusion_matrix[label_index][label_index] as f64;
-        let false_positive = confusion_matrix
+    for label_index in 0..label_count {
+        let true_positive = matrix[label_index][label_index] as f64;
+        let false_positive = matrix
             .iter()
             .enumerate()
             .filter(|(golden_index, _)| *golden_index != label_index)
             .map(|(_, row)| row[label_index])
             .sum::<usize>() as f64;
-        let support = confusion_matrix[label_index].iter().sum::<usize>() as f64;
-        let false_negative = support - true_positive;
+        let support = matrix[label_index].iter().sum::<usize>() as f64;
         let precision = safe_ratio(true_positive, true_positive + false_positive);
-        let recall = safe_ratio(true_positive, true_positive + false_negative);
+        let recall = safe_ratio(true_positive, support);
         let f1 = safe_ratio(2.0 * precision * recall, precision + recall);
-        let weight = support / total;
-
-        macro_precision += precision;
-        macro_recall += recall;
         macro_f1 += f1;
-        weighted_precision += precision * weight;
-        weighted_recall += recall * weight;
-        weighted_f1 += f1 * weight;
-
-        for (metric_name, metric_value) in [
-            (format!("precision_label_{label_index}"), precision),
-            (format!("recall_label_{label_index}"), recall),
-            (format!("f1_label_{label_index}"), f1),
-            (format!("support_label_{label_index}"), support),
-        ] {
-            metrics_store
-                .emit(run_id, None, &metric_name, metric_value, None)
-                .await;
-        }
-
-        for (predicted_index, count) in confusion_matrix[label_index]
-            .iter()
-            .take(choice_labels.len())
-            .enumerate()
-        {
-            metrics_store
-                .emit(
-                    run_id,
-                    None,
-                    &format!("confusion_matrix_{label_index}_{predicted_index}"),
-                    *count as f64,
-                    None,
-                )
-                .await;
-        }
-        metrics_store
-            .emit(
-                run_id,
-                None,
-                &format!("confusion_matrix_{label_index}_unparsed"),
-                confusion_matrix[label_index][unparsed_index] as f64,
-                None,
-            )
-            .await;
+        weighted_f1 += f1 * safe_ratio(support, total);
+        metrics.push(OutputMetric {
+            name: format!("f1_label_{label_index}"),
+            value: f1,
+        });
     }
 
-    let label_count = choice_labels.len() as f64;
-    for (metric_name, metric_value) in [
-        ("macro_precision", macro_precision / label_count),
-        ("macro_recall", macro_recall / label_count),
-        ("macro_f1", macro_f1 / label_count),
-        ("weighted_precision", weighted_precision),
-        ("weighted_recall", weighted_recall),
-        ("weighted_f1", weighted_f1),
-    ] {
-        metrics_store
-            .emit(run_id, None, metric_name, metric_value, None)
-            .await;
-    }
-
-    Ok(())
+    metrics.push(OutputMetric {
+        name: "macro_f1".to_owned(),
+        value: macro_f1 / label_count as f64,
+    });
+    metrics.push(OutputMetric {
+        name: "weighted_f1".to_owned(),
+        value: weighted_f1,
+    });
+    metrics
 }
 
-/// Divide two metric values, returning zero when the denominator is effectively zero.
+#[expect(clippy::cast_precision_loss)]
+fn confusion_metrics(matrix: &[Vec<usize>]) -> Vec<OutputMetric> {
+    let label_count = matrix.len();
+    let mut metrics = Vec::with_capacity(label_count * (label_count + 1));
+    for (golden_index, row) in matrix.iter().enumerate() {
+        for (predicted_index, count) in row.iter().take(label_count).enumerate() {
+            metrics.push(OutputMetric {
+                name: format!("confusion_matrix_{golden_index}_{predicted_index}"),
+                value: *count as f64,
+            });
+        }
+        metrics.push(OutputMetric {
+            name: format!("confusion_matrix_{golden_index}_unparsed"),
+            value: row[label_count] as f64,
+        });
+    }
+    metrics
+}
+
 fn safe_ratio(numerator: f64, denominator: f64) -> f64 {
     if denominator.abs() < f64::EPSILON {
         0.0
@@ -311,10 +255,12 @@ fn safe_ratio(numerator: f64, denominator: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::StepStatus;
+    use serde_json::json;
+    use time::OffsetDateTime;
 
     #[tokio::test]
-    /// Verifies all aggregate metric families and their expected values are emitted.
-    async fn emits_extended_aggregate_metrics() {
+    async fn persists_only_default_aggregates() {
         let tmpdir = tempfile::tempdir().unwrap();
         let metrics_store =
             crate::metrics_store::MetricsStore::new(tmpdir.path().join("metrics")).unwrap();
@@ -325,64 +271,156 @@ mod tests {
                 .await;
         }
         let results = [
-            SampleResult::multiple_choice(true, "A".to_owned(), Some("A".to_owned())),
-            SampleResult::multiple_choice(false, "A".to_owned(), Some("B".to_owned())),
-            SampleResult::multiple_choice(false, "B".to_owned(), None),
+            SampleResult::new(true),
+            SampleResult::new(false),
+            SampleResult::new(false),
         ];
-        let choice_labels = ["A".to_owned(), "B".to_owned()];
 
-        emit_aggregate_metrics(&metrics_store, run_id, &results, Some(&choice_labels))
+        emit_default_aggregate_metrics(&metrics_store, run_id, &results)
             .await
             .unwrap();
         metrics_store.flush(run_id).await.unwrap();
-        let metrics = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
-        let value = |name: &str| {
-            metrics
+        let names = metrics_store
+            .list_aggregate_for_run(run_id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|metric| metric.metric_name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names,
+            [
+                "accuracy",
+                "max_latency_ms",
+                "mean_latency_ms",
+                "median_latency_ms",
+                "min_latency_ms",
+                "p95_latency_ms",
+                "p99_latency_ms",
+            ]
+        );
+    }
+
+    #[test]
+    fn computes_requested_f1_and_confusion_metrics() {
+        let results = [
+            MultipleChoiceResult {
+                golden_label: "A".to_owned(),
+                predicted_label: Some("A".to_owned()),
+            },
+            MultipleChoiceResult {
+                golden_label: "A".to_owned(),
+                predicted_label: Some("B".to_owned()),
+            },
+            MultipleChoiceResult {
+                golden_label: "B".to_owned(),
+                predicted_label: None,
+            },
+        ];
+        let matrix = build_confusion_matrix(&results, &["A".to_owned(), "B".to_owned()]).unwrap();
+        let f1 = compute_f1_metrics(&matrix);
+        let confusion = confusion_metrics(&matrix);
+
+        let macro_f1 = f1.iter().find(|m| m.name == "macro_f1").unwrap().value;
+        assert!((macro_f1 - 1.0 / 3.0).abs() < f64::EPSILON);
+        let unparsed = confusion
+            .iter()
+            .find(|m| m.name == "confusion_matrix_1_unparsed")
+            .unwrap()
+            .value;
+        assert!((unparsed - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn computes_only_metric_families_requested_for_output_mode() {
+        let input = json!({
+            "dataset": {"name": "fixture/qa"},
+            "prompt_template_file": "prompts/qa.txt",
+            "style": {
+                "type": "multiple_choice",
+                "choices": {"column": "options"},
+                "answer": {"label_column": "answer"},
+                "choice_labels": ["A", "B"]
+            },
+            "metrics": [
+                "f1",
+                {"name": "confusion", "show": "all"}
+            ]
+        })
+        .to_string();
+        let steps = vec![
+            step(1, "A", Some("A")),
+            step(2, "A", Some("B")),
+            step(3, "B", None),
+        ];
+
+        let human = compute_output_metrics(Some(&input), &steps, false).unwrap();
+        assert!(
+            human
                 .iter()
-                .find(|metric| metric.metric_name == name)
-                .unwrap()
-                .metric_value
-        };
-        let assert_metric = |name: &str, expected: f64| {
-            let actual = value(name);
-            assert!(
-                (actual - expected).abs() < 1e-12,
-                "expected {name}={expected}, got {actual}"
-            );
+                .all(|metric| metric.name.starts_with("confusion_matrix_"))
+        );
+        assert!(!human.is_empty());
+
+        let json = compute_output_metrics(Some(&input), &steps, true).unwrap();
+        assert!(json.iter().any(|metric| metric.name == "macro_f1"));
+        assert!(
+            json.iter()
+                .any(|metric| metric.name == "confusion_matrix_0_0")
+        );
+    }
+
+    #[test]
+    fn skips_step_parsing_when_no_output_metrics_are_requested() {
+        let input = json!({
+            "dataset": {"name": "fixture/qa"},
+            "prompt_template_file": "prompts/qa.txt",
+            "style": {
+                "type": "multiple_choice",
+                "choices": {"column": "options"},
+                "answer": {"label_column": "answer"},
+                "choice_labels": ["A", "B"]
+            }
+        })
+        .to_string();
+        let malformed_step = StepSummary {
+            id: 1,
+            step_key: "row-0".to_owned(),
+            input_hash: "hash".to_owned(),
+            status: StepStatus::Completed,
+            output: Some("not JSON".to_owned()),
+            error: None,
+            started_at: OffsetDateTime::UNIX_EPOCH,
+            finished_at: Some(OffsetDateTime::UNIX_EPOCH),
         };
 
-        assert_metric("accuracy", 1.0 / 3.0);
-        assert_metric("correct_count", 1.0);
-        assert_metric("incorrect_count", 2.0);
-        assert_metric("total_count", 3.0);
-        assert_metric("parsed_response_count", 2.0);
-        assert_metric("unparsed_response_count", 1.0);
-        assert_metric("parse_rate", 2.0 / 3.0);
-        assert_metric("mean_latency_ms", 20.0);
-        assert_metric("median_latency_ms", 20.0);
-        assert_metric("p95_latency_ms", 29.0);
-        assert_metric("p99_latency_ms", 29.8);
-        assert_metric("min_latency_ms", 10.0);
-        assert_metric("max_latency_ms", 30.0);
-        assert_metric("precision_label_0", 1.0);
-        assert_metric("recall_label_0", 0.5);
-        assert_metric("f1_label_0", 2.0 / 3.0);
-        assert_metric("support_label_0", 2.0);
-        assert_metric("precision_label_1", 0.0);
-        assert_metric("recall_label_1", 0.0);
-        assert_metric("f1_label_1", 0.0);
-        assert_metric("support_label_1", 1.0);
-        assert_metric("macro_precision", 0.5);
-        assert_metric("macro_recall", 0.25);
-        assert_metric("macro_f1", 1.0 / 3.0);
-        assert_metric("weighted_precision", 2.0 / 3.0);
-        assert_metric("weighted_recall", 1.0 / 3.0);
-        assert_metric("weighted_f1", 4.0 / 9.0);
-        assert_metric("confusion_matrix_0_0", 1.0);
-        assert_metric("confusion_matrix_0_1", 1.0);
-        assert_metric("confusion_matrix_0_unparsed", 0.0);
-        assert_metric("confusion_matrix_1_0", 0.0);
-        assert_metric("confusion_matrix_1_1", 0.0);
-        assert_metric("confusion_matrix_1_unparsed", 1.0);
+        assert!(!output_metrics_requested(Some(&input), true));
+        assert!(
+            compute_output_metrics(Some(&input), &[malformed_step], true)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    fn step(id: i64, golden: &str, parsed_response: Option<&str>) -> StepSummary {
+        StepSummary {
+            id,
+            step_key: format!("row-{}", id - 1),
+            input_hash: format!("hash-{id}"),
+            status: StepStatus::Completed,
+            output: Some(
+                json!({
+                    "input": "question",
+                    "response": parsed_response.unwrap_or("unparsed"),
+                    "parsed_response": parsed_response,
+                    "golden": golden,
+                    "is_correct": parsed_response == Some(golden)
+                })
+                .to_string(),
+            ),
+            error: None,
+            started_at: OffsetDateTime::UNIX_EPOCH,
+            finished_at: Some(OffsetDateTime::UNIX_EPOCH),
+        }
     }
 }

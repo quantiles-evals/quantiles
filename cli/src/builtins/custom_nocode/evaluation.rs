@@ -106,12 +106,7 @@ pub(super) async fn evaluate_row(
             .await;
     }
 
-    Ok(match prepared {
-        PreparedRow::ExactMatch { .. } => SampleResult::exact_match(output.is_correct),
-        PreparedRow::MultipleChoice { .. } => {
-            SampleResult::multiple_choice(output.is_correct, output.golden, output.parsed_response)
-        }
-    })
+    Ok(SampleResult::new(output.is_correct))
 }
 
 /// Extract a configured choice label from a direct response or its final few tokens.

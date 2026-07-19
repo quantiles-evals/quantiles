@@ -102,26 +102,9 @@ The following table lists the required and optional fields supported by `custom_
 | `style.shuffle.seed_column`          | string           | conditional | Dataset column containing a stable row-specific value used to reproduce the same shuffled order. Required when `style.shuffle` is configured.                               |
 | `limit`                              | integer          | no          | Maximum number of dataset rows to evaluate. Defaults to all available rows and must be greater than zero.                                                                   |
 | `max_workers`                        | integer          | no          | Maximum number of dataset rows evaluated concurrently. If omitted, Quantiles uses its configured runtime default.                                                           |
+| `metrics`                            | array            | no          | Optional multiple-choice aggregate families to compute for requested output. Supports `"f1"` and `"confusion"`. Each item in this array can be either a string or a table. See the "Metrics" section below for details.                 |
 
-Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
-
-Each run emits these aggregate metrics:
-
-- `accuracy`, `correct_count`, `incorrect_count`, and `total_count`
-- `parsed_response_count`, `unparsed_response_count`, and `parse_rate`
-- `mean_latency_ms`, `median_latency_ms`, `p95_latency_ms`, `p99_latency_ms`, `min_latency_ms`, and `max_latency_ms`
-
-Multiple-choice runs also emit the following aggregate metrics:
-
-- `macro_precision`, `macro_recall`, and `macro_f1` are the arithmetic means of the corresponding per-label metrics. Every configured label has equal weight, regardless of how often it appears as the golden answer.
-- `weighted_precision`, `weighted_recall`, and `weighted_f1` average the corresponding per-label metrics using each label's golden-answer support (e.g., the number of samples whose golden answer is that label). These metrics therefore account for imbalanced label frequencies.
-- Per-label `precision_label_N`, `recall_label_N`, and `f1_label_N` evaluate label `N` as the positive class against all other labels. `support_label_N` is the number of samples whose golden answer is that label, and `N` is the label's index in `style.choice_labels`.
-- `confusion_matrix_G_P` is the number of samples whose golden label has index `G` and whose parsed prediction has index `P`. These cells form the parsed-label columns of the run's confusion matrix.
-- `confusion_matrix_G_unparsed` is the number of samples whose golden label has index `G` but whose response could not be parsed as a configured label. These cells form the confusion matrix's additional unparsed-prediction column.
-
-Per-label precision, recall, F1, and support metrics and all confusion-matrix metrics are stored with the run but omitted from normal CLI output, `qt run --json`, and comparisons. Use `qt show <run_id> --json` to inspect them.
-
-Precision, recall, and F1 are reported as `0` when their denominator is zero. The confusion matrix uses golden labels as rows and predicted labels, plus the unparsed bucket, as columns.
+#### The `style` key
 
 Multiple-choice configuration keeps its choice and answer sources inside `style`:
 
@@ -147,7 +130,47 @@ Templates access dataset fields directly. A multiple-choice template can iterate
 
 See the [sample custom_nocode configuration](./custom-nocode-examples/quantiles.toml) for a complete example.
 
-### `custom_code` evaluation
+#### Metrics
+
+Each sample emits `is_correct`, `response_parsed`, and `latency_ms`. For exact-match benchmarks, every response is considered parsed; for multiple-choice benchmarks, `response_parsed` is `0` when the response cannot be parsed as a configured choice label.
+
+Each run stores `accuracy` and the `mean_latency_ms`, `median_latency_ms`, `p95_latency_ms`, `p99_latency_ms`, `min_latency_ms`, and `max_latency_ms` aggregates. Optional F1 and confusion-matrix aggregates are never stored. They are computed from recorded sample outputs only when requested for the active CLI output mode.
+
+Multiple-choice evaluations can opt into those derived metric families using names or inline tables.
+
+Specifying just the metric names, like in the below example, defaults those metrics to be shown only when the `--json` flag is passed:
+
+```toml
+metrics = ["f1", "confusion"]
+```
+
+Specifying inline tables, like in the below example, allows you to specify whether those metrics are shown in all cases (`show = "all"`), or just when the `--json` flag is passed (`show = "json"`):
+
+```toml
+metrics = [
+    # the below line shows f1-family metrics whether or not the --json flag is passed
+    { name = "f1", show = "all" },
+    # the below line shows a confusion matrix only when the --json flag is passed
+    { name = "confusion", show = "json" },
+]
+```
+
+When `name = "f1"` is given, the following metrics will be output:
+
+- `macro_f1` - aggregate F1 across all labels
+- `weighted_f1` - F1 values weighted by their support (the percentage of samples for which that label is the right answer)
+- `f1_label_N` - raw F1 values for each label
+
+> F1 is reported as `0` when its denominator is zero.
+
+When `name = "confusion"`, the following metrics will be output:
+
+- `confusion_matrix_G_P` - the confusion matrix entry for every golden label `G` and predicted label `P` pair
+- `confusion_matrix_G_unparsed` - the confusion matrix entry for unparseable responses
+
+The confusion matrix uses golden labels as rows and predicted labels, plus the unparsed bucket, as columns.
+
+### `custom_code` evaluations
 
 Custom code evaluations are built with the [Quantiles Python SDK](https://quantiles.io/documentation/reference/python-sdk). Their configuration sections contain the following fields:
 
