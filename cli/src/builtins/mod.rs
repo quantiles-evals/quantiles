@@ -10,7 +10,6 @@ mod simpleqa_verified;
 
 pub use custom_nocode::CustomNoCodeBuiltin;
 pub use custom_nocode::metrics::{
-    OutputMetric as CustomNoCodeOutputMetric,
     compute_output_metrics as compute_custom_nocode_output_metrics,
     output_metrics_requested as custom_nocode_output_metrics_requested,
 };
