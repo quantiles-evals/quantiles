@@ -68,6 +68,7 @@ Use `qt show` to inspect a single run, `qt list` to see a list of all runs, and 
 Common commands:
 
 ```bash
+qt --version
 qt run <eval_name>
 qt list
 qt show <run_id>

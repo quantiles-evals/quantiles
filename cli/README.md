@@ -27,7 +27,7 @@ qt list
 qt show <run_id>
 ```
 
-> See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
+See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 > Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your LLM provider. Depending on your provider, model, and account limits, benchmark runs can hit API rate limits or concurrency quotas. Reduce request concurrency or use a model or provider with higher throughput limits. The example below shows how to adjust `max_workers` if you encounter throttling.
 
