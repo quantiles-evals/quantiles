@@ -45,6 +45,38 @@ choices = { column = "options" }
 choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 answer = { label_column = "answer" }
 
+# The MMLU-pro benchmark configured to use OpenAI's gpt-5.6-luna model.
+#
+# You can customize any custom_nocode eval to use one of a variety of LLM providers.
+# See the following documentation for details:
+#
+# https://quantiles.io/documentation/configuration#customizing-the-model
+#
+# Read more about the gpt-5.6-luna model here:
+#
+# https://developers.openai.com/api/docs/models/gpt-5.6-luna
+#
+# And read more about the MMLU-pro benchmark here:
+#
+# https://arxiv.org/abs/2406.01574
+[benchmarks.mmlu-pro-gpt-5-6]
+type = "custom_nocode"
+dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
+model = "openai:gpt-5.6-luna"
+prompt_template_file = "prompts/mmlu-pro.txt"
+limit = 100
+
+[benchmarks.mmlu-pro-gpt-5-6.style]
+type = "multiple_choice"
+choices = { column = "options" }
+choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+answer = { label_column = "answer" }
+
+# The GPQA benchmark configured to use the random model
+#
+# Read more about GPQA here:
+#
+# https://arxiv.org/abs/2311.12022
 [benchmarks.gpqa]
 type = "custom_nocode"
 model = "random"
