@@ -40,11 +40,10 @@ run = [
 [tasks.run-http-client-example]
 run="cargo run --example http_client"
 
-# build the CLI for ARM Mac and expect a linux binary to be available.
-# then, package both binaries, publish them to R2 and update the stable
-# channel
+# dispatch the GitHub Actions release workflow, which builds the CLI for all
+# supported macOS and Linux targets and publishes the release artifacts to R2
 [tasks.publish-cli-r2]
-run="bash scripts/publish-cli-r2.sh"
+run="gh workflow run cli-release.yml"
 
 # build the CLI for ARM mac, package the binary, then publish it to R2 and
 # update the beta channel.

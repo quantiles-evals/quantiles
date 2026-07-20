@@ -9,26 +9,12 @@ if ! command -v wrangler >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required to parse cargo metadata" >&2
-  exit 1
-fi
-
-version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
-if [[ -z "$version" || "$version" == "null" ]]; then
-  echo "failed to read crate version from cargo metadata" >&2
-  exit 1
-fi
-
 mkdir -p "$dist_dir"
 install_script="${dist_dir}/install.sh"
-object_prefix="releases/v${version}"
 
 cp scripts/install.sh "$install_script"
 chmod +x "$install_script"
 
 wrangler r2 object put "${bucket}/install.sh" --file "$install_script" --remote --cache-control "no-store"
-wrangler r2 object put "${bucket}/${object_prefix}/install.sh" --file "$install_script" --remote --cache-control "no-store"
 
 echo "published installer to r2://${bucket}/install.sh"
-echo "published versioned installer to r2://${bucket}/${object_prefix}/install.sh"
