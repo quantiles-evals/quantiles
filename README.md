@@ -8,7 +8,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
-**[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-nocode-evaluations) for details.
+**[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
 
 ## Why use Quantiles?
 
@@ -81,7 +81,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 
 ### Configuration and customization
 
-You can customize how the CLI executes [built-in-benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory or a parent directory. The CLI uses this configuration each time you run the benchmark with `qt run`.
+You can customize how the CLI executes [built-in-benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory or a parent directory. The CLI uses this configuration each time you run the benchmark with `qt run`.
 
 See the following resources for more details:
 
@@ -100,7 +100,7 @@ The [benchmark hub](https://quantiles.io/benchmark-hub) describes available benc
 
 Custom evaluations measure behavior specific to your product, workflow, prompt, dataset, rubric, or release process. Quantiles provides two ways to build them:
 
-- [`custom_nocode`](https://quantiles.io/documentation/custom-nocode-evaluations): define a custom evaluation entirely in configuration.
+- [`custom_nocode`](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations): define a custom evaluation entirely in configuration.
 - [`custom_code`](https://quantiles.io/documentation/custom-evaluations): build specialized evaluation logic with [Python](https://quantiles.io/documentation/reference/python-sdk).
 
 Prefer to use `custom_nocode` evaluations wherever possible, since they're easier for humans and agents to create and maintain. When required, fall back to `custom_code` evaluations.

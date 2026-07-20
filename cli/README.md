@@ -36,7 +36,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a 
 The CLI supports three evaluation types:
 
 - [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) run predefined datasets and scoring methods. They work without configuration, but you can override settings such as the model, sample count, and concurrency.
-- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
+- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
 - [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
 Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For example:
