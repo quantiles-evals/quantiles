@@ -11,13 +11,10 @@ fi
 
 mkdir -p "$dist_dir"
 install_script="${dist_dir}/install.sh"
-object_prefix="releases/latest"
 
 cp scripts/install.sh "$install_script"
 chmod +x "$install_script"
 
 wrangler r2 object put "${bucket}/install.sh" --file "$install_script" --remote --cache-control "no-store"
-wrangler r2 object put "${bucket}/${object_prefix}/install.sh" --file "$install_script" --remote --cache-control "no-store"
 
 echo "published installer to r2://${bucket}/install.sh"
-echo "published latest installer to r2://${bucket}/${object_prefix}/install.sh"

@@ -9,7 +9,7 @@ on:
       # not to publish the CLI from pull requests, though.
       - ".github/workflows/cli-release.yml"
   push:
-    # TODO: upload CLI builds from pushes to main to the beta channel
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -76,9 +76,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    # make sure we do not publish the CLI to R2 when we're just testing
-    # the workflow definition in a PR
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
     name: publish to R2
     needs: build
     runs-on: ubuntu-24.04
@@ -99,3 +97,25 @@ jobs:
       - name: Publish release artifacts
         working-directory: cli
         run: bash scripts/publish-release-artifacts-r2.sh
+
+  publish-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: publish beta to R2
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist
+          merge-multiple: true
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Publish beta artifacts
+        working-directory: cli
+        run: bash scripts/publish-beta-artifacts-r2.sh
