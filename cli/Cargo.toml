@@ -1,5 +1,8 @@
 [package]
 name = "qt"
+# As of this writing (2026-07-19), we are not distributing a Rust library, and this
+# will not change unless we do. The version that we care about is output by
+# `qt --version`, and that is set up in the cli-release.yml GitHub workflow definition.
 version = "0.1.0"
 edition = "2024"
 
