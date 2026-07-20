@@ -31,8 +31,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
+          # TODO: get Intel Mac builds working. The are currently
+          # failing with this error:
+          #
+          # https://github.com/quantiles-evals/quantiles/actions/runs/29709160146/job/88250642027?pr=22
+          #
+          # - runner: macos-15-intel
+          #   target: x86_64-apple-darwin
           - runner: macos-14
             target: aarch64-apple-darwin
           - runner: ubuntu-24.04
@@ -91,23 +96,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Wrangler
         run: npm install --global wrangler@4
-      - name: Publish release artifacts and installer
+      - name: Publish release artifacts
         working-directory: cli
-        run: |
-          object_prefixes=("releases/latest")
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            object_prefixes+=("releases/${GITHUB_REF_NAME}")
-            printf '%s\n' "$GITHUB_REF_NAME" > ../dist/version.txt
-          fi
-
-          for object_prefix in "${object_prefixes[@]}"; do
-            for file in ../dist/qt-*.tar.gz ../dist/qt-*.tar.gz.sha256; do
-              wrangler r2 object put "${QT_R2_BUCKET}/${object_prefix}/$(basename "$file")" --file "$file" --remote --cache-control "no-store"
-            done
-            wrangler r2 object put "${QT_R2_BUCKET}/${object_prefix}/install.sh" --file scripts/install.sh --remote --cache-control "no-store"
-          done
-
-          wrangler r2 object put "${QT_R2_BUCKET}/install.sh" --file scripts/install.sh --remote --cache-control "no-store"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            wrangler r2 object put "${QT_R2_BUCKET}/releases/latest/version.txt" --file ../dist/version.txt --remote --cache-control "no-store"
-          fi
+        run: bash scripts/publish-release-artifacts-r2.sh
