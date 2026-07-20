@@ -1,13 +1,13 @@
-# This config file demonstrates running a custom evaluation with `qt run`.
+# This config file demonstrates running a custom-code evaluation with `qt run`.
 #
-# Custom benchmarks use `type = "custom_code"` and must specify a `command`
+# Custom-code evaluations use `type = "custom_code"` and must specify a `command`
 # that the CLI will execute. The `input` table is optional and its keys are
 # passed to the child process via the `QUANTILES_INPUT` environment variable
 # as a JSON object.
 #
 # Usage from this directory:
 #
-#   qt run my-eval
+#   qt run <eval_name>
 #
 # This will run the command below, injecting `QUANTILES_RUN_ID`,
 # `QUANTILES_WORKFLOW_NAME`, `QUANTILES_BASE_URL`, and `QUANTILES_INPUT`
@@ -23,4 +23,4 @@
 [benchmarks.my-eval]
 type = "custom_code"
 command = ["python", "my_eval.py"]
-input = {foo = "foo_val", bar = "bar_val"}
+input = { model_name = "openai:gpt-5.6", samples = 5000 }

@@ -5,6 +5,7 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait LLMSampler: Send + Sync {
     /// Generate a response for the given prompt.
+    // TODO: Return structured token log probabilities so benchmarks can compute perplexity.
     async fn sample(&self, prompt: &str) -> Result<String>;
 }
 

@@ -1,5 +1,4 @@
-# This config file sets up PubMedQA to use the OpenAI API, and sets up the SimpleQA-verified
-# benchmark to use the internal demo model.
+# This config file sets up PubMedQA to use the OpenAI API.
 #
 # The PubMedQA benchmark reads the OpenAI API key from the `OPENAI_API_KEY` environment variable.
 #
@@ -10,29 +9,22 @@
 [benchmarks.pubmedqa]
 dataset = "hf://quantiles/PubMedQA"
 
-# The full expert-labeled PubMedQA benchmark has 1000 samples. Since OpenAI charges for
-# usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
+# The full expert-labeled PubMedQA benchmark has 1,000 samples. Because OpenAI charges for
+# usage, this example limits the run to 50 samples to control costs. Omit `samples` to run the
+# full benchmark.
 samples = 50
 
-# The following model is good for demonstrating PubMedQA benchmarks without very high costs,
-# since it's relatively cheap and fast. You may need to ensure the project associated with
-# your API key has permissions to use this model. Do so by going to the follwing page, and
-# enabling the model:
+# You may need to ensure that the project associated with your API key has permission to use
+# the configured model. Manage model access on the following page:
 #
 # https://platform.openai.com/settings/$PROJECT_ID/limits
 #
-# Details on this specific model can be found at:
-#
-# https://developers.openai.com/api/docs/models/gpt-5.5-nano
-#
-# And a list of all models can be found at:
+# A list of available models is available at:
 #
 # https://developers.openai.com/api/docs/models/all
 model = "openai:gpt-5.6"
 
-# If you run this or other benchmarks with more samples, you may also need to increase this
-# `max_workers` parameter to improve throughput. This might cause you to run into rate
-# limits, because the defaults are relatively low. To increase them, scroll down
-# on the same https://platform.openai.com/settings/$PROJECT_ID/limits page and adjust limits
-# for the model you're using.
+# If you run this or other benchmarks with more samples, you may need to increase
+# `max_workers` to improve throughput. Higher concurrency may trigger rate limits. Adjust
+# model limits at https://platform.openai.com/settings/$PROJECT_ID/limits if needed.
 max_workers = 100

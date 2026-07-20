@@ -3,7 +3,10 @@ use reqwest::header;
 use serde::Deserialize;
 use serde_json::Value;
 
-static HF_DATASETS_SERVER: &str = "https://datasets-server.huggingface.co";
+fn hf_base_url() -> String {
+    std::env::var("HF_DATASETS_SERVER")
+        .unwrap_or_else(|_| "https://datasets-server.huggingface.co".to_owned())
+}
 
 /// Thin async HTTP client for the huggingface Dataset Viewer API.
 pub struct HuggingFaceClient {
@@ -104,7 +107,10 @@ impl HuggingFaceClient {
         config: &str,
         revision: Option<&str>,
     ) -> Result<Vec<String>> {
-        let mut url = format!("{HF_DATASETS_SERVER}/splits?dataset={dataset_id}&config={config}");
+        let mut url = format!(
+            "{}/splits?dataset={dataset_id}&config={config}",
+            hf_base_url()
+        );
         if let Some(rev) = revision {
             url = format!("{url}&revision={rev}");
         }
@@ -127,7 +133,7 @@ impl HuggingFaceClient {
     /// Returns an error if configs couldn't be inferred from the given dataset
     /// and revision.
     pub async fn infer_config(&self, dataset_id: &str, revision: Option<&str>) -> Result<String> {
-        let mut url = format!("{HF_DATASETS_SERVER}/splits?dataset={dataset_id}");
+        let mut url = format!("{}/splits?dataset={dataset_id}", hf_base_url());
         if let Some(rev) = revision {
             url = format!("{url}&revision={rev}");
         }
@@ -160,7 +166,8 @@ impl HuggingFaceClient {
         revision: Option<&str>,
     ) -> Result<Vec<Value>> {
         let mut url = format!(
-            "{HF_DATASETS_SERVER}/rows?dataset={dataset_id}&config={config}&split={split}&offset={offset}&length={limit}"
+            "{}/rows?dataset={dataset_id}&config={config}&split={split}&offset={offset}&length={limit}",
+            hf_base_url()
         );
         if let Some(rev) = revision {
             url = format!("{url}&revision={rev}");
@@ -189,8 +196,10 @@ impl HuggingFaceClient {
         split: &str,
         revision: Option<&str>,
     ) -> Result<InfoResponse> {
-        let mut url =
-            format!("{HF_DATASETS_SERVER}/size?dataset={dataset_id}&config={config}&split={split}");
+        let mut url = format!(
+            "{}/size?dataset={dataset_id}&config={config}&split={split}",
+            hf_base_url()
+        );
         if let Some(rev) = revision {
             url = format!("{url}&revision={rev}");
         }

@@ -341,6 +341,93 @@ mod tests {
         assert!(json.get("warning").is_none());
     }
 
+    /// Comparing two actual `custom_nocode` runs (differing accuracy,
+    /// identical `total_count`) should produce a `CompareReport` that correctly
+    /// flags the changed metric while keeping the unchanged one as "same".
+    #[tokio::test]
+    #[expect(clippy::items_after_statements)]
+    async fn compare_two_custom_nocode_runs() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+
+        async fn seed_run(
+            db: &sea_orm::DatabaseConnection,
+            ms: &qt::metrics_store::MetricsStore,
+            accuracy: f64,
+            total_count: f64,
+        ) -> i64 {
+            let run_id = qt::db::create_run(db, "nocode_custom", None).await.unwrap();
+            ms.emit(run_id, None, "accuracy", accuracy, None).await;
+            ms.emit(run_id, None, "total_count", total_count, None)
+                .await;
+            ms.flush(run_id).await.unwrap();
+            qt::db::complete_run(db, ms, run_id).await.unwrap();
+            run_id
+        }
+
+        let run_a = seed_run(&db, &metrics_store, 0.5, 10.0).await;
+        let run_b = seed_run(&db, &metrics_store, 0.7, 10.0).await;
+
+        let data_a = RunData::fetch_by_id(&db, &metrics_store, run_a, false)
+            .await
+            .unwrap();
+        let data_b = RunData::fetch_by_id(&db, &metrics_store, run_b, false)
+            .await
+            .unwrap();
+
+        let report = CompareReport::build(data_a, data_b);
+
+        // The report should detect differences.
+        assert!(report.differs, "report should flag differing metrics");
+
+        // Both metrics should appear in the comparison.
+        assert_eq!(report.metrics.len(), 2, "expected 2 metrics compared");
+
+        // Accuracy differs between the two runs.
+        let accuracy_cmp = report
+            .metrics
+            .iter()
+            .find(|m| m.name == "accuracy")
+            .expect("accuracy metric should be present");
+        assert!(!accuracy_cmp.same, "accuracy should differ");
+
+        // Total count is identical.
+        let total_cmp = report
+            .metrics
+            .iter()
+            .find(|m| m.name == "total_count")
+            .expect("total_count metric should be present");
+        assert!(total_cmp.same, "total_count should be the same");
+
+        // Use JSON to verify the underlying values without touching private fields.
+        let json = serde_json::to_value(&report).expect("report should serialize");
+        let metrics_json = json["metrics"].as_array().unwrap();
+        let accuracy_json = metrics_json
+            .iter()
+            .find(|m| m["name"] == "accuracy")
+            .unwrap();
+        assert_eq!(accuracy_json["run_a"], serde_json::json!([0.5]));
+        assert_eq!(accuracy_json["run_b"], serde_json::json!([0.7]));
+
+        let total_json = metrics_json
+            .iter()
+            .find(|m| m["name"] == "total_count")
+            .unwrap();
+        assert_eq!(total_json["run_a"], serde_json::json!([10.0]));
+        assert_eq!(total_json["run_b"], serde_json::json!([10.0]));
+
+        // No benchmark-name warning since both runs share the same workflow.
+        assert!(
+            report.warning.is_none(),
+            "no warning expected for identical benchmark names"
+        );
+    }
+
     fn run_data(id: i64, workflow_name: &str) -> RunData {
         let now = OffsetDateTime::now_utc();
         RunData {

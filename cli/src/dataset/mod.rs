@@ -14,6 +14,12 @@ pub struct DatasetInfo {
     pub available_splits: Vec<String>,
     pub selected_split: String,
     pub config: String,
+    /// Dataset revision requested from the source, such as a branch, tag, or commit.
+    ///
+    /// If this is passed as `None`, the following behavior applies:
+    ///
+    /// - For Hugging Face datasets, no revision parameter is sent to the API, and Hugging Face uses the default revision.
+    pub revision: Option<String>,
 }
 
 /// Central manager that coordinates fetching from huggingface and local caching.
@@ -29,11 +35,15 @@ impl DatasetManager {
     ///
     /// Returns an error if the system's cache directory cannot be determined.
     pub fn new() -> Result<Self> {
-        let cache_dir = dirs::home_dir()
-            .context("failed to determine home directory")?
-            .join(".cache")
-            .join("quantiles")
-            .join("datasets");
+        let cache_dir = if let Ok(dir) = std::env::var("QUANTILES_DATASET_CACHE_DIR") {
+            std::path::PathBuf::from(dir)
+        } else {
+            dirs::home_dir()
+                .context("failed to determine home directory")?
+                .join(".cache")
+                .join("quantiles")
+                .join("datasets")
+        };
         let client = HuggingFaceClient::new()?;
         Ok(Self {
             client,
@@ -101,6 +111,7 @@ impl DatasetManager {
             available_splits: splits,
             selected_split,
             config,
+            revision: revision.map(str::to_owned),
         })
     }
 
@@ -148,6 +159,11 @@ impl DatasetManager {
 
 /// Resolve a configured Hugging Face dataset source to the dataset ID expected
 /// by the existing Hugging Face download client.
+///
+/// # Errors
+///
+/// If the given `source` is missing a `hf://` / `huggingface://` prefix, or the
+/// source is otherwise unresolvable, this function returns a descriptive error.
 pub fn resolve_hf_dataset_source(source: &str) -> Result<&str> {
     if let Some(dataset_id) = source
         .strip_prefix("hf://")

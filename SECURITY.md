@@ -14,7 +14,7 @@ Quantiles provides security fixes for the latest released versions of actively m
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, pull requests, or other public forums.**
 
-Instead, please send them to security@quantiles.io.
+Instead, send vulnerability reports to security@quantiles.io.
 
 Please include as much of the information below as you can. This will help us understand the nature and scope of the potential issue.
 
@@ -22,11 +22,11 @@ Please include as much of the information below as you can. This will help us un
 - Steps to reproduce, proof of concept, or affected command/API route
 - Affected component(s), such as `qt`, the Python SDK, local `qt` server API, dataset loader, or export path
 - Affected versions, commits, packages, or deployment environment
-- Whether the issue involves secrets, authentication, local `.quantiles/` artifacts, model outputs
+- Whether the issue involves secrets, authentication, local `.quantiles/` artifacts, or model outputs
 
 Do not include real PHI, private customer datasets, secrets, API keys, access tokens, or full `.quantiles/` databases in vulnerability reports.
 
-We aim to acknowledge vulnerability reports within 3 business days.
+We aim to acknowledge vulnerability reports within three business days.
 
 ## Preferred Language
 

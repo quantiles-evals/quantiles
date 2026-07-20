@@ -37,10 +37,18 @@ impl RunData {
         db: &DatabaseConnection,
         metrics_store: &MetricsStore,
         run_id: i64,
+        json: bool,
     ) -> Result<Self> {
         let run = db::get_run(db, run_id).await?;
         let steps = db::list_steps_for_run(db, run_id).await?;
-        let metrics = metrics_store.list_aggregate_for_run(run_id).await?;
+        let mut metrics = metrics_store.list_aggregate_for_run(run_id).await?;
+        super::super::custom_nocode_metrics::append_requested_output_metrics(
+            &mut metrics,
+            run.input.as_deref(),
+            &steps,
+            json,
+            run.finished_at.unwrap_or(run.started_at),
+        )?;
         Ok(Self {
             run,
             steps,

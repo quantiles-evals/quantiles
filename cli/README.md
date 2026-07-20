@@ -1,6 +1,6 @@
 # Quantiles CLI
 
-This directory contains the source code for the `qt` CLI. It is implemented in [Rust](https://rust-lang.org/) to use local machine resources efficiently, improve safety, and provide strong lints and type-system invariants for humans and agents.
+This directory contains the source code for the `qt` CLI. It is implemented in [Rust](https://rust-lang.org/) for efficient local execution, memory safety, and strong compile-time guarantees.
 
 ## Install
 
@@ -13,54 +13,33 @@ curl -fsSL https://cli.quantiles.io/install.sh | bash
 A few commands to see `qt` in action:
 
 ```bash
-# 1. Initialize a workspace
-qt init
-
-# 2. Run a built-in eval
+# 1. Run a built-in evaluation using a demo model that does
+# not incur any usage charges.
 #
-# Note that you can also build and run your own custom evals
-# with the `qt` CLI. See the following "Custom evaluations" section
-# for details.
-qt run pubmedqa
+# You can also build and run custom evaluations.
+# See "Configure evaluations" below.
+qt run simpleqa-verified
 
-# 3. List and inspect what happened
+# 2. See a list of all your evaluation runs and their run IDs.
 qt list
-qt show 1
+
+# 3. Inspect and analyze the results of your evaluation run.
+qt show <run_id>
 ```
 
-> See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
+See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
-### Custom evaluations
+> Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your LLM provider. Depending on your provider, model, and account limits, benchmark runs can hit API rate limits or concurrency quotas. Reduce request concurrency or use a model or provider with higher throughput limits. The example below shows how to adjust `max_workers` if you encounter throttling.
 
-Custom evaluations are denoted in the configuration file with `type = "custom_code"`. The `command` array tells the CLI how to execute your eval, and the optional `input` table is merged with any values passed through the `--input` flag, then passed to your script as `QUANTILES_INPUT`. An example is below:
+## Configure evaluations
 
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-input = {dataset = "my_dataset.jsonl"}
-```
+The CLI supports three evaluation types:
 
-```bash
-# Run the custom evaluation
-qt run my-eval
+- [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) run predefined datasets and scoring methods. They work without configuration, but you can override settings such as the model, sample count, and concurrency.
+- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
+- [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
-# If it fails, resume with only the run ID
-qt resume <run_id>
-```
-
-See the [custom-code configuration example](./examples/configs/custom_code/quantiles.toml) for a complete working configuration.
-
-## Configuration files and customization
-
-You can customize how the CLI executes built-in benchmarks and custom evaluations using a `quantiles.toml` or `.quantiles.toml` configuration file. See the following resources for information and examples:
-
-- [Configuration reference](../CONFIG.md) for configuration guidance and supported options.
-- [Configuration examples](./examples/configs) for complete working configurations.
-
-### Built-in benchmarks
-
-For built-in benchmarks, configure settings like `dataset`, `samples`, `model`, and `max_workers`:
+Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For example:
 
 ```toml
 [benchmarks.pubmedqa]
@@ -70,35 +49,7 @@ model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
-> Note: Quantiles is designed for high-throughput execution and may issue many requests in parallel. Depending on your provider, model, and account limits, benchmark runs can quickly hit API rate limits or concurrency quotas. Consider reducing concurrency or using models/providers with higher rate limits if you encounter throttling. Example configurations illustrate how to do so.
-
-### Custom code evals
-
-For custom evaluations, set `type = "custom_code"` and provide the `command` to run. The optional `input` table is passed to your script as a JSON dictionary.
-
-```toml
-[benchmarks.my-eval]
-type = "custom_code"
-command = ["python", "my_eval.py"]
-input = { foo = "foo_val" }
-```
-
-## Comparing runs
-
-After iterating on an eval, you can compare two runs to see exactly what changed:
-
-```bash
-# Run A — baseline
-qt run my-eval
-
-# Run B — your latest iteration
-qt run my-eval
-
-# See what changed between them
-qt compare 1 2
-```
-
-`qt compare` exits with code 1 if the runs differ, making it useful in CI scripts.
+See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
 
 ## Architecture
 
@@ -106,7 +57,7 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 
 ```
 +--------------------------------------+
-|   Benchmark / Custom Eval (Python)   |
+|   Benchmark / Custom Evaluation      |
 +-------------------+------------------+
                     │
                     │  HTTP / JSON
@@ -116,11 +67,12 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 |            Quantiles Server          |
 +-------------------+------------------+
                     │
-                    │  SQLite
+                    │  SQLite / Parquet
                     │
                     ▼
 +------------------------------------------------+
-|     .quantiles/quantiles.sqlite (local DB)     |
+|                 .quantiles/                    |
+|  quantiles.sqlite       metrics/*.parquet      |
 +-------------------+----------------------------+
                     │
                     │
@@ -132,7 +84,6 @@ The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `
 +--------------------------------------+
 ```
 
-- **Server** owns durability decisions: step caching, run state, metrics
-- **Client** (your script) owns code execution: the server never runs your logic
-  - Note that the CLI itself also has built-in benchmarks, which do not involve your code
-- **CLI** reads the same SQLite database the server writes to
+- **Server** owns durability decisions for run state, and metrics.
+- **Client** (your script) owns code execution; the server never runs your evaluation logic.
+- **CLI** reads run data from SQLite and metrics from Parquet.

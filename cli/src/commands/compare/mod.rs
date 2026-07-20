@@ -19,10 +19,10 @@ pub async fn compare(left_id: i64, right_id: i64, json: bool) -> Result<()> {
     let db = db::open_workspace(&root).await?;
     let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
 
-    let a = RunData::fetch_by_id(&db, &metrics_store, left_id)
+    let a = RunData::fetch_by_id(&db, &metrics_store, left_id, json)
         .await
         .with_context(|| format!("failed to load data for run {left_id}"))?;
-    let b = RunData::fetch_by_id(&db, &metrics_store, right_id)
+    let b = RunData::fetch_by_id(&db, &metrics_store, right_id, json)
         .await
         .with_context(|| format!("failed to load data for run {right_id}"))?;
 

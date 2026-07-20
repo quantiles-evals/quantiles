@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::builtins::common::{
-    compute_statistics, extract_text, get_max_workers, hash_input, run_timed_step,
+    compute_statistics, extract_text, get_max_workers, hash_input, resolve_sampler, run_timed_step,
 };
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::input::set_builtin_run_input;
 use crate::builtins::output::set_builtin_run_output;
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
+
 use crate::dataset::{DatasetManager, resolve_hf_dataset_source};
-use crate::llm::LLMSampler;
 use crate::llm::random::RandomSampler;
 use crate::similarity::{
     SimilarityMetric, SimilarityMetricName, levenshtein::LevenshteinSimilarity,
@@ -69,8 +69,8 @@ pub const FINANCEBENCH: SimilarityBenchmark = SimilarityBenchmark {
 #[expect(clippy::too_many_lines)]
 #[async_trait::async_trait]
 impl BuiltinWorkflow for SimilarityBenchmark {
-    fn name(&self) -> &'static str {
-        self.name
+    fn name(&self) -> String {
+        self.name.to_string()
     }
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
@@ -90,10 +90,9 @@ impl BuiltinWorkflow for SimilarityBenchmark {
             SimilarityMetricName::Cosine => Box::new(CosineSimilarity::try_new()?),
         };
 
-        let llm: Arc<dyn LLMSampler> = match config.base.model {
-            None => Arc::new(RandomSampler::new(80)),
-            Some(ref sampler) => sampler.resolve()?,
-        };
+        let llm = resolve_sampler(config.base.model.as_ref(), || {
+            Arc::new(RandomSampler::new(80))
+        })?;
 
         let manager = DatasetManager::new()?;
         let dataset_source = config

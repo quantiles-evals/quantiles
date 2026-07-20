@@ -75,6 +75,34 @@ pub async fn run(
                     )
                     .await
                 }
+                qt::config::BenchmarkConfig::CustomNoCode(c) => {
+                    let input = assemble_custom_nocode_input(c, cli_input)?;
+
+                    let cwd = std::env::current_dir()?;
+                    let root = db::resolve_workspace_root(&cwd, true).await?;
+                    let db = db::open_workspace(&root).await?;
+                    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
+                    let run_id = db::create_run(&db, workflow_name, Some(&input)).await?;
+
+                    if !json {
+                        println!("Created run {run_id}");
+                    }
+
+                    let builtin = Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+                        workflow_name.to_owned(),
+                    ));
+                    execute_builtin(ExecuteBuiltinArgs {
+                        db: &db,
+                        metrics_store: &metrics_store,
+                        run_id,
+                        workflow_name,
+                        builtin,
+                        input: Some(&input),
+                        json,
+                        process_start,
+                    })
+                    .await
+                }
             }
         }
         None => {
@@ -119,6 +147,53 @@ fn assemble_builtin_input(
     }
 }
 
+/// Serialize a custom no-code configuration to JSON after applying supported overrides
+/// given on the command line from the `--input` flag in the `cli_input` parameter.
+///
+/// # Errors
+///
+/// Returns an error if `cli_input` is invalid JSON, contains an unsupported field, has an
+/// invalid override value, or the resulting configuration cannot be serialized.
+pub(super) fn assemble_custom_nocode_input(
+    bench: &qt::config::CustomNoCodeBenchmarkConfig,
+    cli_input: Option<&str>,
+) -> Result<String> {
+    let mut params = bench.params.clone();
+
+    if let Some(cli_str) = cli_input {
+        let overrides: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(cli_str)
+                .with_context(|| "failed to parse custom_nocode --input as a JSON object")?;
+
+        for (key, value) in overrides {
+            match key.as_str() {
+                "model" => {
+                    params.model = Some(
+                        serde_json::from_value(value)
+                            .with_context(|| "invalid `model` in custom_nocode --input")?,
+                    );
+                }
+                "limit" => {
+                    params.limit = Some(
+                        serde_json::from_value(value)
+                            .with_context(|| "invalid `limit` in custom_nocode --input")?,
+                    );
+                }
+                "prompt_template_file" => {
+                    params.prompt_template_file = serde_json::from_value(value).with_context(
+                        || "invalid `prompt_template_file` in custom_nocode --input",
+                    )?;
+                }
+                _ => bail!(
+                    "unsupported custom_nocode --input field `{key}`; only `model`, `limit`, and `prompt_template_file` may be overridden"
+                ),
+            }
+        }
+    }
+
+    serde_json::to_string(&params).context("failed to serialize custom_nocode input")
+}
+
 fn merge_inputs(
     config_input: Option<&HashMap<String, serde_json::Value>>,
     cli_input: Option<&str>,
@@ -159,6 +234,9 @@ async fn run_builtin_workflow(
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
+    let builtin = builtins::resolve(workflow_name)
+        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
+
     let cwd = std::env::current_dir()?;
     let root = db::resolve_workspace_root(&cwd, true).await?;
     let db = db::open_workspace(&root).await?;
@@ -169,78 +247,98 @@ async fn run_builtin_workflow(
         println!("Created run {run_id}");
     }
 
-    execute_builtin(
-        &db,
-        &metrics_store,
+    execute_builtin(ExecuteBuiltinArgs {
+        db: &db,
+        metrics_store: &metrics_store,
         run_id,
         workflow_name,
+        builtin,
         input,
         json,
         process_start,
-    )
+    })
     .await
 }
 
-pub async fn execute_builtin(
-    db: &DatabaseConnection,
-    metrics_store: &MetricsStore,
-    run_id: i64,
-    workflow_name: &str,
-    input: Option<&str>,
-    json: bool,
-    process_start: Instant,
-) -> Result<()> {
-    let builtin = builtins::resolve(workflow_name)
-        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
+/// Arguments for the [`execute_builtin`] function.
+pub struct ExecuteBuiltinArgs<'a> {
+    pub db: &'a DatabaseConnection,
+    pub metrics_store: &'a MetricsStore,
+    pub run_id: i64,
+    pub workflow_name: &'a str,
+    pub builtin: Box<dyn builtins::BuiltinWorkflow>,
+    pub input: Option<&'a str>,
+    pub json: bool,
+    pub process_start: Instant,
+}
 
-    let builtin_result = builtin
+pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
+    let builtin_result = args
+        .builtin
         .execute(builtins::BuiltinContext {
-            db,
-            metrics_store,
-            run_id,
-            workflow_name,
-            input,
-            quiet: json,
+            db: args.db,
+            metrics_store: args.metrics_store,
+            run_id: args.run_id,
+            workflow_name: args.workflow_name,
+            input: args.input,
+            quiet: args.json,
         })
         .await;
 
-    let duration = process_start.elapsed();
+    let duration = args.process_start.elapsed();
 
     match &builtin_result {
         Ok(()) => {
-            db::complete_run(db, metrics_store, run_id).await?;
-            if !json {
+            db::complete_run(args.db, args.metrics_store, args.run_id).await?;
+            if !args.json {
                 println!(
-                    "Run {run_id} completed successfully in {:.2}s",
+                    "Run {} completed successfully in {:.2}s",
+                    args.run_id,
                     duration.as_secs_f64()
                 );
             }
         }
         Err(err) => {
             let msg = format!("{err:#}");
-            db::fail_run(db, metrics_store, run_id, &msg).await?;
-            if !json {
-                println!("Run {run_id} failed: {msg}");
+            db::fail_run(args.db, args.metrics_store, args.run_id, &msg).await?;
+            if !args.json {
+                println!("Run {} failed: {msg}", args.run_id);
             }
         }
     }
 
-    let aggregate = metrics_store.list_aggregate_for_run(run_id).await?;
+    let mut aggregate = args
+        .metrics_store
+        .list_aggregate_for_run(args.run_id)
+        .await?;
+    if builtins::custom_nocode_output_metrics_requested(args.input, args.json) {
+        let steps = db::list_steps_for_run(args.db, args.run_id).await?;
+        super::custom_nocode_metrics::append_requested_output_metrics(
+            &mut aggregate,
+            args.input,
+            &steps,
+            args.json,
+            qt::time::now_utc(),
+        )?;
+    }
 
-    if json {
+    if args.json {
         let metrics_map: HashMap<String, f64> = aggregate
             .iter()
             .map(|m| (m.metric_name.clone(), m.metric_value))
             .collect();
         let output = BuiltinRunJsonOutput {
             aggregate_metrics: metrics_map,
-            run_id,
+            run_id: args.run_id,
             warning: None,
         };
         println!("{}", serde_json::to_string(&output)?);
     } else {
         print_aggregate_metrics_table(&aggregate);
-        println!("\nRun `qt show {run_id} --verbose` for sample-level details.");
+        println!(
+            "\nRun `qt show {} --json` for sample-level details.",
+            args.run_id
+        );
     }
 
     builtin_result
@@ -670,5 +768,173 @@ mod tests {
     fn assemble_builtin_input_none_when_no_bench() {
         let (input, _) = super::assemble_builtin_input(None, None);
         assert!(input.is_none());
+    }
+
+    /// A `custom_nocode` benchmark config with all fields should serialize into the
+    /// expected JSON shape, converting field names faithfully.
+    #[test]
+    fn assemble_custom_nocode_input_from_config() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: Some("default".to_owned()),
+                    split: Some("test".to_owned()),
+                    revision: Some("main".to_owned()),
+                },
+                model: Some(qt::llm::Sampler::Random {}),
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: Some(10),
+                max_workers: Some(4),
+                metrics: Vec::new(),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        };
+        let input = super::assemble_custom_nocode_input(&bench, None).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(parsed["style"]["type"], "exact_match");
+        assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["dataset"]["config_name"], "default");
+        assert_eq!(parsed["dataset"]["split"], "test");
+        assert_eq!(parsed["dataset"]["revision"], "main");
+        assert_eq!(parsed["model"], "random");
+        assert_eq!(parsed["prompt_template_file"], "prompts/qa.txt");
+        assert_eq!(parsed["style"]["golden_column"], "answer");
+        assert_eq!(parsed["limit"], 10);
+        assert_eq!(parsed["max_workers"], 4);
+    }
+
+    /// When `model`, `limit`, and `max_workers` are absent from the config, the assembled
+    /// JSON should omit those keys entirely rather than emit null values.
+    #[test]
+    fn assemble_custom_nocode_input_omits_none_fields() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                metrics: Vec::new(),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        };
+        let input = super::assemble_custom_nocode_input(&bench, None).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert!(parsed.get("model").is_none());
+        assert!(parsed.get("limit").is_none());
+        assert!(parsed.get("max_workers").is_none());
+    }
+
+    /// Supported `--input` fields should override their configured values while all
+    /// other custom no-code configuration remains intact.
+    #[test]
+    fn assemble_custom_nocode_input_with_cli_override() {
+        let bench = qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                metrics: Vec::new(),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        };
+        let input = super::assemble_custom_nocode_input(
+            &bench,
+            Some(
+                r#"{"model":"openai:gpt-5.6-luna","limit":5,"prompt_template_file":"prompts/other.txt"}"#,
+            ),
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(parsed["dataset"]["name"], "quantiles/simpleqa-verified");
+        assert_eq!(parsed["style"]["type"], "exact_match");
+        assert_eq!(parsed["style"]["golden_column"], "answer");
+        assert_eq!(parsed["model"], "openai:gpt-5.6-luna");
+        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["prompt_template_file"], "prompts/other.txt");
+    }
+
+    /// Fields outside the intentionally narrow custom no-code override surface should
+    /// fail before a run is created.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_unsupported_field() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err = super::assemble_custom_nocode_input(
+            &bench,
+            Some(r#"{"dataset":{"name":"other/dataset"}}"#),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("unsupported custom_nocode --input field `dataset`")
+        );
+    }
+
+    /// Custom no-code CLI input must be a JSON object so its allowed fields can be
+    /// validated and merged predictably.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_non_object() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err = super::assemble_custom_nocode_input(&bench, Some(r#"["limit", 5]"#)).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("failed to parse custom_nocode --input as a JSON object")
+        );
+    }
+
+    /// Null is not a valid override for any supported field.
+    #[test]
+    fn assemble_custom_nocode_input_rejects_null_override() {
+        let bench = custom_nocode_benchmark_for_override_tests();
+        let err =
+            super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":null}"#)).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("invalid `limit` in custom_nocode --input")
+        );
+    }
+
+    fn custom_nocode_benchmark_for_override_tests() -> qt::config::CustomNoCodeBenchmarkConfig {
+        qt::config::CustomNoCodeBenchmarkConfig {
+            type_: "custom_nocode".to_owned(),
+            params: qt::config::CustomNoCodeParams {
+                dataset: qt::config::CustomNoCodeDatasetConfig {
+                    name: "quantiles/simpleqa-verified".to_owned(),
+                    config_name: None,
+                    split: None,
+                    revision: None,
+                },
+                model: None,
+                prompt_template_file: "prompts/qa.txt".to_owned(),
+                limit: None,
+                max_workers: None,
+                metrics: Vec::new(),
+                style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
+                    golden_column: "answer".to_owned(),
+                },
+            },
+        }
     }
 }

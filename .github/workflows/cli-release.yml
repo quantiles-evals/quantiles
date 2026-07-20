@@ -1,0 +1,121 @@
+name: cli-release
+
+on:
+  pull_request:
+    paths:
+      - "cli/**"
+      # This line allows us to test at least the build part of this
+      # workflow definition if/when we change it. Below, we make sure
+      # not to publish the CLI from pull requests, though.
+      - ".github/workflows/cli-release.yml"
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QT_R2_BUCKET: ${{ vars.QT_R2_BUCKET || 'quantiles-cli' }}
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_WEBDAV_ENDPOINT: https://cache.depot.dev
+      SCCACHE_WEBDAV_TOKEN: ${{ secrets.SCCACHE_WEBDAV_TOKEN }}
+      SCCACHE_GHA_ENABLED: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # TODO: get Intel Mac builds working. The are currently
+          # failing with this error:
+          #
+          # https://github.com/quantiles-evals/quantiles/actions/runs/29709160146/job/88250642027?pr=22
+          #
+          # - runner: macos-15-intel
+          #   target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Package release artifact
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          archive="qt-${TARGET}.tar.gz"
+          mkdir -p dist/package
+          cp "target/${TARGET}/release/qt" dist/package/qt
+          COPYFILE_DISABLE=1 tar -czf "dist/${archive}" -C dist/package qt
+          shasum -a 256 "dist/${archive}" > "dist/${archive}.sha256"
+      # TODO: upgrade upload-artifact to v7 and download-artifact to v8 together
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: cli/dist/qt-*.tar.gz*
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
+    name: publish to R2
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist
+          merge-multiple: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Publish release artifacts
+        working-directory: cli
+        run: bash scripts/publish-release-artifacts-r2.sh
+
+  publish-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: publish beta to R2
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist
+          merge-multiple: true
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Publish beta artifacts
+        working-directory: cli
+        run: bash scripts/publish-beta-artifacts-r2.sh

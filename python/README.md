@@ -1,6 +1,6 @@
 # Quantiles Python SDK
 
-The Quantiles Python SDK for the [quantiles](https://quantiles.io) local AI workload observability server.
+The Quantiles Python SDK provides the components for building highly customized AI evaluations that run locally through the [`qt` CLI](https://quantiles.io/documentation/reference/cli) and server.
 
 ## Installation
 
@@ -10,39 +10,40 @@ uv add quantiles
 
 ## Usage
 
-Use the following code to build a custom evaluation with Python. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](../CONFIG.md).
+Use the following code to build a custom evaluation with Python. To run it with `qt run`, configure it in a `quantiles.toml` file as described in the [configuration guide](https://quantiles.io/documentation/configuration).
 
 ```python
-import asyncio
-from quantiles import workflow, step, emit, entrypoint
+from quantiles import JsonValue, WorkflowContext, emit, entrypoint, step, workflow
 
-async def handler(input_value, ctx):
-    result = await ctx.step(
-        "fetch-data",
-        {"url": "https://example.com"},
-        lambda: {"status": 200}
-    )
-    await ctx.emit("latency_ms", 50, "ms")
-    return result
+
+async def fetch_data() -> JsonValue:
+  return {"status": 200}
+
+
+async def handler(_input: JsonValue, ctx: WorkflowContext) -> JsonValue:
+  result = await step(
+    ctx,
+    step_key="fetch-data",
+    input_value={"url": "https://example.com"},
+    execute=fetch_data,
+  )
+  await emit(ctx, "latency_ms", 50, "ms")
+  return result
+
 
 my_workflow = workflow("demo", handler)
 
 if __name__ == "__main__":
-    entrypoint(my_workflow)
+  entrypoint(my_workflow)
 ```
 
-During local development, the SDK executes user code locally. The `qt` server initiates and coordinates workflows, deduplicates steps, and manages durable state, stored outputs, observability records, and metrics.
+Evaluation code executes locally. The `qt` server coordinates workflows, deduplicates steps, and manages durable state, stored outputs, observability records, and metrics.
 
 ## Development
 
-Run tests:
-
 ```bash
 mise run test
-```
-
-Run linter:
-
-```bash
 mise run lint
+mise run fmt-check
+mise run typecheck
 ```
