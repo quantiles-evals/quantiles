@@ -45,6 +45,7 @@ run="cargo run --example http_client"
 [tasks.publish-cli-r2]
 run="gh workflow run cli-release.yml"
 
+
 # Upload only the install script to R2.
 #
 # Use this when installer logic changes, but the already-published CLI release

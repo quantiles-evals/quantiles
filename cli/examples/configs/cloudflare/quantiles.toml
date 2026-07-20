@@ -1,5 +1,4 @@
-# This config file sets up PubMedQA to use the Cloudflare AI gateway, and sets up the SimpleQA-verified
-# benchmark to use the internal demo model.
+# This config file sets up PubMedQA to use Cloudflare AI Gateway.
 #
 # The PubMedQA benchmark reads the Cloudflare account ID, gateway ID, and API key
 # from the following environment variables:
@@ -8,28 +7,28 @@
 # - CLOUDFLARE_GATEWAY_ID
 # - CLOUDFLARE_API_KEY
 #
-# To get your account ID, gateway ID and API key, go to your Cloudflare AI gateway dashboard at:
+# To get your account ID, gateway ID, and API key, go to your Cloudflare AI Gateway dashboard at:
 #
 # https://dash.cloudflare.com/<account_id>/ai/ai-gateway
 
 [benchmarks.pubmedqa]
-# The full expert-labeled PubMedQA benchmark has 1000 samples. Since Cloudflare charges for
-# usage, we are limiting the number of samples to 50 in this demo, to keep costs lower.
+# The full expert-labeled PubMedQA benchmark has 1,000 samples. Because Cloudflare charges for
+# usage, this example limits the run to 50 samples to control costs. Omit `samples` to run the
+# full benchmark.
 samples = 50
 
-# The following model is good for demonstrating PubMedQA benchmarks without very high costs,
-# since it's relatively cheap, fast, and not a reasoning model. Its details can be found at:
+# This example uses a fast, non-reasoning model. Model details are available at:
 #
-# https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/
+# https://developers.cloudflare.com/ai/models/@cf/meta/llama-3.3-70b-instruct-fp8-fast/
 #
-# And a list of all models can be found at:
+# A list of all models is available at:
 #
 # https://developers.cloudflare.com/workers-ai/models/
 model = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 
 # If you don't want to specify your account ID and gateway ID in environment variables
 # (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_GATEWAY_ID, respectively), you can provide them
-# alongside the model in a dictionary as below:
+# alongside the model in a TOML table as shown below:
 #
 # model = {
 #   type = "cloudflare_ai_gateway:@cf/meta/llama-3.3-70b-instruct-fp8-fast",

@@ -7,12 +7,13 @@ use crate::llm::Sampler;
 
 /// Configuration for a single benchmark.
 ///
-/// Exactly one of the two variants is deserialized based on the `type` field:
-/// `builtin` (default when absent) or `custom_code`.
+/// Exactly one of the variants is deserialized based on the `type` field:
+/// `builtin` (default when absent), `custom_code`, or `custom_nocode`.
 #[derive(Debug, Clone)]
 pub enum BenchmarkConfig {
     Builtin(BuiltinBenchmarkConfig),
     CustomCode(CustomCodeBenchmarkConfig),
+    CustomNoCode(Box<CustomNoCodeBenchmarkConfig>),
 }
 
 impl BenchmarkConfig {
@@ -28,6 +29,17 @@ impl BenchmarkConfig {
                 if c.command.is_empty() {
                     bail!("custom_code benchmark config must have a non-empty `command` field");
                 }
+                Ok(())
+            }
+            BenchmarkConfig::CustomNoCode(c) => {
+                if !std::path::Path::new(&c.params.prompt_template_file).is_file() {
+                    bail!(
+                        "custom_nocode benchmark config `prompt_template_file` must point to an existing file. File `{}` was not found",
+                        c.params.prompt_template_file
+                    );
+                }
+                c.params.style.validate()?;
+                c.params.validate_metrics()?;
                 Ok(())
             }
         }
@@ -53,6 +65,14 @@ impl<'de> Deserialize<'de> for BenchmarkConfig {
                 })?;
                 Ok(BenchmarkConfig::CustomCode(config))
             }
+            Some("custom_nocode") => {
+                let config = CustomNoCodeBenchmarkConfig::deserialize(value).map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "failed to deserialize custom_nocode benchmark config: {e}"
+                    ))
+                })?;
+                Ok(BenchmarkConfig::CustomNoCode(Box::new(config)))
+            }
             Some("builtin") | None => {
                 let config = BuiltinBenchmarkConfig::deserialize(value).map_err(|e| {
                     serde::de::Error::custom(format!(
@@ -62,7 +82,7 @@ impl<'de> Deserialize<'de> for BenchmarkConfig {
                 Ok(BenchmarkConfig::Builtin(config))
             }
             Some(other) => Err(serde::de::Error::custom(format!(
-                "invalid benchmark type `{other}`; expected `builtin` or `custom_code`",
+                "invalid benchmark type `{other}`; expected `builtin`, `custom_code`, or `custom_nocode`",
             ))),
         }
     }
@@ -78,7 +98,7 @@ pub struct BuiltinBenchmarkConfig {
     pub samples: Option<usize>,
     /// Which model sampler to use for this benchmark.
     pub model: Option<Sampler>,
-    /// Maximum concurrent workers for this benchmark.
+    /// Maximum number of concurrent workers for this benchmark.
     pub max_workers: Option<usize>,
 }
 
@@ -97,6 +117,9 @@ pub struct CustomCodeBenchmarkConfig {
     /// Structured input object passed to the eval.
     pub input: Option<HashMap<String, serde_json::Value>>,
 }
+
+mod custom_nocode;
+pub use custom_nocode::*;
 
 /// Top-level workspace configuration read from `quantiles.toml` or
 /// `.quantiles.toml` in the current working directory.

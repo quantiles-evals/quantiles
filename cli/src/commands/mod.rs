@@ -1,4 +1,5 @@
 mod compare;
+mod custom_nocode_metrics;
 mod init;
 mod list;
 mod resume;

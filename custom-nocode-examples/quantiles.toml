@@ -1,0 +1,105 @@
+# This file contains configuration to run several popular, public benchmarks as
+# custom no-code evaluations. Each benchmark below is configured to use the 'random'
+# model, which just outputs random text or randomly selects the right answer
+# from a uniform distribution of the choices, for exact_match and multiple_choice
+# benchmarks respectively.
+#
+# If you want to customize the model for any of these benchmarks, pass the `--input`
+# flag to the `qt run ...` command. For example, the below command shows how to run
+# the MMLU-pro benchmark as configured in this file, using OpenAI's gpt-5.6-luna model.
+# Make sure to run this command from the same directory as this file.
+#
+#   qt run mmlu-pro --input '{"model": "openai:gpt-5.6-luna"}'
+#
+# To read more about custom no-code evaluations, see the following documentation:
+#
+# https://quantiles.io/documentation/custom-nocode-evaluations
+
+
+# The SimpleQA-verified becnhmark configured to use the random model.
+#
+# Read more about the SimpleQA-verified benchmark here:
+#
+# https://arxiv.org/abs/2509.07968
+[benchmarks.simpleqa-verified]
+type = "custom_nocode"
+style = { type = "exact_match", golden_column = "answer" }
+dataset = { name = "quantiles/simpleqa-verified" }
+model = "random"
+prompt_template_file = "prompts/qa.txt"
+limit = 10
+
+# The MedQA benchmark configured to use the random model.
+#
+# Read more about the MedQA benchmark here:
+#
+# https://arxiv.org/abs/2009.13081
+[benchmarks.medqa]
+type = "custom_nocode"
+dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
+model = "random"
+prompt_template_file = "prompts/medqa.txt"
+limit = 10
+
+[benchmarks.medqa.style]
+type = "multiple_choice"
+choices = { column = "options" }
+choice_labels = ["A", "B", "C", "D"]
+answer = { label_column = "answer_idx" }
+
+# The MedMCQA benchmark configured as a custom_nocode benchmark, using the random model.
+#
+# Read more about the MedMCQA benchmark here:
+#
+# https://medmcqa.github.io/
+[benchmarks.medmcqa]
+type = "custom_nocode"
+dataset = { name = "quantiles/medmcqa", config_name = "default", split = "validation" }
+model = "random"
+prompt_template_file = "prompts/medmcqa.txt"
+limit = 100
+
+[benchmarks.medmcqa.style]
+type = "multiple_choice"
+choices = { columns = ["opa", "opb", "opc", "opd"] }
+choice_labels = ["A", "B", "C", "D"]
+answer = { index_column = "cop", index_base = 0 }
+
+# The MMLU-pro benchmark configured to use the random model by default.
+#
+# Read more about the MMLU-pro benchmark here:
+#
+# https://arxiv.org/abs/2406.01574
+[benchmarks.mmlu-pro]
+type = "custom_nocode"
+dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
+model = "random"
+prompt_template_file = "prompts/mmlu-pro.txt"
+limit = 1000
+
+[benchmarks.mmlu-pro.style]
+type = "multiple_choice"
+choices = { column = "options" }
+choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+answer = { label_column = "answer" }
+
+# The GPQA benchmark configured to use the random model
+#
+# Read more about GPQA here:
+#
+# https://arxiv.org/abs/2311.12022
+[benchmarks.gpqa]
+type = "custom_nocode"
+model = "random"
+prompt_template_file = "prompts/gpqa.txt"
+dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
+# This key shows F1 aggregate metrics whether or not the `--json` flag is passed to `qt show`,
+# and shows a confusion matrix only when the `--json` flag is passed.
+metrics = [{ name = "f1", show = "all" }, { name = "confusion", show = "json" }]
+
+[benchmarks.gpqa.style]
+type = "multiple_choice"
+choices = { columns = ["Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3"] }
+choice_labels = ["A", "B", "C", "D"]
+answer = { correct_choice_column = "Correct Answer" }
+shuffle = { seed_column = "Record ID" }

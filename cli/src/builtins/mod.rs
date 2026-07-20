@@ -1,4 +1,5 @@
 mod common;
+mod custom_nocode;
 mod dataset_runner;
 mod financebench;
 mod input;
@@ -6,6 +7,12 @@ mod output;
 mod pubmedqa;
 mod similarity;
 mod simpleqa_verified;
+
+pub use custom_nocode::CustomNoCodeBuiltin;
+pub use custom_nocode::metrics::{
+    compute_output_metrics as compute_custom_nocode_output_metrics,
+    output_metrics_requested as custom_nocode_output_metrics_requested,
+};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -27,9 +34,9 @@ pub struct BuiltinContext<'a> {
 /// Trait for builtin evals that run natively inside the CLI.
 #[async_trait]
 pub trait BuiltinWorkflow: Send + Sync {
-    /// Unique name of the built-in (e.g. "financebench").
-    fn name(&self) -> &'static str;
-    /// Execute the builtin eval.
+    /// Unique name of the builtin (e.g. "simpleqa-verified", "mmlu-pro", etc...).
+    fn name(&self) -> String;
+    /// Execute the builtin eval and persist its metrics/output.
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()>;
 }
 

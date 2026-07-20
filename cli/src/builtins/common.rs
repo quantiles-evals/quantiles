@@ -1,13 +1,15 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use std::time::Instant;
+
 use anyhow::{Context, Result};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::time::Instant;
 
 use crate::db::steps::{self, StepDecision};
-use crate::llm::Sampler;
+use crate::llm::{LLMSampler, Sampler};
 use crate::metrics_store::MetricsStore;
 
 /// Fields shared by every builtin benchmark config. When adding a new builtin,
@@ -21,7 +23,7 @@ pub(crate) struct BuiltinConfig {
     /// Which model sampler to use. If omitted, the builtin chooses a sensible default.
     #[serde(default)]
     pub(crate) model: Option<Sampler>,
-    /// Maximum concurrent workers. Falls back to `QUANTILES_MAX_WORKERS` env var (default 25).
+    /// Maximum number of concurrent workers. Falls back to `QUANTILES_MAX_WORKERS` env var (default 25).
     #[serde(default)]
     pub(crate) max_workers: Option<usize>,
 }
@@ -119,6 +121,48 @@ pub(crate) fn get_max_workers() -> usize {
     }
 }
 
+/// Resolve a model sampler, falling back to a default when none is configured.
+pub(crate) fn resolve_sampler(
+    model: Option<&Sampler>,
+    default: impl FnOnce() -> Arc<dyn LLMSampler>,
+) -> Result<Arc<dyn LLMSampler>> {
+    match model {
+        None => Ok(default()),
+        Some(sampler) => sampler.resolve(),
+    }
+}
+
+/// Emit aggregate `accuracy`, `correct_count`, and `total_count` metrics from a
+/// collection of per-sample boolean correctness values.
+#[expect(clippy::cast_precision_loss)]
+pub(crate) async fn emit_accuracy_metrics(
+    metrics_store: &MetricsStore,
+    run_id: i64,
+    results: impl IntoIterator<Item = bool>,
+) {
+    let mut correct_count = 0usize;
+    let mut total_count = 0usize;
+    for is_correct in results {
+        total_count += 1;
+        if is_correct {
+            correct_count += 1;
+        }
+    }
+
+    if total_count > 0 {
+        let accuracy = correct_count as f64 / total_count as f64;
+        metrics_store
+            .emit(run_id, None, "accuracy", accuracy, None)
+            .await;
+        metrics_store
+            .emit(run_id, None, "correct_count", correct_count as f64, None)
+            .await;
+        metrics_store
+            .emit(run_id, None, "total_count", total_count as f64, None)
+            .await;
+    }
+}
+
 /// Statistics computed from a collection of similarity scores.
 #[derive(Debug)]
 pub(crate) struct ScoreStatistics {
@@ -193,14 +237,14 @@ mod tests {
         assert_eq!(extract_text(&row, "field"), expected.map(String::from));
     }
 
-    #[rstest]
+    #[test]
     fn test_extract_text_missing_key() {
         use serde_json::json;
         let row = json!({ "other": "data" });
         assert_eq!(extract_text(&row, "field"), None);
     }
 
-    #[rstest]
+    #[test]
     fn test_extract_text_non_string_value() {
         use serde_json::json;
         let row = json!({ "field": 42 });
@@ -219,7 +263,7 @@ mod tests {
         assert_eq!(a.len(), 16, "hash should be 16 hex chars");
     }
 
-    #[rstest]
+    #[test]
     fn test_hash_input_different_inputs() {
         let a = hash_input("foo");
         let b = hash_input("bar");
@@ -247,7 +291,7 @@ mod tests {
         );
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_single_value() {
         let stats = compute_statistics(&[42.0]);
         assert!((stats.mean - 42.0).abs() < 1e-10);
@@ -258,7 +302,7 @@ mod tests {
         assert!(stats.variance < 1e-10);
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_known_values() {
         let stats = compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0]);
         assert!((stats.mean - 3.0).abs() < 1e-10);
@@ -271,7 +315,7 @@ mod tests {
         assert!(stats.p95 >= stats.median);
     }
 
-    #[rstest]
+    #[test]
     fn test_compute_statistics_monotonic_percentiles() {
         let stats = compute_statistics(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
         assert!(stats.min <= stats.p95);
@@ -279,5 +323,96 @@ mod tests {
         assert!(stats.p99 <= stats.max);
         assert!(stats.min <= stats.median);
         assert!(stats.median <= stats.max);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_sampler_uses_default_when_none() {
+        let result = resolve_sampler(None, || {
+            Arc::new(crate::llm::random::RandomSampler::new(80))
+        })
+        .unwrap();
+        // Should get the default sampler, not panic or error.
+        assert!(!result.sample("test").await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_sampler_resolves_configured_sampler() {
+        let sampler = crate::llm::Sampler::Random {};
+        let result = resolve_sampler(Some(&sampler), || {
+            panic!("default should not be called when model is Some")
+        })
+        .unwrap();
+        // Should get a resolved sampler, not the default.
+        assert!(!result.sample("test").await.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_emit_accuracy_metrics_empty() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            emit_accuracy_metrics(&metrics_store, 1, [false; 0]).await;
+            metrics_store.flush(1).await.unwrap();
+            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
+            assert!(
+                agg.is_empty(),
+                "no metrics should be emitted for empty results"
+            );
+        });
+    }
+
+    #[test]
+    fn test_emit_accuracy_metrics_all_correct() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            emit_accuracy_metrics(&metrics_store, 1, [true, true, true]).await;
+            metrics_store.flush(1).await.unwrap();
+            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
+
+            let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
+            assert!((accuracy.metric_value - 1.0).abs() < 1e-10);
+
+            let correct = agg
+                .iter()
+                .find(|m| m.metric_name == "correct_count")
+                .unwrap();
+            assert!((correct.metric_value - 3.0).abs() < f64::EPSILON);
+
+            let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
+            assert!((total.metric_value - 3.0).abs() < f64::EPSILON);
+        });
+    }
+
+    #[test]
+    fn test_emit_accuracy_metrics_mixed() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            emit_accuracy_metrics(&metrics_store, 1, [true, false, true, false]).await;
+            metrics_store.flush(1).await.unwrap();
+            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
+
+            let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
+            assert!((accuracy.metric_value - 0.5).abs() < 1e-10);
+
+            let correct = agg
+                .iter()
+                .find(|m| m.metric_name == "correct_count")
+                .unwrap();
+            assert!((correct.metric_value - 2.0).abs() < f64::EPSILON);
+
+            let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
+            assert!((total.metric_value - 4.0).abs() < f64::EPSILON);
+        });
     }
 }
