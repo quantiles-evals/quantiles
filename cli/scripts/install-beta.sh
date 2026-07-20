@@ -44,7 +44,7 @@ esac
 
 archive="qt-${target}.tar.gz"
 checksum="${archive}.sha256"
-url="${base_url%/}/releases/latest/${archive}"
+url="${base_url%/}/channel/beta/latest/${archive}"
 checksum_url="${url}.sha256"
 
 tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t qt-install)"
@@ -53,7 +53,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "Downloading latest qt for ${target}"
+echo "Downloading latest beta qt for ${target}"
 curl -fsSL "$url" -o "$tmpdir/$archive"
 curl -fsSL "$checksum_url" -o "$tmpdir/$checksum"
 
