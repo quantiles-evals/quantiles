@@ -45,10 +45,19 @@ run="cargo run --example http_client"
 [tasks.publish-cli-r2]
 run="gh workflow run cli-release.yml"
 
-# upload only the install script to R2; use this when installer logic changes
-# but the already-published CLI release artifact does not need to be rebuilt
+# Upload only the install script to R2.
+#
+# Use this when installer logic changes, but the already-published CLI release
+# artifact does not need to be rebuilt.
 [tasks.upload-install-script-r2]
 run="bash scripts/upload-install-script-r2.sh"
+
+# Upload only the beta install script to R2.
+#
+# Use this when beta installer logic changes but the already-published beta CLI
+# artifacts do not need to be rebuilt.
+[tasks.upload-install-beta-script-r2]
+run="bash scripts/upload-install-beta-script-r2.sh"
 
 # lint shell scripts
 [tasks.shellcheck]
