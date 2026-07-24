@@ -1,8 +1,8 @@
-<h1 align="center">
+<p align="center">
   <a href="https://quantiles.io">
     <img src="./docs/assets/quantiles-wordmark.svg" alt="Quantiles" width="240">
   </a>
-</h1>
+</p>
 
 <p align="center"><strong>Local-first AI evaluation for developers and coding agents.</strong></p>
 
@@ -10,8 +10,10 @@
   <a href="https://github.com/quantiles-evals/quantiles/blob/main/LICENSE"><img src="https://img.shields.io/github/license/quantiles-evals/quantiles" alt="License"></a>
   <a href="https://quantiles.io/documentation"><img src="https://img.shields.io/badge/docs-quantiles.io-blue" alt="Documentation"></a>
   <a href="https://github.com/quantiles-evals/skill"><img src="https://img.shields.io/badge/agent%20skill-install-6f42c1" alt="Agent Skill"></a>
-  <a href="https://huggingface.co/quantiles"><img src="https://img.shields.io/badge/Hugging%20Face-Quantiles-FFD21E?logo=huggingface&amp;logoColor=black" alt="Quantiles on Hugging Face"></a>
+  <a href="https://huggingface.co/quantiles"><img src="https://img.shields.io/badge/Hugging%20Face-Quantiles-FFD21E" alt="Quantiles on Hugging Face"></a>
 </p>
+
+---
 
 Quantiles is open-source, local-first evaluation infrastructure for applied AI systems, designed for developer and coding-agent workflows.
 
