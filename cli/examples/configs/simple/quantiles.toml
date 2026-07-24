@@ -8,7 +8,9 @@
 # dataset rows processed.
 
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
 samples = 10
 
 [benchmarks.simpleqa-verified]
+dataset = "hf://quantiles/simpleqa-verified"
 samples = 100

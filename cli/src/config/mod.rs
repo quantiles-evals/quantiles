@@ -96,6 +96,8 @@ pub struct BuiltinBenchmarkConfig {
     pub type_: String,
     /// Number of samples (rows) to evaluate.
     pub samples: Option<usize>,
+    /// Dataset source for this benchmark.
+    pub dataset: String,
     /// Which model sampler to use for this benchmark.
     pub model: Option<Sampler>,
     /// Maximum number of concurrent workers for this benchmark.
@@ -182,6 +184,7 @@ mod tests {
     fn deserialize_builtin_without_type() {
         let toml = r#"
             [benchmarks.demo]
+            dataset = "hf://quantiles/demo"
             samples = 10
         "#;
         let config: WorkspaceConfig = toml::from_str(toml).unwrap();
@@ -190,6 +193,7 @@ mod tests {
         if let BenchmarkConfig::Builtin(b) = bench {
             assert_eq!(b.type_, "builtin");
             assert_eq!(b.samples, Some(10));
+            assert_eq!(b.dataset, "hf://quantiles/demo");
             assert!(b.model.is_none());
         }
     }
@@ -200,11 +204,25 @@ mod tests {
             [benchmarks.demo]
             type = "builtin"
             samples = 5
+            dataset = "hf://quantiles/demo"
             model = "openai:gpt-4"
         "#;
         let config: WorkspaceConfig = toml::from_str(toml).unwrap();
         let bench = config.benchmarks.get("demo").unwrap();
         assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
+        if let BenchmarkConfig::Builtin(b) = bench {
+            assert_eq!(b.dataset, "hf://quantiles/demo");
+        }
+    }
+
+    #[test]
+    fn builtin_requires_dataset_field() {
+        let toml = r#"
+            [benchmarks.demo]
+            samples = 5
+        "#;
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err(), "builtin should require dataset field");
     }
 
     #[test]

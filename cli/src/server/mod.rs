@@ -15,7 +15,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 use tokio::net::TcpListener;
 
-use crate::dataset::DatasetManager;
+use crate::dataset::{DatasetManager, resolve_hf_dataset_source};
 use crate::db::steps::{self, StepDecision};
 use crate::db::{self, DBUrl, SQLitePathURL};
 use crate::metrics_store::MetricsStore;
@@ -321,14 +321,7 @@ async fn dataset_batch(
 }
 
 fn parse_hf_source(source: &str) -> Result<&str, ApiError> {
-    source
-        .strip_prefix("huggingface://")
-        .or_else(|| source.strip_prefix("hf://"))
-        .ok_or_else(|| {
-            ApiError(anyhow::anyhow!(
-                "unsupported dataset source `{source}`; expected `huggingface://...` or `hf://...`"
-            ))
-        })
+    resolve_hf_dataset_source(source).map_err(ApiError)
 }
 
 struct ApiError(anyhow::Error);
