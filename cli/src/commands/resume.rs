@@ -237,7 +237,7 @@ mod tests {
                     },
                     model: Some(qt::llm::Sampler::Random {}),
                     prompt_template_file: file.path().to_str().unwrap().to_owned(),
-                    limit: None,
+                    samples: None,
                     max_workers: None,
                     metrics: Vec::new(),
                     style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
@@ -319,7 +319,7 @@ style = {{ type = "exact_match", golden_column = "answer" }}
 dataset = {{ name = "fixture/qa" }}
 model = "random"
 prompt_template_file = "{}"
-limit = 2
+samples = 2
 "#,
                 template_path.to_str().unwrap()
             ),
@@ -330,7 +330,7 @@ limit = 2
         // reconstruct the executable configuration from quantiles.toml.
         let input_json = serde_json::to_string(&serde_json::json!({
             "model": "demo-builtin",
-            "num_samples": 2,
+            "samples": 2,
         }))
         .unwrap();
 

@@ -4,7 +4,7 @@ use crate::builtins::common::BuiltinConfig;
 
 /// Parsed user input for the builtin.
 ///
-/// All common fields (`limit`, `model`, `max_workers`) live in [`BuiltinConfig`]
+/// All common fields (`samples`, `model`, `max_workers`) live in [`BuiltinConfig`]
 /// and are flattened during deserialization so that the TOML surface stays flat.
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct PubMedQAConfig {

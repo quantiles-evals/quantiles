@@ -136,7 +136,7 @@ fn assemble_builtin_input(
         }
 
         let input = BuiltinConfigInput {
-            limit: bench.samples,
+            samples: bench.samples,
             model: bench.model.clone(),
             max_workers: bench.max_workers,
         };
@@ -176,10 +176,10 @@ pub(super) fn assemble_custom_nocode_input(
                             .with_context(|| "invalid `model` in custom_nocode --input")?,
                     );
                 }
-                "limit" => {
-                    params.limit = Some(
+                "samples" => {
+                    params.samples = Some(
                         serde_json::from_value(value)
-                            .with_context(|| "invalid `limit` in custom_nocode --input")?,
+                            .with_context(|| "invalid `samples` in custom_nocode --input")?,
                     );
                 }
                 "prompt_template_file" => {
@@ -188,7 +188,7 @@ pub(super) fn assemble_custom_nocode_input(
                     )?;
                 }
                 _ => bail!(
-                    "unsupported custom_nocode --input field `{key}`; only `model`, `limit`, and `prompt_template_file` may be overridden"
+                    "unsupported custom_nocode --input field `{key}`; only `model`, `samples`, and `prompt_template_file` may be overridden"
                 ),
             }
         }
@@ -479,7 +479,7 @@ struct BuiltinRunJsonOutput {
 #[derive(Serialize, Default)]
 struct BuiltinConfigInput {
     #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<usize>,
+    samples: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<qt::llm::Sampler>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -740,7 +740,7 @@ mod tests {
         };
         let (input, _) = super::assemble_builtin_input(Some(&bench), None);
         let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
-        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["samples"], 5);
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["max_workers"], 8);
     }
@@ -782,7 +782,7 @@ mod tests {
                 },
                 model: Some(qt::llm::Sampler::Random {}),
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                limit: Some(10),
+                samples: Some(10),
                 max_workers: Some(4),
                 metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
@@ -800,11 +800,11 @@ mod tests {
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["prompt_template_file"], "prompts/qa.txt");
         assert_eq!(parsed["style"]["golden_column"], "answer");
-        assert_eq!(parsed["limit"], 10);
+        assert_eq!(parsed["samples"], 10);
         assert_eq!(parsed["max_workers"], 4);
     }
 
-    /// When `model`, `limit`, and `max_workers` are absent from the config, the assembled
+    /// When `model`, `samples`, and `max_workers` are absent from the config, the assembled
     /// JSON should omit those keys entirely rather than emit null values.
     #[test]
     fn assemble_custom_nocode_input_omits_none_fields() {
@@ -819,7 +819,7 @@ mod tests {
                 },
                 model: None,
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
@@ -830,7 +830,7 @@ mod tests {
         let input = super::assemble_custom_nocode_input(&bench, None).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&input).unwrap();
         assert!(parsed.get("model").is_none());
-        assert!(parsed.get("limit").is_none());
+        assert!(parsed.get("samples").is_none());
         assert!(parsed.get("max_workers").is_none());
     }
 
@@ -849,7 +849,7 @@ mod tests {
                 },
                 model: None,
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {
@@ -860,7 +860,7 @@ mod tests {
         let input = super::assemble_custom_nocode_input(
             &bench,
             Some(
-                r#"{"model":"openai:gpt-5.6-luna","limit":5,"prompt_template_file":"prompts/other.txt"}"#,
+                r#"{"model":"openai:gpt-5.6-luna","samples":5,"prompt_template_file":"prompts/other.txt"}"#,
             ),
         )
         .unwrap();
@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(parsed["style"]["type"], "exact_match");
         assert_eq!(parsed["style"]["golden_column"], "answer");
         assert_eq!(parsed["model"], "openai:gpt-5.6-luna");
-        assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["samples"], 5);
         assert_eq!(parsed["prompt_template_file"], "prompts/other.txt");
     }
 
@@ -894,7 +894,8 @@ mod tests {
     #[test]
     fn assemble_custom_nocode_input_rejects_non_object() {
         let bench = custom_nocode_benchmark_for_override_tests();
-        let err = super::assemble_custom_nocode_input(&bench, Some(r#"["limit", 5]"#)).unwrap_err();
+        let err =
+            super::assemble_custom_nocode_input(&bench, Some(r#"["samples", 5]"#)).unwrap_err();
         assert!(
             err.to_string()
                 .contains("failed to parse custom_nocode --input as a JSON object")
@@ -906,10 +907,10 @@ mod tests {
     fn assemble_custom_nocode_input_rejects_null_override() {
         let bench = custom_nocode_benchmark_for_override_tests();
         let err =
-            super::assemble_custom_nocode_input(&bench, Some(r#"{"limit":null}"#)).unwrap_err();
+            super::assemble_custom_nocode_input(&bench, Some(r#"{"samples":null}"#)).unwrap_err();
         assert!(
             err.to_string()
-                .contains("invalid `limit` in custom_nocode --input")
+                .contains("invalid `samples` in custom_nocode --input")
         );
     }
 
@@ -925,7 +926,7 @@ mod tests {
                 },
                 model: None,
                 prompt_template_file: "prompts/qa.txt".to_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: Vec::new(),
                 style: qt::config::CustomNoCodeStyleConfig::ExactMatch {

@@ -27,7 +27,7 @@ style = { type = "exact_match", golden_column = "answer" }
 dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
-limit = 10
+samples = 10
 
 # The MedQA benchmark configured to use the random model.
 #
@@ -39,7 +39,7 @@ type = "custom_nocode"
 dataset = { name = "quantiles/MedQA-USMLE-4-options", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/medqa.txt"
-limit = 10
+samples = 10
 
 [benchmarks.medqa.style]
 type = "multiple_choice"
@@ -57,7 +57,7 @@ type = "custom_nocode"
 dataset = { name = "quantiles/medmcqa", config_name = "default", split = "validation" }
 model = "random"
 prompt_template_file = "prompts/medmcqa.txt"
-limit = 100
+samples = 100
 
 [benchmarks.medmcqa.style]
 type = "multiple_choice"
@@ -75,7 +75,7 @@ type = "custom_nocode"
 dataset = { name = "quantiles/MMLU-Pro", config_name = "default", split = "test" }
 model = "random"
 prompt_template_file = "prompts/mmlu-pro.txt"
-limit = 1000
+samples = 1000
 
 [benchmarks.mmlu-pro.style]
 type = "multiple_choice"

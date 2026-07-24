@@ -95,8 +95,8 @@ pub struct CustomNoCodeParams {
     /// Path to a Jinja template file for rendering prompts.
     pub prompt_template_file: String,
     /// Number of dataset rows to evaluate.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<usize>,
+    #[serde(alias = "limit", skip_serializing_if = "Option::is_none")]
+    pub samples: Option<usize>,
     /// Maximum number of concurrent workers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_workers: Option<usize>,
@@ -290,7 +290,7 @@ mod tests {
             dataset = { name = "quantiles/simpleqa-verified" }
             model = "random"
             prompt_template_file = "prompts/qa.txt"
-            limit = 10
+            samples = 10
         "#;
         let config: WorkspaceConfig = toml::from_str(toml).unwrap();
         let bench = config.benchmarks.get("nocode_custom").unwrap();
@@ -298,7 +298,7 @@ mod tests {
         if let BenchmarkConfig::CustomNoCode(c) = bench {
             assert_eq!(c.params.dataset.name, "quantiles/simpleqa-verified");
             assert_eq!(c.params.model, Some(Sampler::Random));
-            assert_eq!(c.params.limit, Some(10));
+            assert_eq!(c.params.samples, Some(10));
             let CustomNoCodeStyleConfig::ExactMatch { golden_column } = &c.params.style else {
                 panic!("expected exact-match task");
             };
@@ -347,7 +347,7 @@ mod tests {
                 },
                 model: Some(Sampler::Random),
                 prompt_template_file: "does_not_exist.txt".to_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: Vec::new(),
                 style: CustomNoCodeStyleConfig::ExactMatch {
@@ -373,7 +373,7 @@ mod tests {
                 },
                 model: Some(Sampler::Random),
                 prompt_template_file: file.path().to_str().unwrap().to_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: Vec::new(),
                 style: CustomNoCodeStyleConfig::ExactMatch {
@@ -496,7 +496,7 @@ mod tests {
                 },
                 model: None,
                 prompt_template_file: file.path().to_string_lossy().into_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: vec![
                     CustomNoCodeMetricSelection::Name(CustomNoCodeMetricName::F1),
@@ -541,7 +541,7 @@ mod tests {
                 },
                 model: None,
                 prompt_template_file: file.path().to_string_lossy().into_owned(),
-                limit: None,
+                samples: None,
                 max_workers: None,
                 metrics: vec![CustomNoCodeMetricSelection::Name(
                     CustomNoCodeMetricName::F1,
