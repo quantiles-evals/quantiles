@@ -7,8 +7,7 @@
 <p align="center"><strong>Local-first AI evaluation for developers and coding agents.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/quantiles-evals/quantiles/actions/workflows/ci.yml"><img src="https://github.com/quantiles-evals/quantiles/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/quantiles-evals/quantiles/releases/latest"><img src="https://img.shields.io/github/v/release/quantiles-evals/quantiles" alt="GitHub Release"></a>
+  <a href="https://github.com/quantiles-evals/quantiles/actions/workflows/cli.yml"><img src="https://github.com/quantiles-evals/quantiles/actions/workflows/cli.yml/badge.svg" alt="CLI CI"></a>
   <a href="https://github.com/quantiles-evals/quantiles/blob/main/LICENSE"><img src="https://img.shields.io/github/license/quantiles-evals/quantiles" alt="License"></a>
   <a href="https://quantiles.io/documentation"><img src="https://img.shields.io/badge/docs-quantiles.io-blue" alt="Documentation"></a>
   <a href="https://github.com/quantiles-evals/skill"><img src="https://img.shields.io/badge/agent%20skill-install-6f42c1" alt="Agent Skill"></a>
@@ -22,7 +21,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
-**[2026.07.07]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
+**[2026.07.19]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
 
 ## Why use Quantiles?
 
