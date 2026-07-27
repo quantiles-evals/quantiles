@@ -37,7 +37,7 @@ When performing tasks in this repository, always do the following:
 - Read the nearest subdirectory `AGENTS.md` if present.
 - Inspect the relevant README, package configuration, and existing tests before changing behavior.
 - Prefer the smallest change that satisfies the task.
-- Do not run expensive, provider-backed, or full benchmark commands without explicit approval.
+- Obtain explicit approval for external model calls and potentially expensive evaluation runs.
 - Keep changes small, public-safe, and reviewable.
 - Preserve Quantiles as a local-first, offline system by default.
 - Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
@@ -91,15 +91,15 @@ The `typescript/` directory contains an unreleased Quantiles TypeScript SDK for 
 
 When editing the TypeScript SDK subdirectory, preserve strict typing, JSON-serializable public surfaces, ESM behavior, and documented package exports.
 
-### Using provider-backed models
+### Running evaluations with hosted models
 
-Start with the smallest useful sample limit before running a full benchmark with either a demo model or a provider-backed model to validate configuration, catch setup issues early, and avoid unnecessary cost.
+Start with the smallest useful sample limit before running a full benchmark with either a demo model or a model from a supported provider to validate configuration, catch setup issues early, and avoid unnecessary cost.
 
-Ask before running any evaluation that is expected to be slow, expensive, provider-backed, network-dependent, destructive, or likely to meaningfully modify local run state. Note that demo model runs are for workflow validation only. Do not treat them as model-quality benchmark evidence.
+Ask before running any evaluation that is expected to be slow, expensive, call an external model API, network-dependent, destructive, or likely to meaningfully modify local run state. Note that demo model runs are for workflow validation only. Do not treat them as model-quality benchmark evidence.
 
-Do not run provider-backed evaluations unless the user explicitly asks for them or provides a provider-prefixed model name. Configure providers in the `quantiles.toml` config file. Follow configuration examples in the [`cli/examples/configs`](./cli/examples/configs) directory. Before running a provider-backed evaluation, verify that the required provider API key is configured, but never print or expose the key value.
+Do not run evaluations that call external model APIs unless the user explicitly requests one or provides a provider-prefixed model name. Configure providers in the `quantiles.toml` config file using the [model configuration guide](https://quantiles.io/documentation/model-configuration). Follow configuration examples in the [`cli/examples/configs`](./cli/examples/configs) directory. Before running an evaluation that calls an external model API, verify that the required provider API key is configured, but never print or expose the key value.
 
-Provider-backed model inputs should use provider-prefixed model names, for example:
+Model inputs should use provider-prefixed model names, for example:
 
 - `openai:<model>`
 - `anthropic:<model>`
