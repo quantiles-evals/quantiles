@@ -48,7 +48,7 @@ model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
-See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
+See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
 
 ## Architecture
 

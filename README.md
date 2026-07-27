@@ -101,6 +101,7 @@ You can customize how the CLI executes [built-in-benchmarks](https://quantiles.i
 See the following resources for more details:
 
 - [Configuration guide](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
+- [Model configuration guide](https://quantiles.io/documentation/model-configuration) - Configure provider models and credentials, and troubleshoot common setup issues.
 - [Configuration examples](./cli/examples/configs) - Complete examples, including a [custom-code evaluation](./cli/examples/configs/custom_code/quantiles.toml)
 
 #### Built-in benchmarks
