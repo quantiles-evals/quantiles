@@ -57,8 +57,40 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: cli
+      - name: Set CLI version
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="unversioned-${COMMIT}"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            version="$REF_NAME"
+          elif [[ "$REF" == "refs/heads/main" ]]; then
+            version="beta-${COMMIT}"
+          else
+            echo "unable to determine CLI version" >&2
+            exit 1
+          fi
+
+          echo "QT_CLI_VERSION=$version" >> "$GITHUB_ENV"
+          echo "EXPECTED_CLI_VERSION=$version" >> "$GITHUB_ENV"
       - name: Build release binary
         run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Verify CLI version
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          actual="$("target/${TARGET}/release/qt" --version)"
+          if [[ "$actual" != "$EXPECTED_CLI_VERSION" ]]; then
+            echo "CLI version mismatch: expected '$EXPECTED_CLI_VERSION', got '$actual'" >&2
+            exit 1
+          fi
       - name: Package release artifact
         env:
           TARGET: ${{ matrix.target }}
