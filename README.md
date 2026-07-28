@@ -23,6 +23,8 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
+**[2026.07.27]** Published the [model configuration guide](https://quantiles.io/documentation/model-configuration), covering the built-in demo model, supported model providers, credentials, request concurrency, cost and data handling, and troubleshooting.
+
 **[2026.07.19]** Added `custom_nocode` evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
 
 ## Why use Quantiles?
