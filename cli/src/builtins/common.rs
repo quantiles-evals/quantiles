@@ -13,13 +13,16 @@ use crate::llm::{LLMSampler, Sampler};
 use crate::metrics_store::MetricsStore;
 
 /// Fields shared by every builtin benchmark config. When adding a new builtin,
-/// embed this with `#[serde(flatten)]` so that `limit`, `model`, and
+/// embed this with `#[serde(flatten)]` so that `samples`, `model`, and
 /// `max_workers` are automatically supported without duplication.
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct BuiltinConfig {
     /// Number of dataset rows to evaluate. If omitted, the entire dataset is used.
-    #[serde(default)]
-    pub(crate) limit: Option<usize>,
+    ///
+    /// This field used to be called `limit`, so we are aliasing it to provide
+    /// backward compatibility.
+    #[serde(default, alias = "limit")]
+    pub(crate) samples: Option<usize>,
     /// Which model sampler to use. If omitted, the builtin chooses a sensible default.
     #[serde(default)]
     pub(crate) model: Option<Sampler>,
@@ -227,6 +230,13 @@ pub(crate) fn percentile(sorted: &[f64], p: f64) -> f64 {
 mod tests {
     use super::*;
     use rstest::rstest;
+
+    #[test]
+    fn builtin_config_accepts_samples() {
+        let config: BuiltinConfig = serde_json::from_str(r#"{"samples":10}"#).unwrap();
+
+        assert_eq!(config.samples, Some(10));
+    }
 
     #[rstest]
     #[case("hello", Some("hello"))]

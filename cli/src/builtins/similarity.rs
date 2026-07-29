@@ -18,7 +18,7 @@ use crate::similarity::{
 
 /// Configuration shared by all similarity-based builtins.
 ///
-/// All common fields (`limit`, `model`, `max_workers`) live in [`BuiltinConfig`]
+/// All common fields (`samples`, `model`, `max_workers`) live in [`BuiltinConfig`]
 /// and are flattened during deserialization so that the TOML surface stays flat.
 #[derive(Debug, Default, Deserialize)]
 struct SimilarityConfig {
@@ -80,8 +80,8 @@ impl BuiltinWorkflow for SimilarityBenchmark {
             .context("invalid builtin input JSON")?
             .unwrap_or_default();
 
-        if config.base.limit == Some(0) {
-            bail!("limit must be > 0");
+        if config.base.samples == Some(0) {
+            bail!("samples must be > 0");
         }
 
         let metric: Box<dyn SimilarityMetric> = match config.metric {
@@ -98,8 +98,8 @@ impl BuiltinWorkflow for SimilarityBenchmark {
 
         let total = info
             .total_rows
-            .context("could not determine dataset size; pass an explicit limit")?;
-        let limit = config.base.limit.unwrap_or(total).min(total);
+            .context("could not determine dataset size; pass an explicit samples value")?;
+        let limit = config.base.samples.unwrap_or(total).min(total);
 
         let db = ctx.db;
         let run_id = ctx.run_id;

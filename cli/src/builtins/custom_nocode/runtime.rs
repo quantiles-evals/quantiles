@@ -30,8 +30,8 @@ pub(super) fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNo
         .context("invalid builtin input JSON")?
         .context("custom_nocode benchmark requires input configuration")?;
 
-    if config.limit == Some(0) {
-        bail!("limit must be > 0");
+    if config.samples == Some(0) {
+        bail!("samples must be > 0");
     }
 
     Ok(config)
@@ -65,7 +65,7 @@ pub(super) async fn resolve_dataset_limit(
 
     let total = info
         .total_rows
-        .context("could not determine dataset size; pass an explicit limit")?;
+        .context("could not determine dataset size; pass an explicit samples value")?;
     let limit = limit.unwrap_or(total).min(total);
 
     Ok((manager, info, limit))

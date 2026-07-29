@@ -37,8 +37,8 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
             .context("invalid builtin input JSON")?
             .unwrap_or_default();
 
-        if config.base.limit == Some(0) {
-            bail!("limit must be > 0");
+        if config.base.samples == Some(0) {
+            bail!("samples must be > 0");
         }
 
         let max_workers = config.base.max_workers.unwrap_or_else(get_max_workers);
@@ -55,8 +55,8 @@ impl BuiltinWorkflow for PubmedqaBuiltin {
 
         let total = info
             .total_rows
-            .context("could not determine dataset size; pass an explicit limit")?;
-        let limit = config.base.limit.unwrap_or(total).min(total);
+            .context("could not determine dataset size; pass an explicit samples value")?;
+        let limit = config.base.samples.unwrap_or(total).min(total);
 
         set_builtin_run_input(
             ctx.db,

@@ -46,10 +46,10 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
             config.dataset.config_name.as_deref(),
             config.dataset.split.as_deref(),
             config.dataset.revision.as_deref(),
-            config.limit,
+            config.samples,
         )
         .await?;
-        config.limit = Some(limit);
+        config.samples = Some(limit);
         crate::db::set_run_input(ctx.db, ctx.run_id, &serde_json::to_string(&config)?).await?;
 
         let db = ctx.db.clone();
@@ -214,7 +214,7 @@ mod tests {
             "dataset": {"name": "fixture/qa"},
             "model": "random",
             "prompt_template_file": template_path.to_str().unwrap(),
-            "limit": 2,
+            "samples": 2,
         }))
         .unwrap();
 
@@ -257,7 +257,10 @@ mod tests {
         let recorded_input: serde_json::Value =
             serde_json::from_str(recorded_run.input.as_deref().unwrap()).unwrap();
         assert_eq!(recorded_input["style"]["type"], "exact_match");
-        assert_eq!(recorded_input["limit"], 2);
+        assert_eq!(recorded_input["samples"], 2);
+        let recorded_output: serde_json::Value =
+            serde_json::from_str(recorded_run.output.as_deref().unwrap()).unwrap();
+        assert_eq!(recorded_output, json!({"samples": 2}));
 
         let all_metrics = metrics_store.list_for_run(run_id).await.unwrap();
         let is_correct_count = all_metrics
