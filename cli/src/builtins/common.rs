@@ -20,6 +20,9 @@ pub(crate) struct BuiltinConfig {
     /// Number of dataset rows to evaluate. If omitted, the entire dataset is used.
     #[serde(default)]
     pub(crate) limit: Option<usize>,
+    /// Dataset source to evaluate. Builtins currently support Hugging Face via `hf://...`.
+    #[serde(default)]
+    pub(crate) dataset: Option<String>,
     /// Which model sampler to use. If omitted, the builtin chooses a sensible default.
     #[serde(default)]
     pub(crate) model: Option<Sampler>,

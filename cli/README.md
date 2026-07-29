@@ -43,6 +43,7 @@ Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For
 
 ```toml
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
 samples = 50
 model = "openai:gpt-5.6"
 max_workers = 100
