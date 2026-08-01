@@ -118,6 +118,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 input: custom_nocode_input.as_deref().or(stored_input),
                 json,
                 process_start,
+                remote_hash: None,
             })
             .await
         }

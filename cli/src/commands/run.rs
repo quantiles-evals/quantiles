@@ -105,6 +105,7 @@ pub async fn run(
                         input: Some(&input),
                         json,
                         process_start,
+                        remote_hash: None,
                     })
                     .await
                 }
@@ -139,6 +140,7 @@ async fn run_remote_benchmark(
     remote: qt::benchmark_registry::RemoteBenchmark,
 ) -> Result<()> {
     let configured_template_path = remote.config.params.prompt_template_file.clone();
+    let remote_hash = remote.manifest_sha256.clone();
     let input = assemble_custom_nocode_input(&remote.config, cli_input)?;
     let effective_params: qt::config::CustomNoCodeParams = serde_json::from_str(&input)
         .context("failed to parse assembled remote custom_nocode input")?;
@@ -176,6 +178,7 @@ async fn run_remote_benchmark(
         input: Some(&input),
         json,
         process_start,
+        remote_hash: Some(&remote_hash),
     })
     .await
 }
@@ -314,6 +317,7 @@ async fn run_builtin_workflow(
         input,
         json,
         process_start,
+        remote_hash: None,
     })
     .await
 }
@@ -328,6 +332,10 @@ pub struct ExecuteBuiltinArgs<'a> {
     pub input: Option<&'a str>,
     pub json: bool,
     pub process_start: Instant,
+    /// If the benchmark was loaded from local configuration, this
+    /// field will be `None`. If it was loaded from remote configuration,
+    /// it will contain a hash of that configuration.
+    pub remote_hash: Option<&'a str>,
 }
 
 pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
@@ -389,6 +397,7 @@ pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
             aggregate_metrics: metrics_map,
             run_id: args.run_id,
             warning: None,
+            remote_hash: args.remote_hash,
         };
         println!("{}", serde_json::to_string(&output)?);
     } else {
@@ -523,11 +532,13 @@ fn print_aggregate_metrics_table(metrics: &[MetricPointSummary]) {
 
 /// JSON payload emitted by `qt run <builtin> --json`.
 #[derive(Serialize)]
-struct BuiltinRunJsonOutput {
+struct BuiltinRunJsonOutput<'a> {
     aggregate_metrics: HashMap<String, f64>,
     run_id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     warning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    remote_hash: Option<&'a str>,
 }
 
 /// Config input shape auto-generated from `quantiles.toml` `[benchmarks.*]`.
@@ -716,6 +727,34 @@ mod tests {
     use std::collections::HashMap;
 
     use serde_json::json;
+
+    #[test]
+    fn builtin_run_json_includes_remote_hash_when_resolved_remotely() {
+        let output = super::BuiltinRunJsonOutput {
+            aggregate_metrics: HashMap::new(),
+            run_id: 1,
+            warning: None,
+            remote_hash: Some("0123456789abcdef"),
+        };
+
+        let serialized = serde_json::to_value(output).unwrap();
+
+        assert_eq!(serialized["remote_hash"], "0123456789abcdef");
+    }
+
+    #[test]
+    fn builtin_run_json_omits_remote_hash_for_local_runs() {
+        let output = super::BuiltinRunJsonOutput {
+            aggregate_metrics: HashMap::new(),
+            run_id: 1,
+            warning: None,
+            remote_hash: None,
+        };
+
+        let serialized = serde_json::to_value(output).unwrap();
+
+        assert!(serialized.get("remote_hash").is_none());
+    }
 
     /// When only config input is present and no `--input` CLI flag is given, the result
     /// should be the exact config object with no overridden keys.
