@@ -8,6 +8,12 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
+/// A validated prompt template and the environment used to render it.
+pub(super) struct LoadedTemplate {
+    pub(super) template: String,
+    pub(super) environment: jinja::Environment<'static>,
+}
+
 /// Resolve the configured sampler, using configured choice labels for random multiple-choice runs.
 pub(super) fn resolve_sampler_for_style(
     model: Option<&crate::llm::Sampler>,
@@ -38,16 +44,33 @@ pub(super) fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNo
 }
 
 /// Read a prompt template and validate its Jinja syntax against the available variables.
-pub(super) fn load_template(path: &str) -> Result<(String, jinja::Environment<'_>)> {
+pub(super) fn load_template(path: &str) -> Result<LoadedTemplate> {
     let template_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read prompt template file `{path}`"))?;
+    let env = validate_template(&template_str, &format!("prompt template file `{path}`"))?;
+    Ok(LoadedTemplate {
+        template: template_str,
+        environment: env,
+    })
+}
+
+/// Validate an in-memory prompt template and return its rendering environment.
+pub(super) fn load_template_string(template_str: String) -> Result<LoadedTemplate> {
+    let env = validate_template(&template_str, "remote prompt template")?;
+    Ok(LoadedTemplate {
+        template: template_str,
+        environment: env,
+    })
+}
+
+fn validate_template(template_str: &str, source: &str) -> Result<jinja::Environment<'static>> {
     let env = jinja::Environment::new();
     env.render_str(
-        &template_str,
+        template_str,
         jinja::context!(row => serde_json::json!({}), choices => Vec::<PromptChoice>::new()),
     )
-    .with_context(|| format!("invalid jinja syntax in prompt template file `{path}`"))?;
-    Ok((template_str, env))
+    .with_context(|| format!("invalid jinja syntax in {source}"))?;
+    Ok(env)
 }
 
 /// Initialize the configured dataset and clamp the requested limit to its available row count.

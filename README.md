@@ -75,6 +75,8 @@ qt show <run_id>
 qt compare <run_id_a> <run_id_b>
 ```
 
+When `qt run <eval_name>` does not find the requested name in the local configuration, it queries the Quantiles remote benchmark service for a benchmark that has the given name. See the [CLI's README file](./cli/README.md#remote-benchmark-fallback) for details.
+
 > Note: Pass `--json` to any of these commands to output machine- and agent-friendly JSON instead of human-formatted output.
 
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for available commands, options, and usage details.

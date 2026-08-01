@@ -51,6 +51,14 @@ max_workers = 100
 
 See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
 
+### Remote benchmark fallback
+
+When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in 1the Quantiles remote benchmark service for an evaluation called `eval_name` and, if a match is found, downloads the benchmark definition and runs it.
+
+>If you want to override the location of the remote benchmark service, use the `--remote-url` flag or the `QUANTILES_REMOTE_URL` environment variable.
+
+When `qt` uses the remote benchmark service, downloaded remote definitions and prompt templates are verified and kept in memory for the run. They will not be cached on disk.
+
 ## Architecture
 
 The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.

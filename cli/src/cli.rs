@@ -49,6 +49,9 @@ pub enum Command {
         workflow_name: String,
         #[arg(long)]
         input: Option<String>,
+        /// Override the remote benchmark service URL.
+        #[arg(long)]
+        remote_url: Option<String>,
         /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,

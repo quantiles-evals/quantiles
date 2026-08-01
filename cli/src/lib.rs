@@ -1,3 +1,4 @@
+pub mod benchmark_registry;
 pub mod builtins;
 pub mod client;
 pub mod config;

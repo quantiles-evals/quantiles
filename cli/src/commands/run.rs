@@ -20,9 +20,14 @@ use qt::server::{self, ServerConfig};
 pub async fn run(
     workflow_name: &str,
     cli_input: Option<&str>,
+    cli_remote_url: Option<&str>,
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
+    let remote_url = qt::benchmark_registry::select_remote_url(
+        cli_remote_url,
+        std::env::var_os("QUANTILES_REMOTE_URL"),
+    )?;
     let config = qt::config::load()?;
 
     let bench_config = config.benchmarks.get(workflow_name);
@@ -106,7 +111,11 @@ pub async fn run(
             }
         }
         None => {
-            if builtins::resolve(workflow_name).is_some() {
+            if let Some(remote) =
+                qt::benchmark_registry::resolve_and_download(workflow_name, &remote_url).await?
+            {
+                run_remote_benchmark(workflow_name, cli_input, json, process_start, remote).await
+            } else if builtins::resolve(workflow_name).is_some() {
                 let (effective_input, _) = assemble_builtin_input(None, cli_input);
                 run_builtin_workflow(
                     workflow_name,
@@ -120,6 +129,55 @@ pub async fn run(
             }
         }
     }
+}
+
+async fn run_remote_benchmark(
+    workflow_name: &str,
+    cli_input: Option<&str>,
+    json: bool,
+    process_start: Instant,
+    remote: qt::benchmark_registry::RemoteBenchmark,
+) -> Result<()> {
+    let configured_template_path = remote.config.params.prompt_template_file.clone();
+    let input = assemble_custom_nocode_input(&remote.config, cli_input)?;
+    let effective_params: qt::config::CustomNoCodeParams = serde_json::from_str(&input)
+        .context("failed to parse assembled remote custom_nocode input")?;
+
+    let cwd = std::env::current_dir()?;
+    let root = db::resolve_workspace_root(&cwd, true).await?;
+    let db = db::open_workspace(&root).await?;
+    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
+    let run_id = db::create_run(&db, workflow_name, Some(&input)).await?;
+
+    if !json {
+        println!(
+            "Resolved remote benchmark {workflow_name} version {} ({})",
+            remote.version, remote.manifest_sha256
+        );
+        println!("Created run {run_id}");
+    }
+
+    let builtin = if effective_params.prompt_template_file == configured_template_path {
+        Box::new(qt::builtins::CustomNoCodeBuiltin::with_prompt_template(
+            workflow_name.to_owned(),
+            remote.prompt_template,
+        ))
+    } else {
+        Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+            workflow_name.to_owned(),
+        ))
+    };
+    execute_builtin(ExecuteBuiltinArgs {
+        db: &db,
+        metrics_store: &metrics_store,
+        run_id,
+        workflow_name,
+        builtin,
+        input: Some(&input),
+        json,
+        process_start,
+    })
+    .await
 }
 
 fn assemble_builtin_input(

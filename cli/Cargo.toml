@@ -10,6 +10,8 @@ async-trait = "0.1"
 axum = "0.8.9"
 clap = { version = "4.6.1", features = ["derive"] }
 comfy-table = "7.2.1"
+buffa = "0.8"
+connectrpc = { version = "0.8", features = ["client-tls"] }
 datafusion = "46.0.0"
 dirs = "6"
 fastembed = "5"
@@ -19,6 +21,7 @@ jinja = "0.1"
 parquet = { version = "54", features = ["arrow"] }
 rand = "0.8"
 reqwest = { version = "0.13.3", features = ["json", "rustls"] }
+rustls-platform-verifier = "0.7"
 sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-native-tls", "time"] }
 seq-macro = "0.3"
 serde = { version = "1.0.228", features = ["derive"] }

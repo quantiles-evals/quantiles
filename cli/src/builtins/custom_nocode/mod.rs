@@ -5,7 +5,10 @@ use anyhow::Result;
 use self::data::{DatasetRow, prepare_row};
 use self::evaluation::{EvaluateRowArgs, evaluate_row};
 use self::metrics::emit_default_aggregate_metrics;
-use self::runtime::{load_template, parse_input, resolve_dataset_limit, resolve_sampler_for_style};
+use self::runtime::{
+    LoadedTemplate, load_template, load_template_string, parse_input, resolve_dataset_limit,
+    resolve_sampler_for_style,
+};
 use crate::builtins::common::get_max_workers;
 use crate::builtins::dataset_runner::DatasetRunner;
 use crate::builtins::output::set_builtin_run_output;
@@ -19,13 +22,26 @@ mod runtime;
 /// No-code custom benchmark builtin.
 pub struct CustomNoCodeBuiltin {
     name: String,
+    prompt_template: Option<String>,
 }
 
 impl CustomNoCodeBuiltin {
     /// Create a new builtin with the workflow name from the config file.
     #[must_use]
     pub fn new(name: String) -> Self {
-        Self { name }
+        Self {
+            name,
+            prompt_template: None,
+        }
+    }
+
+    /// Create a no-code benchmark backed by an in-memory prompt template.
+    #[must_use]
+    pub fn with_prompt_template(name: String, prompt_template: String) -> Self {
+        Self {
+            name,
+            prompt_template: Some(prompt_template),
+        }
     }
 }
 
@@ -37,7 +53,13 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
 
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()> {
         let mut config = parse_input(ctx.input)?;
-        let (template_str, env) = load_template(&config.prompt_template_file)?;
+        let LoadedTemplate {
+            template: template_str,
+            environment: env,
+        } = match &self.prompt_template {
+            Some(template) => load_template_string(template.clone())?,
+            None => load_template(&config.prompt_template_file)?,
+        };
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler_for_style(config.model.as_ref(), &config.style)?;
 
