@@ -2,11 +2,18 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 
-use super::data::PromptChoice;
 use crate::builtins::common::resolve_sampler;
 use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
+
+/// A validated prompt template and its Jinja environment.
+pub(super) struct LoadedTemplate {
+    /// The prompt template source.
+    pub(super) template: String,
+    /// The environment used to render the template.
+    pub(super) environment: jinja::Environment<'static>,
+}
 
 /// Resolve the configured sampler, using configured choice labels for random multiple-choice runs.
 pub(super) fn resolve_sampler_for_style(
@@ -37,17 +44,22 @@ pub(super) fn parse_input(input: Option<&str>) -> Result<crate::config::CustomNo
     Ok(config)
 }
 
-/// Read a prompt template and validate its Jinja syntax against the available variables.
-pub(super) fn load_template(path: &str) -> Result<(String, jinja::Environment<'_>)> {
+/// Read a prompt template and validate its Jinja syntax without rendering it.
+pub(super) fn load_template(path: &str) -> Result<LoadedTemplate> {
     let template_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read prompt template file `{path}`"))?;
-    let env = jinja::Environment::new();
-    env.render_str(
-        &template_str,
-        jinja::context!(row => serde_json::json!({}), choices => Vec::<PromptChoice>::new()),
-    )
-    .with_context(|| format!("invalid jinja syntax in prompt template file `{path}`"))?;
-    Ok((template_str, env))
+    let env = validate_template(&template_str, &format!("prompt template file `{path}`"))?;
+    Ok(LoadedTemplate {
+        template: template_str,
+        environment: env,
+    })
+}
+
+fn validate_template(template_str: &str, source: &str) -> Result<jinja::Environment<'static>> {
+    let mut env = jinja::Environment::new();
+    env.add_template_owned(source.to_owned(), template_str.to_owned())
+        .with_context(|| format!("invalid jinja syntax in {source}"))?;
+    Ok(env)
 }
 
 /// Initialize the configured dataset and clamp the requested limit to its available row count.
@@ -74,6 +86,33 @@ pub(super) async fn resolve_dataset_limit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn template_validation_allows_nested_row_fields() {
+        let template = r#"{{ row.context.contexts | join("\n") }}"#;
+        let env = validate_template(template, "test template").unwrap();
+        let rendered = env
+            .render_str(
+                template,
+                jinja::context!(row => serde_json::json!({
+                    "context": {"contexts": ["first", "second"]}
+                })),
+            )
+            .unwrap();
+
+        assert_eq!(rendered, "first\nsecond");
+    }
+
+    #[test]
+    fn template_validation_rejects_invalid_syntax() {
+        let error = validate_template("{{ row.question", "test template").unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("invalid jinja syntax in test template")
+        );
+    }
 
     /// Build a standard four-label style for sampler-selection tests.
     fn multiple_choice_style() -> crate::config::CustomNoCodeStyleConfig {
