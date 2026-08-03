@@ -58,7 +58,7 @@ pub(super) fn validate_remote_url(remote_url: &str) -> Result<Url> {
     Ok(url)
 }
 
-/// Resolve benchmark metadata from the remote ConnectRPC service.
+/// Resolve benchmark metadata from the remote `ConnectRPC` service.
 pub(super) async fn resolve_manifest(
     benchmark_name: &str,
     endpoint: &Url,

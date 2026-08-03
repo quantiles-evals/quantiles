@@ -21,7 +21,7 @@ pub(crate) struct BuiltinConfig {
     #[serde(default)]
     pub(crate) limit: Option<usize>,
     /// The dataset to use for the evaluation.
-    /// Currently HuggingFace is the only supported source, and all sources
+    /// Currently `HuggingFace` is the only supported source, and all sources
     /// must start with `hf://...` or `huggingface://...`
     #[serde(default)]
     pub(crate) dataset: Option<String>,

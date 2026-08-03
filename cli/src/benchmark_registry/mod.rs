@@ -3,7 +3,6 @@
 use anyhow::Result;
 
 pub use self::benchmark::RemoteBenchmark;
-use self::benchmark::build_remote_benchmark;
 pub use self::client::select_remote_url;
 use self::client::{resolve_manifest, validate_remote_url};
 use self::download::download_resources;
@@ -36,6 +35,6 @@ pub async fn resolve_and_download(
     validate_response_identity(benchmark_name, &response)?;
     let resources = validate_resources(&response.resources, endpoint.scheme() == "http")?;
     let downloaded = download_resources(&resources).await?;
-    let remote = build_remote_benchmark(benchmark_name, response, downloaded)?;
+    let remote = RemoteBenchmark::new(benchmark_name, response, downloaded)?;
     Ok(Some(remote))
 }
