@@ -4,6 +4,8 @@ monorepo_root = true
 config_roots = [".", "cli", "typescript", "python", "python-examples"]
 
 [tools]
+# needed by the `.use_buf()` call in cli/build.rs
+buf = "1.72.0"
 # keep this version inline with the version declared in .github/workflows/typescript
 bun = "1.3.14"
 # keep this version inline with rust stable
