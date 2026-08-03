@@ -21,7 +21,7 @@ use crate::config::{BenchmarkConfig, CustomNoCodeBenchmarkConfig, WorkspaceConfi
     clippy::pedantic,
     reason = "ConnectRPC and Buffa generated code uses allow attributes"
 )]
-pub mod proto {
+mod proto {
     connectrpc::include_generated!();
 }
 
@@ -30,7 +30,7 @@ use proto::quantiles::benchmark::v1::{
     ResolveBenchmarkResponse, ResourceKind,
 };
 
-pub const DEFAULT_REMOTE_URL: &str = "https://api.quantiles.io";
+pub(crate) const DEFAULT_REMOTE_URL: &str = "https://api.quantiles.io";
 const MAX_MANIFEST_BYTES: usize = 1024 * 1024;
 const MAX_RESOURCE_COUNT: usize = 32;
 const MAX_RESOURCE_BYTES: u64 = 10 * 1024 * 1024;
