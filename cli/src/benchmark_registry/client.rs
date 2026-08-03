@@ -38,6 +38,7 @@ pub fn select_remote_url(cli_url: Option<&str>, env_url: Option<OsString>) -> Re
     )
 }
 
+/// Parse and validate a remote benchmark service URL.
 pub(super) fn validate_remote_url(remote_url: &str) -> Result<Url> {
     let mut url = Url::parse(remote_url)
         .with_context(|| format!("invalid remote benchmark service URL `{remote_url}`"))?;
@@ -57,6 +58,7 @@ pub(super) fn validate_remote_url(remote_url: &str) -> Result<Url> {
     Ok(url)
 }
 
+/// Resolve benchmark metadata from the remote ConnectRPC service.
 pub(super) async fn resolve_manifest(
     benchmark_name: &str,
     endpoint: &Url,

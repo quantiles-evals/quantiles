@@ -15,6 +15,7 @@ pub struct RemoteBenchmark {
     pub manifest_sha256: String,
 }
 
+/// Assemble a runnable no-code benchmark from its manifest and downloaded resources.
 pub(super) fn build_remote_benchmark(
     benchmark_name: &str,
     response: ResolveBenchmarkResponse,

@@ -9,6 +9,7 @@ use sha2::{Digest as _, Sha256};
 use super::manifest::{MAX_RESOURCE_BYTES, validate_logical_path};
 use super::proto::v1::BenchmarkResource;
 
+/// Download validated resources into memory and verify their sizes and digests.
 pub(super) async fn download_resources(
     resources: &[BenchmarkResource],
 ) -> Result<HashMap<PathBuf, Vec<u8>>> {

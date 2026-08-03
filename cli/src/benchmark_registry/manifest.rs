@@ -6,10 +6,14 @@ use reqwest::Url;
 
 use super::proto::v1::{BenchmarkResource, ResolveBenchmarkResponse, ResourceKind};
 
+/// Maximum number of resources allowed in a remote benchmark manifest.
 const MAX_RESOURCE_COUNT: usize = 32;
+/// Maximum declared and downloaded size of one benchmark resource.
 pub(super) const MAX_RESOURCE_BYTES: u64 = 10 * 1024 * 1024;
+/// Maximum aggregate declared size of all resources in a benchmark manifest.
 const MAX_BUNDLE_BYTES: u64 = 50 * 1024 * 1024;
 
+/// Validate that a response identifies the requested immutable benchmark manifest.
 pub(super) fn validate_response_identity(
     benchmark_name: &str,
     response: &ResolveBenchmarkResponse,
@@ -27,6 +31,7 @@ pub(super) fn validate_response_identity(
     Ok(())
 }
 
+/// Validate a manifest's resource identities, locations, kinds, digests, and sizes.
 pub(super) fn validate_resources(
     resources: &[BenchmarkResource],
     allow_plaintext_downloads: bool,
@@ -93,6 +98,7 @@ pub(super) fn validate_resources(
     Ok(resources.to_vec())
 }
 
+/// Validate and normalize a resource path relative to its benchmark bundle.
 pub(super) fn validate_logical_path(path: &str) -> Result<PathBuf> {
     if path.is_empty() || path.contains('\\') {
         bail!("resource logical path `{path}` is invalid");
@@ -111,6 +117,7 @@ pub(super) fn validate_logical_path(path: &str) -> Result<PathBuf> {
     Ok(path.to_path_buf())
 }
 
+/// Validate a resource URL and enforce the benchmark service's transport security.
 fn validate_download_url(download_url: &str, allow_plaintext: bool) -> Result<()> {
     let url = Url::parse(download_url)
         .with_context(|| format!("invalid benchmark resource URL `{download_url}`"))?;
