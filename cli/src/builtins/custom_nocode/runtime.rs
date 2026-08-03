@@ -7,7 +7,8 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
-/// A validated prompt template and its Jinja environment.
+/// A validated prompt template and the Jinja environment
+/// used to render it.
 pub(super) struct LoadedTemplate {
     /// The prompt template source.
     pub(super) template: String,
@@ -49,6 +50,15 @@ pub(super) fn load_template(path: &str) -> Result<LoadedTemplate> {
     let template_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read prompt template file `{path}`"))?;
     let env = validate_template(&template_str, &format!("prompt template file `{path}`"))?;
+    Ok(LoadedTemplate {
+        template: template_str,
+        environment: env,
+    })
+}
+
+/// Validate an in-memory prompt template and return its rendering environment.
+pub(super) fn load_template_string(template_str: String) -> Result<LoadedTemplate> {
+    let env = validate_template(&template_str, "remote prompt template")?;
     Ok(LoadedTemplate {
         template: template_str,
         environment: env,

@@ -43,12 +43,21 @@ Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For
 
 ```toml
 [benchmarks.pubmedqa]
+dataset = "hf://quantiles/PubMedQA"
 samples = 50
 model = "openai:gpt-5.6"
 max_workers = 100
 ```
 
 See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
+
+### Custom evaluations and the remote benchmark service
+
+When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in the Quantiles remote benchmark service for an evaluation of the same name. If a match is found, the CLI downloads the benchmark definition and runs it.
+
+>If you want to override the location of the remote benchmark service, use the `--remote-url` flag or the `QUANTILES_REMOTE_URL` environment variable.
+
+When `qt` uses the remote benchmark service, downloaded remote definitions and prompt templates are verified and kept in memory for the run. They will not be cached on disk.
 
 ## Architecture
 

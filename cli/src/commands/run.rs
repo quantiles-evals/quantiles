@@ -20,9 +20,14 @@ use qt::server::{self, ServerConfig};
 pub async fn run(
     workflow_name: &str,
     cli_input: Option<&str>,
+    cli_remote_url: Option<&str>,
     json: bool,
     process_start: Instant,
 ) -> Result<()> {
+    let remote_url = qt::benchmark_registry::select_remote_url(
+        cli_remote_url,
+        std::env::var_os("QUANTILES_REMOTE_URL"),
+    )?;
     let config = qt::config::load()?;
 
     let bench_config = config.benchmarks.get(workflow_name);
@@ -100,13 +105,18 @@ pub async fn run(
                         input: Some(&input),
                         json,
                         process_start,
+                        remote_hash: None,
                     })
                     .await
                 }
             }
         }
         None => {
-            if builtins::resolve(workflow_name).is_some() {
+            if let Some(remote) =
+                qt::benchmark_registry::resolve_and_download(workflow_name, &remote_url).await?
+            {
+                run_remote_benchmark(workflow_name, cli_input, json, process_start, remote).await
+            } else if builtins::resolve(workflow_name).is_some() {
                 let (effective_input, _) = assemble_builtin_input(None, cli_input);
                 run_builtin_workflow(
                     workflow_name,
@@ -122,6 +132,57 @@ pub async fn run(
     }
 }
 
+async fn run_remote_benchmark(
+    workflow_name: &str,
+    cli_input: Option<&str>,
+    json: bool,
+    process_start: Instant,
+    remote: qt::benchmark_registry::RemoteBenchmark,
+) -> Result<()> {
+    let configured_template_path = remote.config.params.prompt_template_file.clone();
+    let remote_hash = remote.manifest_sha256.clone();
+    let input = assemble_custom_nocode_input(&remote.config, cli_input)?;
+    let effective_params: qt::config::CustomNoCodeParams = serde_json::from_str(&input)
+        .context("failed to parse assembled remote custom_nocode input")?;
+
+    let cwd = std::env::current_dir()?;
+    let root = db::resolve_workspace_root(&cwd, true).await?;
+    let db = db::open_workspace(&root).await?;
+    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
+    let run_id = db::create_run(&db, workflow_name, Some(&input)).await?;
+
+    if !json {
+        println!(
+            "Resolved remote benchmark {workflow_name} version {} ({})",
+            remote.version, remote.manifest_sha256
+        );
+        println!("Created run {run_id}");
+    }
+
+    let builtin = if effective_params.prompt_template_file == configured_template_path {
+        Box::new(qt::builtins::CustomNoCodeBuiltin::with_prompt_template(
+            workflow_name.to_owned(),
+            remote.prompt_template,
+        ))
+    } else {
+        Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+            workflow_name.to_owned(),
+        ))
+    };
+    execute_builtin(ExecuteBuiltinArgs {
+        db: &db,
+        metrics_store: &metrics_store,
+        run_id,
+        workflow_name,
+        builtin,
+        input: Some(&input),
+        json,
+        process_start,
+        remote_hash: Some(&remote_hash),
+    })
+    .await
+}
+
 fn assemble_builtin_input(
     bench: Option<&qt::config::BuiltinBenchmarkConfig>,
     cli_input: Option<&str>,
@@ -131,12 +192,9 @@ fn assemble_builtin_input(
     }
 
     if let Some(bench) = bench {
-        if bench.samples.is_none() && bench.model.is_none() && bench.max_workers.is_none() {
-            return (None, Vec::new());
-        }
-
         let input = BuiltinConfigInput {
             limit: bench.samples,
+            dataset: bench.dataset.clone(),
             model: bench.model.clone(),
             max_workers: bench.max_workers,
         };
@@ -259,6 +317,7 @@ async fn run_builtin_workflow(
         input,
         json,
         process_start,
+        remote_hash: None,
     })
     .await
 }
@@ -273,6 +332,10 @@ pub struct ExecuteBuiltinArgs<'a> {
     pub input: Option<&'a str>,
     pub json: bool,
     pub process_start: Instant,
+    /// If the benchmark was loaded from local configuration, this
+    /// field will be `None`. If it was loaded from remote configuration,
+    /// it will contain a hash of that configuration.
+    pub remote_hash: Option<&'a str>,
 }
 
 pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
@@ -334,6 +397,7 @@ pub async fn execute_builtin(args: ExecuteBuiltinArgs<'_>) -> Result<()> {
             aggregate_metrics: metrics_map,
             run_id: args.run_id,
             warning: None,
+            remote_hash: args.remote_hash,
         };
         println!("{}", serde_json::to_string(&output)?);
     } else {
@@ -468,11 +532,13 @@ fn print_aggregate_metrics_table(metrics: &[MetricPointSummary]) {
 
 /// JSON payload emitted by `qt run <builtin> --json`.
 #[derive(Serialize)]
-struct BuiltinRunJsonOutput {
+struct BuiltinRunJsonOutput<'a> {
     aggregate_metrics: HashMap<String, f64>,
     run_id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     warning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    remote_hash: Option<&'a str>,
 }
 
 /// Config input shape auto-generated from `quantiles.toml` `[benchmarks.*]`.
@@ -480,6 +546,7 @@ struct BuiltinRunJsonOutput {
 struct BuiltinConfigInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     limit: Option<usize>,
+    dataset: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<qt::llm::Sampler>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -661,6 +728,34 @@ mod tests {
 
     use serde_json::json;
 
+    #[test]
+    fn builtin_run_json_includes_remote_hash_when_resolved_remotely() {
+        let output = super::BuiltinRunJsonOutput {
+            aggregate_metrics: HashMap::new(),
+            run_id: 1,
+            warning: None,
+            remote_hash: Some("0123456789abcdef"),
+        };
+
+        let serialized = serde_json::to_value(output).unwrap();
+
+        assert_eq!(serialized["remote_hash"], "0123456789abcdef");
+    }
+
+    #[test]
+    fn builtin_run_json_omits_remote_hash_for_local_runs() {
+        let output = super::BuiltinRunJsonOutput {
+            aggregate_metrics: HashMap::new(),
+            run_id: 1,
+            warning: None,
+            remote_hash: None,
+        };
+
+        let serialized = serde_json::to_value(output).unwrap();
+
+        assert!(serialized.get("remote_hash").is_none());
+    }
+
     /// When only config input is present and no `--input` CLI flag is given, the result
     /// should be the exact config object with no overridden keys.
     #[test]
@@ -721,6 +816,7 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(10),
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         };
@@ -735,28 +831,32 @@ mod tests {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(5),
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: Some(qt::llm::Sampler::Random {}),
             max_workers: Some(8),
         };
         let (input, _) = super::assemble_builtin_input(Some(&bench), None);
         let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
         assert_eq!(parsed["limit"], 5);
+        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
         assert_eq!(parsed["model"], "random");
         assert_eq!(parsed["max_workers"], 8);
     }
 
-    /// When the builtin config section exists but has no runtime-relevant fields, the
-    /// input should be `None` rather than an empty JSON object.
+    /// When the builtin config section only has the required dataset, the input should
+    /// still carry that dataset source into builtin execution.
     #[test]
-    fn assemble_builtin_input_none_when_no_config_fields() {
+    fn assemble_builtin_input_with_dataset_only_config() {
         let bench = qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         };
         let (input, _) = super::assemble_builtin_input(Some(&bench), None);
-        assert!(input.is_none());
+        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
+        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
     }
 
     /// When there is no config section at all and no CLI `--input`, builtin runs should

@@ -7,6 +7,13 @@ use anyhow::Result;
 use clap::Parser;
 
 fn main() -> Result<()> {
+    // `fastembed`'s dependency tree enables another Rustls crypto provider alongside AWS-LC.
+    // Install AWS-LC explicitly, to avoid Rustls-related panics when multiple providers are
+    // enabled.
+    connectrpc::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("failed to install the AWS-LC Rustls crypto provider"))?;
+
     let process_start = Instant::now();
 
     // TODO: allow number of total threads to be configurable, and possibly default
@@ -33,8 +40,18 @@ async fn async_main(process_start: Instant) -> Result<()> {
         cli::Command::Run {
             workflow_name,
             input,
+            remote_url,
             json,
-        } => commands::run(&workflow_name, input.as_deref(), json, process_start).await,
+        } => {
+            commands::run(
+                &workflow_name,
+                input.as_deref(),
+                remote_url.as_deref(),
+                json,
+                process_start,
+            )
+            .await
+        }
         cli::Command::Resume { run_id, json } => {
             commands::resume(run_id, json, process_start).await
         }

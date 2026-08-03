@@ -118,6 +118,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 input: custom_nocode_input.as_deref().or(stored_input),
                 json,
                 process_start,
+                remote_hash: None,
             })
             .await
         }
@@ -147,6 +148,7 @@ mod tests {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: None,
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         });
@@ -161,6 +163,7 @@ mod tests {
         let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
             type_: "builtin".to_owned(),
             samples: Some(10),
+            dataset: "hf://quantiles/PubMedQA".to_owned(),
             model: None,
             max_workers: None,
         });

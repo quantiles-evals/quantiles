@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package quantiles.benchmark.v1;
+
+// Resolves immutable benchmark metadata and the resources needed to run it.
+service BenchmarkRegistryService {
+  rpc ResolveBenchmark(ResolveBenchmarkRequest) returns (ResolveBenchmarkResponse);
+}
+
+message ResolveBenchmarkRequest {
+  // Stable benchmark name, such as "simpleqa-verified".
+  string benchmark_name = 1;
+
+  // Immutable version to resolve. An empty value requests the latest published version.
+  string version = 2;
+}
+
+message ResolveBenchmarkResponse {
+  string benchmark_name = 1;
+  string version = 2;
+
+  // SHA-256 digest of the canonical resource manifest.
+  string manifest_sha256 = 3;
+
+  repeated BenchmarkResource resources = 4;
+}
+
+message BenchmarkResource {
+  // Opaque registry identifier used to identify this resource.
+  string resource_id = 1;
+
+  // Relative path at which the client materializes the resource.
+  string logical_path = 2;
+
+  ResourceKind kind = 3;
+
+  // HTTP(S) URL from which the client downloads the resource bytes.
+  string download_url = 4;
+
+  // Lowercase hexadecimal SHA-256 digest of the resource bytes.
+  string sha256 = 5;
+
+  uint64 size_bytes = 6;
+  string content_type = 7;
+}
+
+enum ResourceKind {
+  RESOURCE_KIND_UNSPECIFIED = 0;
+  RESOURCE_KIND_DEFINITION = 1;
+  RESOURCE_KIND_PROMPT_TEMPLATE = 2;
+  RESOURCE_KIND_AUXILIARY = 3;
+}

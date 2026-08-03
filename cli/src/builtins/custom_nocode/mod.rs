@@ -6,7 +6,8 @@ use self::data::{DatasetRow, prepare_row};
 use self::evaluation::{EvaluateRowArgs, evaluate_row};
 use self::metrics::emit_default_aggregate_metrics;
 use self::runtime::{
-    LoadedTemplate, load_template, parse_input, resolve_dataset_limit, resolve_sampler_for_style,
+    LoadedTemplate, load_template, load_template_string, parse_input, resolve_dataset_limit,
+    resolve_sampler_for_style,
 };
 use crate::builtins::common::get_max_workers;
 use crate::builtins::dataset_runner::DatasetRunner;
@@ -20,14 +21,30 @@ mod runtime;
 
 /// No-code custom benchmark builtin.
 pub struct CustomNoCodeBuiltin {
+    /// The name of the custom no-code evaluation
     name: String,
+    /// The template used to construct the prompt for a dataset
+    /// row, if applicable.
+    prompt_template: Option<String>,
 }
 
 impl CustomNoCodeBuiltin {
     /// Create a new builtin with the workflow name from the config file.
     #[must_use]
     pub fn new(name: String) -> Self {
-        Self { name }
+        Self {
+            name,
+            prompt_template: None,
+        }
+    }
+
+    /// Create a no-code benchmark backed by an in-memory prompt template.
+    #[must_use]
+    pub fn with_prompt_template(name: String, prompt_template: String) -> Self {
+        Self {
+            name,
+            prompt_template: Some(prompt_template),
+        }
     }
 }
 
@@ -42,7 +59,10 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let LoadedTemplate {
             template: template_str,
             environment: env,
-        } = load_template(&config.prompt_template_file)?;
+        } = match &self.prompt_template {
+            Some(template) => load_template_string(template.clone())?,
+            None => load_template(&config.prompt_template_file)?,
+        };
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler_for_style(config.model.as_ref(), &config.style)?;
 
