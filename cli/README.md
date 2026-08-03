@@ -53,7 +53,7 @@ See the [configuration guide](https://quantiles.io/documentation/configuration) 
 
 ### Remote benchmark fallback
 
-When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in 1the Quantiles remote benchmark service for an evaluation called `eval_name` and, if a match is found, downloads the benchmark definition and runs it.
+When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in the Quantiles remote benchmark service for an evaluation of the same name. If a match is found, the CLI downloads the benchmark definition and runs it.
 
 >If you want to override the location of the remote benchmark service, use the `--remote-url` flag or the `QUANTILES_REMOTE_URL` environment variable.
 
