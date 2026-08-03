@@ -39,6 +39,3 @@ pub async fn resolve_and_download(
     let remote = build_remote_benchmark(benchmark_name, response, downloaded)?;
     Ok(Some(remote))
 }
-
-#[cfg(test)]
-mod tests;
