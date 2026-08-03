@@ -21,7 +21,10 @@ mod runtime;
 
 /// No-code custom benchmark builtin.
 pub struct CustomNoCodeBuiltin {
+    /// The name of the custom no-code evaluation
     name: String,
+    /// The template used to construct the prompt for a dataset
+    /// row, if applicable.
     prompt_template: Option<String>,
 }
 
