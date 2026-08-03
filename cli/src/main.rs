@@ -8,7 +8,8 @@ use clap::Parser;
 
 fn main() -> Result<()> {
     // `fastembed`'s dependency tree enables another Rustls crypto provider alongside AWS-LC.
-    // Install AWS-LC explicitly because Rustls may panic when multiple providers are enabled.
+    // Install AWS-LC explicitly, to avoid Rustls-related panics when multiple providers are
+    // enabled.
     connectrpc::rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .map_err(|_| anyhow::anyhow!("failed to install the AWS-LC Rustls crypto provider"))?;
