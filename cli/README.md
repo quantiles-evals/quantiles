@@ -13,7 +13,7 @@ curl -fsSL https://cli.quantiles.io/install.sh | bash
 A few commands to see `qt` in action:
 
 ```bash
-# 1. Run a built-in evaluation using a demo model that does
+# 1. Run a built-in benchmark using a demo model that does
 # not incur any usage charges.
 #
 # You can also build and run custom evaluations.
@@ -27,6 +27,8 @@ qt list
 qt show <run_id>
 ```
 
+Running built-in benchmarks requires access to `https://api.quantiles.io`, where qt retrieves their configuration.
+
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
 > Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your LLM provider. Depending on your provider, model, and account limits, benchmark runs can hit API rate limits or concurrency quotas. Reduce request concurrency or use a model or provider with higher throughput limits. The example below shows how to adjust `max_workers` if you encounter throttling.
@@ -35,33 +37,43 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a 
 
 The CLI supports three evaluation types:
 
-- [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) run predefined datasets and scoring methods. They work without configuration, but you can override settings such as the model, sample count, and concurrency.
+- [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations, with optional configuration for custom settings such as a hosted AI model.
 - [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
 - [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
-Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For example:
+Add a `quantiles.toml` or `.quantiles.toml` config file to configure an evaluation. When you run a benchmark, Quantiles first checks this file for a matching configuration. If none is found, it queries the remote Quantiles benchmark registry at `https://api.quantiles.io` for a built-in benchmark with that name.
+
+The following example configures the built-in PubMedQA benchmark to use an OpenAI model and limit the number of samples:
 
 ```toml
+# Define a local configuration for the PubMedQA benchmark.
 [benchmarks.pubmedqa]
+
+# Use the configurable no-code evaluation framework.
+type = "custom-nocode"
+
+# Use the same dataset as the built-in PubMedQA benchmark.
 dataset = "hf://quantiles/PubMedQA"
+
+# Run the evaluation on 50 samples.
+# Omit this field to evaluate the full dataset.
 samples = 50
-model = "openai:gpt-5.6"
-max_workers = 100
+
+# Replace the default demo model with a hosted OpenAI model.
+model = "openai:gpt-5.6-luna"
 ```
 
-See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
+For additional guidance, see:
 
-### Custom evaluations and the remote benchmark service
-
-When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in the Quantiles remote benchmark service for an evaluation of the same name. If a match is found, the CLI downloads the benchmark definition and runs it.
-
->If you want to override the location of the remote benchmark service, use the `--remote-url` flag or the `QUANTILES_REMOTE_URL` environment variable.
-
-When `qt` uses the remote benchmark service, downloaded remote definitions and prompt templates are verified and kept in memory for the run. They will not be cached on disk.
+- [Configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples.
+- [Model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up hosted AI models, managing credentials, and troubleshooting configuration issues.
+- [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
 
 ## Architecture
 
-The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.
+ASK AARON IF THIS NEEDS TO CHANGE
+
+The Quantiles CLI, `qt` runs code locally, while `qt` handles durability and observability.
 
 ```
 +--------------------------------------+
