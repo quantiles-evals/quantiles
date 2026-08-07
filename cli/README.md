@@ -27,7 +27,7 @@ qt list
 qt show <run_id>
 ```
 
-Running built-in benchmarks requires access to `https://api.quantiles.io`, where qt retrieves their configuration.
+Running a built-in benchmark, such as `simpleqa-verified` above, requires an internet connection so that `qt` can retrieve its configuration from `https://api.quantiles.io`.
 
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
