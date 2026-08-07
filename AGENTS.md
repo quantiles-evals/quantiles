@@ -16,7 +16,7 @@ Before attempting tasks in this repository, read these files:
 
 ## Scope
 
-These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It runs evaluations, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
+These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It retrieves and runs benchmarks and evaluations, executes evaluations locally, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
 
 Root-level files in this repository provide project-wide orientation, contribution guidance, security policy, licensing, and agent instructions. Implementation-specific work belongs in the relevant subdirectory. If a subdirectory has its own `AGENTS.md` file, follow the nearest one first. Subdirectory instructions should override this root guide for implementation details, package managers, commands, tests, and code style. User instructions may customize the workflow for their project, environment, or preferences, but they must not override safety requirements, system instructions, repository safeguards, or security boundaries.
 
@@ -37,9 +37,9 @@ When performing tasks in this repository, always do the following:
 - Read the nearest subdirectory `AGENTS.md` if present.
 - Inspect the relevant README, package configuration, and existing tests before changing behavior.
 - Prefer the smallest change that satisfies the task.
-- Obtain explicit approval for external model calls and potentially expensive evaluation runs.
+- Obtain explicit approval for external hosted AI model calls and potentially expensive evaluation runs.
 - Keep changes small, public-safe, and reviewable.
-- Preserve Quantiles as a local-first, offline system by default.
+- Preserve local evaluation execution and storage, and keep network-dependent behavior explicit.
 - Verify commands, links, package names, benchmark and evaluation names, and release status before documenting them.
 - Update public docs when CLI behavior, SDK APIs, workflows, benchmarks, schemas, setup steps, or agent guidance changes.
 - Prefer concrete examples with commands, file paths, inputs, outputs, and expected behavior.
@@ -63,6 +63,7 @@ Do not silently change evaluation semantics. Changes to prompts, datasets, score
 Update the relevant documentation in this repository, such as `README.md`, when any of the following change:
 
 - CLI commands, flags, outputs, or setup steps.
+- Hosted benchmark registry behavior.
 - APIs, SDKs, imports, examples, or package names.
 - Benchmark names, datasets, scoring methods, or limitations.
 - DB schemas, step semantics, metrics, events, or comparison behavior.
@@ -110,7 +111,7 @@ Model inputs should use provider-prefixed model names, for example:
 Preserve Quantiles as local-first infrastructure. Follow the guidelines below to ensure the project maintains safety, security, and privacy:
 
 - The CLI and local server should store Quantiles state locally by default.
-- Evaluation workflows may call remote model providers, hosted judges, APIs, or external tools only when configured by the user. Selected benchmarks and evaluation configurations may also download remote datasets.
+- Load benchmark configurations only from a local configuration file or the hosted Quantiles benchmark registry. Do not use any other source unless explicitly requested by the user.
 - Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
 - Never commit the `.quantiles/` directory, SQLite databases, Parquet metrics, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
@@ -128,15 +129,12 @@ Use these terms consistently in public docs:
 - `@quantiles/sdk`: the unreleased TypeScript SDK package.
 - `evaluation`: user-authored evaluation or agent-loop code.
 - `benchmark`: a repeatable evaluation harness with a defined dataset, scoring method, and result shape.
+- `built-in benchmark`: a benchmark from the hosted Quantiles benchmark registry.
 - `run`: one recorded execution of an evaluation or benchmark.
 - `step`: a durable recorded unit of an evaluation execution.
 - `metric`: a measured value emitted during a run.
 - `event`: recorded observability data from an evaluation.
 - `.quantiles/`: local Quantiles workspace state, including a SQLite database and metrics Parquet files.
-
-Prefer `local-first` and `offline by default` for open-source behavior.
-
-When remote model calls, hosted judges, external tools, provider APIs, or network datasets are involved, state that those calls are user-configured exceptions to the local-first default.
 
 ## Output Style For Coding Agents
 
@@ -158,6 +156,7 @@ After running, inspecting, comparing, or resuming Quantiles evaluations, report:
 - Run ID or run IDs.
 - Evaluation or benchmark name.
 - Model, including whether it was a demo model.
+- Hosted built-in benchmark version and manifest hash, when applicable.
 - Input and output JSON.
 - Status and success or failure.
 - Key metrics.
