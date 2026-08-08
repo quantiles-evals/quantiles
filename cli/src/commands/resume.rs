@@ -270,6 +270,20 @@ async fn execute_resume_plan(args: ExecuteResumeArgs<'_>) -> Result<()> {
 mod tests {
     use super::*;
 
+    /// We're re-including generated proto stubs here, rather than increasing the visibility of
+    /// generated code in proto.rs, since this is just test code and expanding visibility of
+    /// the proto stubs just so test code can use it isn't a great idea.
+    #[expect(
+        clippy::allow_attributes,
+        clippy::pedantic,
+        reason = "ConnectRPC and Buffa generated code uses allow attributes"
+    )]
+    mod registry_proto {
+        connectrpc::include_generated!();
+    }
+
+    // TODO: Remove this lock by extracting a `resume_in_workspace` helper and a
+    // path-based config loader so tests can pass a workspace root without changing process CWD.
     static CWD_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     /// Resuming a run whose status is `completed` must be rejected before any execution
@@ -456,6 +470,215 @@ mod tests {
         let run = qt::db::get_run(&db, run_id).await.unwrap();
         assert_eq!(run.status, qt::db::RunStatus::Failed);
         assert_eq!(run.error.as_deref(), Some("simulated failure"));
+    }
+
+    #[tokio::test]
+    async fn remote_benchmark_resumes_from_exact_published_version() {
+        use wiremock::MockServer;
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let server = MockServer::start().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let cache_dir = root.join("cache");
+        let manifest_sha256 = mock_remote_registry(&server).await;
+
+        let original_hf = std::env::var("HF_DATASETS_SERVER").ok();
+        let original_cache = std::env::var("QUANTILES_DATASET_CACHE_DIR").ok();
+        unsafe {
+            std::env::set_var("HF_DATASETS_SERVER", server.uri());
+            std::env::set_var("QUANTILES_DATASET_CACHE_DIR", &cache_dir);
+        }
+        cache_fixture_rows(&cache_dir).await;
+
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+        let stored_input = serde_json::json!({
+            "dataset": { "name": "fixture/qa" },
+            "model": "random",
+            "prompt_template_file": "prompts/qa.txt",
+            "limit": 2,
+            "style": { "type": "exact_match", "golden_column": "answer" }
+        })
+        .to_string();
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "remote-resume-test".to_owned(),
+            registry_url: server.uri(),
+            version: "v1".to_owned(),
+            manifest_sha256,
+        };
+        let run_id = qt::db::create_remote_benchmark_run(
+            &db,
+            "remote-resume-test",
+            Some(&stored_input),
+            &provenance,
+        )
+        .await
+        .unwrap();
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+        restore_env("HF_DATASETS_SERVER", original_hf);
+        restore_env("QUANTILES_DATASET_CACHE_DIR", original_cache);
+        result.unwrap();
+
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Completed);
+        assert_eq!(
+            qt::db::list_steps_for_run(&db, run_id).await.unwrap().len(),
+            2
+        );
+        let metrics = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        assert!(
+            metrics
+                .iter()
+                .any(|metric| metric.metric_name == "accuracy")
+        );
+    }
+
+    async fn mock_remote_registry(server: &wiremock::MockServer) -> String {
+        use buffa::Message as _;
+        use sha2::{Digest as _, Sha256};
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+
+        use registry_proto::quantiles::benchmark::v1::{
+            BenchmarkResource, ResolveBenchmarkResponse, ResourceKind,
+        };
+
+        let definition = br#"
+[benchmarks.remote-resume-test]
+type = "custom_nocode"
+dataset = { name = "fixture/qa" }
+model = "random"
+prompt_template_file = "prompts/qa.txt"
+limit = 2
+style = { type = "exact_match", golden_column = "answer" }
+"#;
+        let prompt = b"{{ row.question }}\nAnswer:";
+        let resource =
+            |id: &str, logical_path: &str, kind: ResourceKind, route: &str, bytes: &[u8]| {
+                BenchmarkResource {
+                    resource_id: id.to_owned(),
+                    logical_path: logical_path.to_owned(),
+                    kind: kind.into(),
+                    download_url: format!("{}{route}", server.uri()),
+                    sha256: format!("{:x}", Sha256::digest(bytes)),
+                    size_bytes: u64::try_from(bytes.len()).unwrap(),
+                    content_type: "application/octet-stream".to_owned(),
+                    ..Default::default()
+                }
+            };
+        let manifest_sha256 = "a".repeat(64);
+        let response = ResolveBenchmarkResponse {
+            benchmark_name: "remote-resume-test".to_owned(),
+            version: "v1".to_owned(),
+            manifest_sha256: manifest_sha256.clone(),
+            resources: vec![
+                resource(
+                    "definition",
+                    "bundle/quantiles.toml",
+                    ResourceKind::Definition,
+                    "/definition",
+                    definition,
+                ),
+                resource(
+                    "prompt",
+                    "bundle/prompts/qa.txt",
+                    ResourceKind::PromptTemplate,
+                    "/prompt",
+                    prompt,
+                ),
+            ],
+            ..Default::default()
+        };
+
+        Mock::given(method("POST"))
+            .and(path(
+                "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
+            ))
+            .and(RequestedVersion("v1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/proto")
+                    .set_body_bytes(response.encode_to_vec()),
+            )
+            .expect(1)
+            .mount(server)
+            .await;
+        for (route, body) in [
+            ("/definition", definition.as_slice()),
+            ("/prompt", prompt.as_slice()),
+        ] {
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(server)
+                .await;
+        }
+        mock_dataset_metadata(server).await;
+        manifest_sha256
+    }
+
+    async fn mock_dataset_metadata(server: &wiremock::MockServer) {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+
+        Mock::given(method("GET"))
+            .and(path("/splits"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "splits": [{"config": "default", "split": "train"}]
+            })))
+            .mount(server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/size"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "size": {"splits": [{"num_rows": 2}]}
+            })))
+            .mount(server)
+            .await;
+    }
+
+    async fn cache_fixture_rows(cache_dir: &std::path::Path) {
+        let cache = qt::dataset::cache::DatasetCache::new(cache_dir.to_owned());
+        let rows = vec![
+            serde_json::json!({"question": "what is 2+2", "answer": "4"}),
+            serde_json::json!({"question": "what is 3+3", "answer": "6"}),
+        ];
+        let key = qt::dataset::cache::cache_key("fixture/qa", "default", "train", None);
+        cache
+            .write_batch(&cache.batch_path(&key, 0, 2), &rows)
+            .await
+            .unwrap();
+    }
+
+    fn restore_env(name: &str, value: Option<String>) {
+        unsafe {
+            match value {
+                Some(value) => std::env::set_var(name, value),
+                None => std::env::remove_var(name),
+            }
+        }
+    }
+
+    struct RequestedVersion(&'static str);
+
+    impl wiremock::Match for RequestedVersion {
+        fn matches(&self, request: &wiremock::Request) -> bool {
+            use buffa::Message as _;
+            use registry_proto::quantiles::benchmark::v1::ResolveBenchmarkRequest;
+
+            ResolveBenchmarkRequest::decode_from_slice(&request.body)
+                .is_ok_and(|request| request.version == self.0)
+        }
     }
 
     /// A failed `custom_nocode` run can be resumed and re-execute successfully

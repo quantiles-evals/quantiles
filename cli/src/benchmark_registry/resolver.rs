@@ -165,7 +165,11 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(error.to_string().contains("must not be empty"));
+        assert!(
+            error
+                .to_string()
+                .contains("must not be passed as the empty string")
+        );
     }
 
     struct RequestedVersion(&'static str);
