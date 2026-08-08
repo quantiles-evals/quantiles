@@ -28,6 +28,56 @@ enum RowOutput {
     },
 }
 
+impl RowOutput {
+    /// Persist per-step metrics for this row.
+    async fn emit_row_metrics(
+        &self,
+        metrics_store: &crate::metrics_store::MetricsStore,
+        run_id: i64,
+        step_id: i64,
+    ) {
+        match self {
+            Self::Classification {
+                parsed_response,
+                is_correct,
+                ..
+            } => {
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "is_correct",
+                        if *is_correct { 1.0 } else { 0.0 },
+                        None,
+                    )
+                    .await;
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "response_parsed",
+                        if parsed_response.is_some() { 1.0 } else { 0.0 },
+                        None,
+                    )
+                    .await;
+            }
+            Self::Similarity {
+                similarity_score, ..
+            } => {
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "similarity_score",
+                        *similarity_score,
+                        None,
+                    )
+                    .await;
+            }
+        }
+    }
+}
+
 /// Canonical serialized scoring configuration used in durable step hashes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ScoringIdentity(String);
@@ -63,6 +113,53 @@ pub(super) struct EvaluateRowArgs<'a> {
     pub(super) run_id: i64,
 }
 
+impl EvaluateRowArgs<'_> {
+    /// Sample and score this rendered row and return its durable output.
+    async fn evaluate_response(&self, rendered: &str, golden: &str) -> Result<RowOutput> {
+        let model_response = self
+            .llm
+            .sample(rendered)
+            .await
+            .with_context(|| format!("failed to sample LLM for row {}", self.i))?;
+
+        match &self.prepared {
+            PreparedRow::Similarity { .. } => {
+                let similarity = self
+                    .similarity
+                    .context("similarity style did not initialize a similarity metric")?;
+                let similarity_score = similarity
+                    .metric
+                    .compute(&model_response, golden)
+                    .await
+                    .with_context(|| format!("failed to compute similarity for row {}", self.i))?;
+                Ok(RowOutput::Similarity {
+                    input: rendered.to_owned(),
+                    response: model_response,
+                    golden: golden.to_owned(),
+                    similarity_name: similarity.name.to_owned(),
+                    embedding_model: similarity.embedding_model.map(str::to_owned),
+                    similarity_score,
+                })
+            }
+            PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => {
+                let parsed_response = match self.prepared.response_labels() {
+                    Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
+                    None => Some(model_response.trim().to_owned()),
+                };
+                let is_correct = parsed_response.as_deref() == Some(golden.trim());
+
+                Ok(RowOutput::Classification {
+                    input: rendered.to_owned(),
+                    response: model_response,
+                    parsed_response,
+                    golden: golden.to_owned(),
+                    is_correct,
+                })
+            }
+        }
+    }
+}
+
 /// Render, sample, score, and record one normalized dataset row.
 /// Returns the style-specific sample result used for aggregate metrics.
 pub(super) async fn evaluate_row(
@@ -90,113 +187,18 @@ pub(super) async fn evaluate_row(
         args.run_id,
         &step_key,
         &input_hash,
-        evaluate_response(&args, &rendered, &golden),
+        args.evaluate_response(&rendered, &golden),
     )
     .await?;
 
     // only emit metrics if the step was actually run. run_timed_step returns step_id=None
     // if the step was cached
     if let Some(step_id) = step_id {
-        emit_row_metrics(args.metrics_store, args.run_id, step_id, &output).await;
+        output
+            .emit_row_metrics(args.metrics_store, args.run_id, step_id)
+            .await;
     }
     Ok(sample_result(&output))
-}
-
-/// Sample and score one rendered row and return its durable output.
-async fn evaluate_response(
-    args: &EvaluateRowArgs<'_>,
-    rendered: &str,
-    golden: &str,
-) -> Result<RowOutput> {
-    let model_response = args
-        .llm
-        .sample(rendered)
-        .await
-        .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
-
-    match &args.prepared {
-        PreparedRow::Similarity { .. } => {
-            let similarity = args
-                .similarity
-                .context("similarity style did not initialize a similarity metric")?;
-            let similarity_score = similarity
-                .metric
-                .compute(&model_response, golden)
-                .await
-                .with_context(|| format!("failed to compute similarity for row {}", args.i))?;
-            Ok(RowOutput::Similarity {
-                input: rendered.to_owned(),
-                response: model_response,
-                golden: golden.to_owned(),
-                similarity_name: similarity.name.to_owned(),
-                embedding_model: similarity.embedding_model.map(str::to_owned),
-                similarity_score,
-            })
-        }
-        PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => {
-            let parsed_response = match args.prepared.response_labels() {
-                Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
-                None => Some(model_response.trim().to_owned()),
-            };
-            let is_correct = parsed_response.as_deref() == Some(golden.trim());
-
-            Ok(RowOutput::Classification {
-                input: rendered.to_owned(),
-                response: model_response,
-                parsed_response,
-                golden: golden.to_owned(),
-                is_correct,
-            })
-        }
-    }
-}
-
-/// Persist per-step metrics for a newly evaluated row.
-async fn emit_row_metrics(
-    metrics_store: &crate::metrics_store::MetricsStore,
-    run_id: i64,
-    step_id: i64,
-    output: &RowOutput,
-) {
-    match output {
-        RowOutput::Classification {
-            parsed_response,
-            is_correct,
-            ..
-        } => {
-            metrics_store
-                .emit(
-                    run_id,
-                    Some(step_id),
-                    "is_correct",
-                    if *is_correct { 1.0 } else { 0.0 },
-                    None,
-                )
-                .await;
-            metrics_store
-                .emit(
-                    run_id,
-                    Some(step_id),
-                    "response_parsed",
-                    if parsed_response.is_some() { 1.0 } else { 0.0 },
-                    None,
-                )
-                .await;
-        }
-        RowOutput::Similarity {
-            similarity_score, ..
-        } => {
-            metrics_store
-                .emit(
-                    run_id,
-                    Some(step_id),
-                    "similarity_score",
-                    *similarity_score,
-                    None,
-                )
-                .await;
-        }
-    }
 }
 
 /// Convert a row output into the sample value used for aggregate metrics.
@@ -336,8 +338,8 @@ mod tests {
             is_correct: false,
         };
 
-        emit_row_metrics(&metrics_store, run_id, 7, &parsed).await;
-        emit_row_metrics(&metrics_store, run_id, 8, &unparsed).await;
+        parsed.emit_row_metrics(&metrics_store, run_id, 7).await;
+        unparsed.emit_row_metrics(&metrics_store, run_id, 8).await;
         metrics_store.flush(run_id).await.unwrap();
 
         let metrics = metrics_store.list_for_run(run_id).await.unwrap();
@@ -385,7 +387,8 @@ mod tests {
             run_id,
         };
 
-        let error = evaluate_response(&args, "say hello", "hello")
+        let error = args
+            .evaluate_response("say hello", "hello")
             .await
             .unwrap_err();
         assert!(
