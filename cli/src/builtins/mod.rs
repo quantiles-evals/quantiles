@@ -1,12 +1,7 @@
 mod common;
 mod custom_nocode;
 mod dataset_runner;
-mod financebench;
-mod input;
 mod output;
-mod pubmedqa;
-mod similarity;
-mod simpleqa_verified;
 
 pub use custom_nocode::CustomNoCodeBuiltin;
 pub use custom_nocode::metrics::{
@@ -34,22 +29,8 @@ pub struct BuiltinContext<'a> {
 /// Trait for builtin evals that run natively inside the CLI.
 #[async_trait]
 pub trait BuiltinWorkflow: Send + Sync {
-    /// Unique name of the builtin (e.g. "simpleqa-verified", "mmlu-pro", etc...).
+    /// Unique name of the native workflow.
     fn name(&self) -> String;
     /// Execute the builtin eval and persist its metrics/output.
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()>;
-}
-
-/// Try to resolve a builtin by its name.
-#[must_use]
-pub fn resolve(name: &str) -> Option<Box<dyn BuiltinWorkflow>> {
-    if name == financebench::FinancebenchBuiltin.name() {
-        Some(Box::new(financebench::FinancebenchBuiltin))
-    } else if name == pubmedqa::PubmedqaBuiltin.name() {
-        Some(Box::new(pubmedqa::PubmedqaBuiltin))
-    } else if name == simpleqa_verified::SimpleqaVerifiedBuiltin.name() {
-        Some(Box::new(simpleqa_verified::SimpleqaVerifiedBuiltin))
-    } else {
-        None
-    }
 }

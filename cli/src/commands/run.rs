@@ -36,16 +36,6 @@ pub async fn run(
         Some(bench) => {
             bench.validate()?;
             match bench {
-                qt::config::BenchmarkConfig::Builtin(b) => {
-                    let (effective_input, _) = assemble_builtin_input(Some(b), cli_input);
-                    run_builtin_workflow(
-                        workflow_name,
-                        effective_input.as_deref(),
-                        json,
-                        process_start,
-                    )
-                    .await
-                }
                 qt::config::BenchmarkConfig::CustomCode(c) => {
                     let (merged_input, overridden_keys) =
                         merge_inputs(c.input.as_ref(), cli_input)?;
@@ -116,15 +106,6 @@ pub async fn run(
                 qt::benchmark_registry::resolve_and_download(workflow_name, &remote_url).await?
             {
                 run_remote_benchmark(workflow_name, cli_input, json, process_start, remote).await
-            } else if builtins::resolve(workflow_name).is_some() {
-                let (effective_input, _) = assemble_builtin_input(None, cli_input);
-                run_builtin_workflow(
-                    workflow_name,
-                    effective_input.as_deref(),
-                    json,
-                    process_start,
-                )
-                .await
             } else {
                 bail!("no config section found for benchmark `{workflow_name}`");
             }
@@ -181,31 +162,6 @@ async fn run_remote_benchmark(
         remote_hash: Some(&remote_hash),
     })
     .await
-}
-
-fn assemble_builtin_input(
-    bench: Option<&qt::config::BuiltinBenchmarkConfig>,
-    cli_input: Option<&str>,
-) -> (Option<String>, Vec<String>) {
-    if let Some(cli_str) = cli_input {
-        return (Some(cli_str.to_owned()), Vec::new());
-    }
-
-    if let Some(bench) = bench {
-        let input = BuiltinConfigInput {
-            limit: bench.samples,
-            dataset: bench.dataset.clone(),
-            model: bench.model.clone(),
-            max_workers: bench.max_workers,
-        };
-
-        let json =
-            serde_json::to_string(&input).expect("infallible serialization of BuiltinConfigInput");
-
-        (Some(json), Vec::new())
-    } else {
-        (None, Vec::new())
-    }
 }
 
 /// Serialize a custom no-code configuration to JSON after applying supported overrides
@@ -287,39 +243,6 @@ fn merge_inputs(
     } else {
         Ok((Some(serde_json::to_string(&merged)?), overridden))
     }
-}
-
-async fn run_builtin_workflow(
-    workflow_name: &str,
-    input: Option<&str>,
-    json: bool,
-    process_start: Instant,
-) -> Result<()> {
-    let builtin = builtins::resolve(workflow_name)
-        .with_context(|| format!("builtin `{workflow_name}` not found"))?;
-
-    let cwd = std::env::current_dir()?;
-    let root = db::resolve_workspace_root(&cwd, true).await?;
-    let db = db::open_workspace(&root).await?;
-    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
-
-    let run_id = db::create_run(&db, workflow_name, input).await?;
-    if !json {
-        println!("Created run {run_id}");
-    }
-
-    execute_builtin(ExecuteBuiltinArgs {
-        db: &db,
-        metrics_store: &metrics_store,
-        run_id,
-        workflow_name,
-        builtin,
-        input,
-        json,
-        process_start,
-        remote_hash: None,
-    })
-    .await
 }
 
 /// Arguments for the [`execute_builtin`] function.
@@ -539,18 +462,6 @@ struct BuiltinRunJsonOutput<'a> {
     warning: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     remote_hash: Option<&'a str>,
-}
-
-/// Config input shape auto-generated from `quantiles.toml` `[benchmarks.*]`.
-#[derive(Serialize, Default)]
-struct BuiltinConfigInput {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<usize>,
-    dataset: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    model: Option<qt::llm::Sampler>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_workers: Option<usize>,
 }
 
 /// Captured result of running the user command.
@@ -807,64 +718,6 @@ mod tests {
         let (result, overridden) = super::merge_inputs(None, None).unwrap();
         assert!(result.is_none());
         assert!(overridden.is_empty());
-    }
-
-    /// A `--input` CLI flag should take precedence over any config fields, returning the
-    /// raw CLI string directly without assembling a config-based JSON object.
-    #[test]
-    fn assemble_builtin_input_with_cli_override() {
-        let bench = qt::config::BuiltinBenchmarkConfig {
-            type_: "builtin".to_owned(),
-            samples: Some(10),
-            dataset: "hf://quantiles/PubMedQA".to_owned(),
-            model: None,
-            max_workers: None,
-        };
-        let (input, _) = super::assemble_builtin_input(Some(&bench), Some(r#"{"model":"x"}"#));
-        assert_eq!(input, Some(r#"{"model":"x"}"#.to_owned()));
-    }
-
-    /// When no `--input` is given but the config has builtin fields, they should be
-    /// assembled into a `BuiltinConfigInput` JSON object with the correct key names.
-    #[test]
-    fn assemble_builtin_input_from_config() {
-        let bench = qt::config::BuiltinBenchmarkConfig {
-            type_: "builtin".to_owned(),
-            samples: Some(5),
-            dataset: "hf://quantiles/PubMedQA".to_owned(),
-            model: Some(qt::llm::Sampler::Random {}),
-            max_workers: Some(8),
-        };
-        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
-        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
-        assert_eq!(parsed["limit"], 5);
-        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
-        assert_eq!(parsed["model"], "random");
-        assert_eq!(parsed["max_workers"], 8);
-    }
-
-    /// When the builtin config section only has the required dataset, the input should
-    /// still carry that dataset source into builtin execution.
-    #[test]
-    fn assemble_builtin_input_with_dataset_only_config() {
-        let bench = qt::config::BuiltinBenchmarkConfig {
-            type_: "builtin".to_owned(),
-            samples: None,
-            dataset: "hf://quantiles/PubMedQA".to_owned(),
-            model: None,
-            max_workers: None,
-        };
-        let (input, _) = super::assemble_builtin_input(Some(&bench), None);
-        let parsed: serde_json::Value = serde_json::from_str(&input.unwrap()).unwrap();
-        assert_eq!(parsed["dataset"], "hf://quantiles/PubMedQA");
-    }
-
-    /// When there is no config section at all and no CLI `--input`, builtin runs should
-    /// proceed with no input JSON stored in the database.
-    #[test]
-    fn assemble_builtin_input_none_when_no_bench() {
-        let (input, _) = super::assemble_builtin_input(None, None);
-        assert!(input.is_none());
     }
 
     /// A `custom_nocode` benchmark config with all fields should serialize into the
