@@ -56,7 +56,7 @@ pub(super) struct EvaluateRowArgs<'a> {
     /// Scoring identity included in this row's durable step hash.
     pub(super) scoring_identity: &'a ScoringIdentity,
     /// Resolved scorer for a similarity-style row.
-    pub(super) similarity: Option<&'a super::runtime::ResolvedSimilarityMetric>,
+    pub(super) similarity: Option<&'a super::runtime::SimilarityMetric>,
     pub(super) llm: &'a std::sync::Arc<dyn crate::llm::LLMSampler>,
     pub(super) db: &'a sea_orm::DatabaseConnection,
     pub(super) metrics_store: &'a crate::metrics_store::MetricsStore,
@@ -288,7 +288,7 @@ mod tests {
         }))
         .unwrap();
         let prepared = super::super::data::prepare_row(0, &row, &style).unwrap();
-        let similarity = super::super::runtime::resolve_similarity_metric(&style)
+        let similarity = super::super::runtime::SimilarityMetric::new(&style)
             .unwrap()
             .unwrap();
         let env = jinja::Environment::new();

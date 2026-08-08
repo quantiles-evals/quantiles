@@ -6,8 +6,8 @@ use self::data::{DatasetRow, prepare_row};
 use self::evaluation::{EvaluateRowArgs, ScoringIdentity, evaluate_row};
 use self::metrics::emit_default_aggregate_metrics;
 use self::runtime::{
-    LoadedTemplate, load_template, load_template_string, parse_input, resolve_dataset_limit,
-    resolve_sampler_for_style, resolve_similarity_metric,
+    LoadedTemplate, SimilarityMetric, load_template, load_template_string, parse_input,
+    resolve_dataset_limit, resolve_sampler_for_style,
 };
 use crate::builtins::common::get_max_workers;
 use crate::builtins::dataset_runner::DatasetRunner;
@@ -65,7 +65,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         };
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler_for_style(config.model.as_ref(), &config.style)?;
-        let similarity = resolve_similarity_metric(&config.style)?;
+        let similarity = SimilarityMetric::new(&config.style)?;
         let scoring_identity = ScoringIdentity::from_style(&config.style)?;
 
         let (manager, info, limit) = resolve_dataset_limit(

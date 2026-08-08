@@ -1,0 +1,6 @@
+{#
+This is the prompt template for the FinanceBench custom no-code benchmark.
+See the [`quantiles.toml`](../quantiles.toml) configuration to understand how
+this template is used.
+#}
+{{ row.question }}

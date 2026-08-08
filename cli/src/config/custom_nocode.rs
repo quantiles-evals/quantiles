@@ -573,7 +573,14 @@ mod tests {
         ))
         .unwrap();
 
-        for name in ["simpleqa-verified", "medqa", "medmcqa", "mmlu-pro", "gpqa"] {
+        for name in [
+            "simpleqa-verified",
+            "financebench",
+            "medqa",
+            "medmcqa",
+            "mmlu-pro",
+            "gpqa",
+        ] {
             assert!(
                 matches!(
                     config.benchmarks.get(name),

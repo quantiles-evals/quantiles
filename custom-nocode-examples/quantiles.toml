@@ -32,6 +32,21 @@ model = "random"
 prompt_template_file = "prompts/qa.txt"
 limit = 10
 
+# The FinanceBench benchmark configured to use cosine similarity with a
+# built-in embedding model powered by FastEmbed and the demo model. Note that
+# the first cosine run may download the embedding model if it is not cached locally.
+#
+# Read more about FinanceBench here:
+#
+# https://arxiv.org/abs/2311.11944
+[benchmarks.financebench]
+type = "custom_nocode"
+style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
+dataset = { name = "quantiles/financebench" }
+model = "random"
+prompt_template_file = "prompts/financebench.txt"
+limit = 10
+
 # The MedQA benchmark configured to use the random model.
 #
 # Read more about the MedQA benchmark here:
