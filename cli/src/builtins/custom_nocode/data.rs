@@ -123,7 +123,8 @@ pub(super) enum PreparedRow {
 }
 
 impl PreparedRow {
-    /// Return the choices exposed to the prompt template, or an empty slice for exact match.
+    /// Return the choices exposed to the prompt template, or an empty slice for exact match
+    /// and similarity metric evals
     pub(super) fn choices(&self) -> &[PromptChoice] {
         match self {
             Self::ExactMatch { .. } | Self::Similarity { .. } => &[],
