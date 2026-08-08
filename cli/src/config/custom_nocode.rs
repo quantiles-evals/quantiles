@@ -86,6 +86,7 @@ pub enum CustomNoCodeLevenshteinMetric {
     Levenshtein,
 }
 
+/// Tagged wire representation of a structured similarity metric.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
 enum StructuredSimilarityMetric {

@@ -24,9 +24,9 @@ pub struct OutputMetric {
     pub value: f64,
 }
 
+/// Tagged durable row output read when computing classification aggregates.
 #[derive(Debug, Deserialize)]
 struct StoredRowOutput {
-    #[serde(rename = "Classification")]
     classification: StoredClassificationOutput,
 }
 
@@ -491,7 +491,7 @@ mod tests {
             status: StepStatus::Completed,
             output: Some(
                 json!({
-                    "Classification": {
+                    "classification": {
                         "input": "question",
                         "response": parsed_response.unwrap_or("unparsed"),
                         "parsed_response": parsed_response,

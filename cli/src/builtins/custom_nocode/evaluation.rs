@@ -8,6 +8,7 @@ use crate::builtins::common::{hash_input, run_timed_step};
 /// Style-specific step output for each row, stored as JSON in the step
 /// record.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 enum RowOutput {
     Classification {
         input: String,
@@ -101,6 +102,7 @@ pub(super) async fn evaluate_row(
     Ok(sample_result(&output))
 }
 
+/// Sample and score one rendered row and return its durable output.
 async fn evaluate_response(
     args: &EvaluateRowArgs<'_>,
     rendered: &str,
@@ -149,6 +151,7 @@ async fn evaluate_response(
     }
 }
 
+/// Persist per-step metrics for a newly evaluated row.
 async fn emit_row_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
@@ -196,6 +199,7 @@ async fn emit_row_metrics(
     }
 }
 
+/// Convert a row output into the sample value used for aggregate metrics.
 fn sample_result(output: &RowOutput) -> SampleResult {
     match output {
         RowOutput::Classification { is_correct, .. } => SampleResult::Classification(*is_correct),
@@ -283,6 +287,114 @@ mod tests {
         assert_eq!(extract_choice_label("unknown", &labels), None);
     }
 
+    #[test]
+    fn row_outputs_use_lowercase_tags() {
+        let classification = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            parsed_response: Some("answer".to_owned()),
+            golden: "answer".to_owned(),
+            is_correct: true,
+        };
+        let similarity = RowOutput::Similarity {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            golden: "answer".to_owned(),
+            similarity_name: "levenshtein".to_owned(),
+            embedding_model: None,
+            similarity_score: 1.0,
+        };
+
+        let classification = serde_json::to_value(classification).unwrap();
+        let similarity = serde_json::to_value(similarity).unwrap();
+        assert!(classification.get("classification").is_some());
+        assert!(similarity.get("similarity").is_some());
+    }
+
+    #[tokio::test]
+    async fn emits_classification_metric_values_for_parsed_and_unparsed_responses() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "classification-metrics-test", None)
+            .await
+            .unwrap();
+        let parsed = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            parsed_response: Some("answer".to_owned()),
+            golden: "answer".to_owned(),
+            is_correct: true,
+        };
+        let unparsed = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "unknown".to_owned(),
+            parsed_response: None,
+            golden: "answer".to_owned(),
+            is_correct: false,
+        };
+
+        emit_row_metrics(&metrics_store, run_id, 7, &parsed).await;
+        emit_row_metrics(&metrics_store, run_id, 8, &unparsed).await;
+        metrics_store.flush(run_id).await.unwrap();
+
+        let metrics = metrics_store.list_for_run(run_id).await.unwrap();
+        let metric_value = |step_id, metric_name| {
+            metrics
+                .iter()
+                .find(|metric| metric.step_id == Some(step_id) && metric.metric_name == metric_name)
+                .unwrap()
+                .metric_value
+        };
+        assert!((metric_value(7, "is_correct") - 1.0).abs() < f64::EPSILON);
+        assert!((metric_value(7, "response_parsed") - 1.0).abs() < f64::EPSILON);
+        assert!(metric_value(8, "is_correct").abs() < f64::EPSILON);
+        assert!(metric_value(8, "response_parsed").abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn evaluate_response_requires_a_similarity_metric() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "missing-similarity-metric-test", None)
+            .await
+            .unwrap();
+        let row: DatasetRow = serde_json::from_value(json!({"question": "say hello"})).unwrap();
+        let env = jinja::Environment::new();
+        let llm: std::sync::Arc<dyn crate::llm::LLMSampler> = std::sync::Arc::new(FixedSampler);
+        let scoring_identity = ScoringIdentity("similarity".to_owned());
+        let args = EvaluateRowArgs {
+            i: 0,
+            row: &row,
+            prepared: PreparedRow::Similarity {
+                golden: "hello".to_owned(),
+            },
+            template_str: "{{ row.question }}",
+            env: &env,
+            model_name: "fixed",
+            scoring_identity: &scoring_identity,
+            similarity: None,
+            llm: &llm,
+            db: &db,
+            metrics_store: &metrics_store,
+            run_id,
+        };
+
+        let error = evaluate_response(&args, "say hello", "hello")
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("similarity style did not initialize a similarity metric")
+        );
+    }
+
     #[tokio::test]
     async fn evaluates_and_records_levenshtein_similarity() {
         let tmpdir = tempfile::tempdir().unwrap();
@@ -350,7 +462,7 @@ mod tests {
         let steps = crate::db::list_steps_for_run(&db, run_id).await.unwrap();
         let output: serde_json::Value =
             serde_json::from_str(steps[0].output.as_deref().unwrap()).unwrap();
-        let output = &output["Similarity"];
+        let output = &output["similarity"];
         assert_eq!(output["similarity_name"], "levenshtein");
         assert_eq!(output["similarity_score"], 1.0);
         assert!(output.get("embedding_model").is_none());
