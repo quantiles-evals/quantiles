@@ -76,6 +76,18 @@ impl RowOutput {
             }
         }
     }
+
+    /// Convert a row output into the sample value used for aggregate metrics.
+    fn sample_result(&self) -> SampleResult {
+        match self {
+            RowOutput::Classification { is_correct, .. } => {
+                SampleResult::Classification(*is_correct)
+            }
+            RowOutput::Similarity {
+                similarity_score, ..
+            } => SampleResult::Similarity(*similarity_score),
+        }
+    }
 }
 
 /// Canonical serialized scoring configuration used in durable step hashes.
@@ -198,17 +210,7 @@ pub(super) async fn evaluate_row(
             .emit_row_metrics(args.metrics_store, args.run_id, step_id)
             .await;
     }
-    Ok(sample_result(&output))
-}
-
-/// Convert a row output into the sample value used for aggregate metrics.
-fn sample_result(output: &RowOutput) -> SampleResult {
-    match output {
-        RowOutput::Classification { is_correct, .. } => SampleResult::Classification(*is_correct),
-        RowOutput::Similarity {
-            similarity_score, ..
-        } => SampleResult::Similarity(*similarity_score),
-    }
+    Ok(output.sample_result())
 }
 
 /// Extract a configured choice label from a direct response or its final few tokens.
