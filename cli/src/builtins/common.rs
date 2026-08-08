@@ -269,5 +269,4 @@ mod tests {
         // Should get a resolved sampler, not the default.
         assert!(!result.sample("test").await.unwrap().is_empty());
     }
-
 }
