@@ -92,9 +92,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
             let Some(qt::config::BenchmarkConfig::CustomNoCode(config)) = bench_config else {
                 unreachable!("custom no-code resume plan requires custom no-code config");
             };
-            let builtin: Box<dyn builtins::BuiltinWorkflow> = Box::new(
-                builtins::CustomNoCodeBuiltin::new(workflow_name.to_owned()),
-            );
+            let builtin: Box<dyn builtins::BuiltinWorkflow> =
+                Box::new(builtins::CustomNoCodeBuiltin::new(workflow_name.to_owned()));
             let custom_nocode_input = super::run::assemble_custom_nocode_input(config, None)?;
             super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
                 db: &db,
@@ -132,13 +131,12 @@ mod tests {
     /// begins, because a completed run cannot be meaningfully resumed.
     #[test]
     fn plan_resume_completed_run_errors() {
-        let bench = qt::config::BenchmarkConfig::CustomCode(
-            qt::config::CustomCodeBenchmarkConfig {
+        let bench =
+            qt::config::BenchmarkConfig::CustomCode(qt::config::CustomCodeBenchmarkConfig {
                 type_: "custom_code".to_owned(),
                 command: vec!["python".to_owned(), "eval.py".to_owned()],
                 input: None,
-            },
-        );
+            });
         let err = plan_resume("demo", &RunStatus::Completed, Some(&bench)).unwrap_err();
         assert!(err.to_string().contains("already completed"));
     }

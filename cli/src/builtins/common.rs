@@ -6,37 +6,10 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::db::steps::{self, StepDecision};
 use crate::llm::{LLMSampler, Sampler};
 use crate::metrics_store::MetricsStore;
-
-/// Fields shared by every builtin benchmark config. When adding a new builtin,
-/// embed this with `#[serde(flatten)]` so that `limit`, `model`, and
-/// `max_workers` are automatically supported without duplication.
-#[derive(Debug, Default, Deserialize)]
-pub(crate) struct BuiltinConfig {
-    /// Number of dataset rows to evaluate. If omitted, the entire dataset is used.
-    #[serde(default)]
-    pub(crate) limit: Option<usize>,
-    /// The dataset to use for the evaluation.
-    /// Currently `HuggingFace` is the only supported source, and all sources
-    /// must start with `hf://...` or `huggingface://...`
-    #[serde(default)]
-    pub(crate) dataset: Option<String>,
-    /// Which model sampler to use. If omitted, the builtin chooses a sensible default.
-    #[serde(default)]
-    pub(crate) model: Option<Sampler>,
-    /// Maximum number of concurrent workers. Falls back to `QUANTILES_MAX_WORKERS` env var (default 25).
-    #[serde(default)]
-    pub(crate) max_workers: Option<usize>,
-}
-
-/// Extract a string field from a JSON row.
-pub(crate) fn extract_text(row: &Value, key: &str) -> Option<String> {
-    row.get(key)?.as_str().map(String::from)
-}
 
 /// Compute a deterministic hash for step caching.
 pub(crate) fn hash_input(input: &str) -> String {
@@ -137,37 +110,6 @@ pub(crate) fn resolve_sampler(
     }
 }
 
-/// Emit aggregate `accuracy`, `correct_count`, and `total_count` metrics from a
-/// collection of per-sample boolean correctness values.
-#[expect(clippy::cast_precision_loss)]
-pub(crate) async fn emit_accuracy_metrics(
-    metrics_store: &MetricsStore,
-    run_id: i64,
-    results: impl IntoIterator<Item = bool>,
-) {
-    let mut correct_count = 0usize;
-    let mut total_count = 0usize;
-    for is_correct in results {
-        total_count += 1;
-        if is_correct {
-            correct_count += 1;
-        }
-    }
-
-    if total_count > 0 {
-        let accuracy = correct_count as f64 / total_count as f64;
-        metrics_store
-            .emit(run_id, None, "accuracy", accuracy, None)
-            .await;
-        metrics_store
-            .emit(run_id, None, "correct_count", correct_count as f64, None)
-            .await;
-        metrics_store
-            .emit(run_id, None, "total_count", total_count as f64, None)
-            .await;
-    }
-}
-
 /// Statistics computed from a collection of similarity scores.
 #[derive(Debug)]
 pub(crate) struct ScoreStatistics {
@@ -232,29 +174,6 @@ pub(crate) fn percentile(sorted: &[f64], p: f64) -> f64 {
 mod tests {
     use super::*;
     use rstest::rstest;
-
-    #[rstest]
-    #[case("hello", Some("hello"))]
-    #[case("", Some(""))]
-    fn test_extract_text(#[case] value: &str, #[case] expected: Option<&str>) {
-        use serde_json::json;
-        let row = json!({"field": value});
-        assert_eq!(extract_text(&row, "field"), expected.map(String::from));
-    }
-
-    #[test]
-    fn test_extract_text_missing_key() {
-        use serde_json::json;
-        let row = json!({ "other": "data" });
-        assert_eq!(extract_text(&row, "field"), None);
-    }
-
-    #[test]
-    fn test_extract_text_non_string_value() {
-        use serde_json::json;
-        let row = json!({ "field": 42 });
-        assert_eq!(extract_text(&row, "field"), None);
-    }
 
     #[rstest]
     #[case("hello")]
@@ -351,73 +270,4 @@ mod tests {
         assert!(!result.sample("test").await.unwrap().is_empty());
     }
 
-    #[test]
-    fn test_emit_accuracy_metrics_empty() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store =
-            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            emit_accuracy_metrics(&metrics_store, 1, [false; 0]).await;
-            metrics_store.flush(1).await.unwrap();
-            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
-            assert!(
-                agg.is_empty(),
-                "no metrics should be emitted for empty results"
-            );
-        });
-    }
-
-    #[test]
-    fn test_emit_accuracy_metrics_all_correct() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store =
-            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            emit_accuracy_metrics(&metrics_store, 1, [true, true, true]).await;
-            metrics_store.flush(1).await.unwrap();
-            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
-
-            let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
-            assert!((accuracy.metric_value - 1.0).abs() < 1e-10);
-
-            let correct = agg
-                .iter()
-                .find(|m| m.metric_name == "correct_count")
-                .unwrap();
-            assert!((correct.metric_value - 3.0).abs() < f64::EPSILON);
-
-            let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
-            assert!((total.metric_value - 3.0).abs() < f64::EPSILON);
-        });
-    }
-
-    #[test]
-    fn test_emit_accuracy_metrics_mixed() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let metrics_store =
-            crate::metrics_store::MetricsStore::new(tmpdir.path().to_path_buf()).unwrap();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            emit_accuracy_metrics(&metrics_store, 1, [true, false, true, false]).await;
-            metrics_store.flush(1).await.unwrap();
-            let agg = metrics_store.list_aggregate_for_run(1).await.unwrap();
-
-            let accuracy = agg.iter().find(|m| m.metric_name == "accuracy").unwrap();
-            assert!((accuracy.metric_value - 0.5).abs() < 1e-10);
-
-            let correct = agg
-                .iter()
-                .find(|m| m.metric_name == "correct_count")
-                .unwrap();
-            assert!((correct.metric_value - 2.0).abs() < f64::EPSILON);
-
-            let total = agg.iter().find(|m| m.metric_name == "total_count").unwrap();
-            assert!((total.metric_value - 4.0).abs() < f64::EPSILON);
-        });
-    }
 }

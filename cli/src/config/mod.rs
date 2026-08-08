@@ -147,7 +147,6 @@ pub fn load() -> Result<WorkspaceConfig> {
 }
 
 #[cfg(test)]
-#[expect(clippy::needless_raw_string_hashes)]
 mod tests {
     use super::*;
 
