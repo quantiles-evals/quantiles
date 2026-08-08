@@ -5,10 +5,14 @@ use super::client::{resolve_manifest, validate_remote_url};
 use super::download::download_resources;
 use super::manifest::{validate_resources, validate_response_identity};
 
-/// Resolve a benchmark and download all of its resources into memory.
+/// Resolve a benchmark, optionally with a version, and download all of its
+/// resources into memory.
 ///
-/// `Ok(None)` means the registry returned Connect's `not_found` status. Other transport and
-/// service failures are returned to the caller rather than treated as absence.
+/// If you pass `None` for `version`, this function returns the latest latest
+/// published version for that benchmark.
+///
+/// A return value of `Ok(None)` means the registry did not find that benchmark
+/// name and/or version.
 ///
 /// # Errors
 ///
@@ -16,35 +20,13 @@ use super::manifest::{validate_resources, validate_response_identity};
 /// digest mismatches, invalid UTF-8, or invalid no-code benchmark definitions.
 pub async fn resolve_and_download(
     benchmark_name: &str,
+    version: Option<&str>,
     remote_url: &str,
 ) -> Result<Option<RemoteBenchmark>> {
-    resolve_and_download_inner(benchmark_name, "", remote_url).await
-}
-
-/// Resolve and download one exact immutable benchmark version.
-///
-/// `Ok(None)` means the registry no longer exposes the requested version.
-///
-/// # Errors
-///
-/// Returns an error for an empty version, invalid endpoints, RPC failures, malformed manifests,
-/// failed downloads, digest mismatches, invalid UTF-8, or invalid no-code definitions.
-pub async fn resolve_and_download_version(
-    benchmark_name: &str,
-    version: &str,
-    remote_url: &str,
-) -> Result<Option<RemoteBenchmark>> {
-    if version.is_empty() {
-        anyhow::bail!("remote benchmark version must not be empty");
+    if version.is_some_and(str::is_empty) {
+        anyhow::bail!("remote benchmark version must not be passed as the empty string");
     }
-    resolve_and_download_inner(benchmark_name, version, remote_url).await
-}
 
-async fn resolve_and_download_inner(
-    benchmark_name: &str,
-    version: &str,
-    remote_url: &str,
-) -> Result<Option<RemoteBenchmark>> {
     let endpoint = validate_remote_url(remote_url)?;
     let Some(response) = resolve_manifest(benchmark_name, version, &endpoint).await? else {
         return Ok(None);
@@ -128,7 +110,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let benchmark = resolve_and_download("remote-test", &server.uri())
+        let benchmark = resolve_and_download("remote-test", None, &server.uri())
             .await
             .unwrap()
             .unwrap();
@@ -166,7 +148,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let error = resolve_and_download_version("remote-test", "v1", &server.uri())
+        let error = resolve_and_download("remote-test", Some("v1"), &server.uri())
             .await
             .unwrap_err();
 
@@ -175,6 +157,15 @@ mod tests {
                 .to_string()
                 .contains("does not match requested version")
         );
+    }
+
+    #[tokio::test]
+    async fn rejects_an_empty_explicit_version() {
+        let error = resolve_and_download("remote-test", Some(""), "https://api.quantiles.io")
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("must not be empty"));
     }
 
     struct RequestedVersion(&'static str);

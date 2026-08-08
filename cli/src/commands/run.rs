@@ -39,7 +39,8 @@ pub async fn run(
         }
         None => {
             if let Some(remote) =
-                qt::benchmark_registry::resolve_and_download(workflow_name, &remote_url).await?
+                qt::benchmark_registry::resolve_and_download(workflow_name, None, &remote_url)
+                    .await?
             {
                 run_remote_benchmark(
                     workflow_name,
@@ -66,6 +67,7 @@ pub async fn run(
     }
 }
 
+/// Runs a benchmark defined in the local configuration.
 async fn run_configured_benchmark(
     workflow_name: &str,
     cli_input: Option<&str>,
@@ -141,6 +143,7 @@ async fn run_configured_benchmark(
     }
 }
 
+/// Persists and runs a benchmark resolved from the remote registry.
 async fn run_remote_benchmark(
     workflow_name: &str,
     cli_input: Option<&str>,
@@ -188,6 +191,7 @@ async fn run_remote_benchmark(
     .await
 }
 
+/// Builds an executable no-code workflow from a downloaded remote benchmark.
 pub(super) fn remote_benchmark_builtin(
     workflow_name: &str,
     input: &str,

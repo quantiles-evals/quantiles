@@ -15,6 +15,7 @@ pub(crate) enum ResumePlan {
     RemoteBenchmark,
 }
 
+/// Executable state reconstructed from immutable remote benchmark provenance.
 struct RemoteResume {
     builtin: Box<dyn builtins::BuiltinWorkflow>,
     manifest_sha256: String,
@@ -133,6 +134,7 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
     .await
 }
 
+/// Resolves, verifies, and reconstructs a remotely sourced benchmark for resume.
 async fn prepare_remote_resume(
     workflow_name: &str,
     stored_input: Option<&str>,
@@ -145,9 +147,9 @@ async fn prepare_remote_resume(
             provenance.benchmark_name
         );
     }
-    let remote = qt::benchmark_registry::resolve_and_download_version(
+    let remote = qt::benchmark_registry::resolve_and_download(
         workflow_name,
-        &provenance.version,
+        Some(&provenance.version),
         &provenance.registry_url,
     )
     .await?
@@ -173,6 +175,7 @@ async fn prepare_remote_resume(
     })
 }
 
+/// Inputs needed to execute a prepared resume plan.
 struct ExecuteResumeArgs<'a> {
     plan: ResumePlan,
     bench_config: Option<&'a qt::config::BenchmarkConfig>,
@@ -186,6 +189,7 @@ struct ExecuteResumeArgs<'a> {
     process_start: Instant,
 }
 
+/// Executes a prepared resume plan using the existing run and stored input.
 async fn execute_resume_plan(args: ExecuteResumeArgs<'_>) -> Result<()> {
     // TODO: we always re-read the command from the config file on resume.
     // This means that if the config file is edited between `qt run` and
