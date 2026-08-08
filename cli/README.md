@@ -36,7 +36,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a 
 The CLI supports three evaluation types:
 
 - [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) run predefined datasets and scoring methods. They work without configuration, but you can override settings such as the model, sample count, and concurrency.
-- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
+- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration. Supported scoring styles include exact match, multiple choice, and text similarity.
 - [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
 Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For example:
@@ -47,6 +47,26 @@ dataset = "hf://quantiles/PubMedQA"
 samples = 50
 model = "openai:gpt-5.6"
 max_workers = 100
+```
+
+Custom no-code similarity evaluations support Levenshtein distance and cosine similarity. Configuration to use Levenshtein distance is below:
+
+```toml
+[benchmarks.simpleqa-levenshtein]
+type = "custom_nocode"
+dataset = { name = "quantiles/simpleqa-verified" }
+prompt_template_file = "prompts/qa.txt"
+style = { type = "similarity", golden_column = "answer", metric = "levenshtein" }
+```
+
+Configuration to use cosine similarity requires an explicit embedding model and is below. You can use `"fastembed"` for the local FastEmbed-powered model built into the CLI:
+
+```toml
+[benchmarks.simpleqa-cosine]
+type = "custom_nocode"
+dataset = { name = "quantiles/simpleqa-verified" }
+prompt_template_file = "prompts/qa.txt"
+style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
 ```
 
 See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
