@@ -61,7 +61,7 @@ pub(super) fn validate_remote_url(remote_url: &str) -> Result<Url> {
 /// Resolve benchmark metadata from the remote `ConnectRPC` service.
 pub(super) async fn resolve_manifest(
     benchmark_name: &str,
-    version: &str,
+    version: Option<&str>,
     endpoint: &Url,
 ) -> Result<Option<ResolveBenchmarkResponse>> {
     let uri = endpoint
@@ -81,7 +81,9 @@ pub(super) async fn resolve_manifest(
     let client = BenchmarkRegistryServiceClient::new(transport, config);
     let request = ResolveBenchmarkRequest {
         benchmark_name: benchmark_name.to_owned(),
-        version: version.to_owned(),
+        // If the version is passed as `None` to this function, send the empty string
+        // over RPC
+        version: version.unwrap_or_default().to_owned(),
         ..Default::default()
     };
 
@@ -136,7 +138,7 @@ mod tests {
 
         let endpoint = validate_remote_url(&server.uri()).unwrap();
         assert!(
-            resolve_manifest("missing", "", &endpoint)
+            resolve_manifest("missing", None, &endpoint)
                 .await
                 .unwrap()
                 .is_none()
