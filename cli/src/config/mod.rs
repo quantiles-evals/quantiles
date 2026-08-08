@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Deserializer};
 
-use crate::llm::Sampler;
-
 /// Configuration for a single benchmark.
 ///
 /// Exactly one of the variants is deserialized based on the `type` field:
