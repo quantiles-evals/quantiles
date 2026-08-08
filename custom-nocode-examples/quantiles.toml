@@ -1,8 +1,9 @@
 # This file contains configuration to run several popular, public benchmarks as
 # custom no-code evaluations. Each benchmark below is configured to use the 'random'
 # model, which just outputs random text or randomly selects the right answer
-# from a uniform distribution of the choices, for exact_match and multiple_choice
-# benchmarks respectively.
+# from a uniform distribution of the choices, for exact_match/similarity and
+# multiple_choice benchmarks respectively. Similarity scoring still uses the
+# configured local metric after the response is generated.
 #
 # If you want to customize the model for any of these benchmarks, pass the `--input`
 # flag to the `qt run ...` command. For example, the below command shows how to run
@@ -16,17 +17,34 @@
 # https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
 
 
-# The SimpleQA-verified becnhmark configured to use the random model.
+# The SimpleQA-verified benchmark configured to use cosine similarity with a
+# built-in embedding model powered by FastEmbed and the demo model. Note that
+# the first cosine run may download the embedding model if it is not cached locally.
 #
 # Read more about the SimpleQA-verified benchmark here:
 #
 # https://arxiv.org/abs/2509.07968
 [benchmarks.simpleqa-verified]
 type = "custom_nocode"
-style = { type = "exact_match", golden_column = "answer" }
+style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
 dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
+limit = 10
+
+# The FinanceBench benchmark configured to use cosine similarity with a
+# built-in embedding model powered by FastEmbed and the demo model. Note that
+# the first cosine run may download the embedding model if it is not cached locally.
+#
+# Read more about FinanceBench here:
+#
+# https://arxiv.org/abs/2311.11944
+[benchmarks.financebench]
+type = "custom_nocode"
+style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
+dataset = { name = "quantiles/financebench" }
+model = "random"
+prompt_template_file = "prompts/financebench.txt"
 limit = 10
 
 # The MedQA benchmark configured to use the random model.

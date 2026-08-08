@@ -67,3 +67,16 @@ impl SimilarityMetric for CosineSimilarity {
         Ok(f64::midpoint(score, 1.0))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::CosineSimilarity;
+
+    #[test]
+    fn computes_raw_cosine_without_initializing_a_model() {
+        assert!((CosineSimilarity::cosine(&[1.0, 0.0], &[1.0, 0.0]) - 1.0).abs() < f64::EPSILON);
+        assert!(CosineSimilarity::cosine(&[1.0, 0.0], &[0.0, 1.0]).abs() < f64::EPSILON);
+        assert!((CosineSimilarity::cosine(&[1.0, 0.0], &[-1.0, 0.0]) + 1.0).abs() < f64::EPSILON);
+        assert!(CosineSimilarity::cosine(&[0.0], &[1.0]).abs() < f64::EPSILON);
+    }
+}

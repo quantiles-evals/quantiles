@@ -12,10 +12,7 @@ use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 
 use crate::dataset::{DatasetManager, resolve_hf_dataset_source};
 use crate::llm::random::RandomSampler;
-use crate::similarity::{
-    SimilarityMetric, SimilarityMetricName, levenshtein::LevenshteinSimilarity,
-    vector::CosineSimilarity,
-};
+use crate::similarity::{SimilarityMetricName, build_similarity_metric};
 
 /// Configuration shared by all similarity-based builtins.
 ///
@@ -85,10 +82,7 @@ impl BuiltinWorkflow for SimilarityBenchmark {
             bail!("limit must be > 0");
         }
 
-        let metric: Box<dyn SimilarityMetric> = match config.metric {
-            SimilarityMetricName::Levenshtein => Box::new(LevenshteinSimilarity),
-            SimilarityMetricName::Cosine => Box::new(CosineSimilarity::try_new()?),
-        };
+        let metric = build_similarity_metric(config.metric)?;
 
         let llm = resolve_sampler(config.base.model.as_ref(), || {
             Arc::new(RandomSampler::new(80))

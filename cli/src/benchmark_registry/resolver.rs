@@ -48,7 +48,7 @@ mod tests {
             type = "custom_nocode"
             dataset = { name = "quantiles/example" }
             prompt_template_file = "prompts/qa.txt"
-            style = { type = "exact_match", golden_column = "answer" }
+            style = { type = "similarity", golden_column = "answer", metric = "levenshtein" }
         "#;
         let prompt = b"{{ row.question }}";
         let definition_url = format!("{}/resources/definition", server.uri());
@@ -105,6 +105,13 @@ mod tests {
         assert_eq!(benchmark.version, "v1");
         assert_eq!(benchmark.prompt_template, "{{ row.question }}");
         assert_eq!(benchmark.config.params.dataset.name, "quantiles/example");
+        assert!(matches!(
+            benchmark.config.params.style,
+            crate::config::CustomNoCodeStyleConfig::Similarity {
+                metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(_),
+                ..
+            }
+        ));
     }
 
     fn resource(

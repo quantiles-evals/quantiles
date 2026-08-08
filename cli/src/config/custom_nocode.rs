@@ -9,6 +9,11 @@ use crate::llm::Sampler;
 pub enum CustomNoCodeStyleConfig {
     /// Compare the trimmed model response with a golden dataset column.
     ExactMatch { golden_column: String },
+    /// Score the model response against a golden dataset column using a similarity metric.
+    Similarity {
+        golden_column: String,
+        metric: CustomNoCodeSimilarityMetric,
+    },
     /// Render labeled choices and score the selected label.
     MultipleChoice {
         choices: CustomNoCodeChoiceSource,
@@ -17,6 +22,114 @@ pub enum CustomNoCodeStyleConfig {
         #[serde(skip_serializing_if = "Option::is_none")]
         shuffle: Option<CustomNoCodeShuffleConfig>,
     },
+}
+
+/// Similarity metric configuration for a no-code benchmark.
+///
+/// Levenshtein uses the string form `"levenshtein"`. Cosine uses a table so its
+/// required embedding model is explicit: `{ type = "cosine", embedding_model = "fastembed" }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CustomNoCodeSimilarityMetric {
+    Levenshtein(CustomNoCodeLevenshteinMetric),
+    Cosine(CustomNoCodeCosineMetric),
+}
+
+impl Serialize for CustomNoCodeSimilarityMetric {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Levenshtein(metric) => metric.serialize(serializer),
+            Self::Cosine(config) => config.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CustomNoCodeSimilarityMetric {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if let Some(name) = value.as_str() {
+            return match name {
+                "levenshtein" => Ok(Self::Levenshtein(
+                    CustomNoCodeLevenshteinMetric::Levenshtein,
+                )),
+                "cosine" => Err(serde::de::Error::custom(
+                    "cosine similarity `metric` must be a table with `type = \"cosine\"` and the required `embedding_model` field",
+                )),
+                other => Err(serde::de::Error::custom(format!(
+                    "unsupported similarity metric `{other}`; expected `levenshtein` or a cosine metric table"
+                ))),
+            };
+        }
+
+        if value.is_object() {
+            let config = CustomNoCodeCosineMetric::deserialize(value).map_err(|error| {
+                serde::de::Error::custom(format!("invalid cosine similarity metric: {error}"))
+            })?;
+            return Ok(Self::Cosine(config));
+        }
+
+        Err(serde::de::Error::custom(
+            "similarity `metric` must be `\"levenshtein\"` or a cosine metric table",
+        ))
+    }
+}
+
+/// The only supported string-form similarity metric.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CustomNoCodeLevenshteinMetric {
+    Levenshtein,
+}
+
+/// Tagged wire representation of a structured similarity metric.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
+enum StructuredSimilarityMetric {
+    Cosine {
+        embedding_model: CustomNoCodeEmbeddingModel,
+    },
+}
+
+/// Cosine similarity configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CustomNoCodeCosineMetric {
+    pub embedding_model: CustomNoCodeEmbeddingModel,
+}
+
+impl Serialize for CustomNoCodeCosineMetric {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        StructuredSimilarityMetric::Cosine {
+            embedding_model: self.embedding_model,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for CustomNoCodeCosineMetric {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match StructuredSimilarityMetric::deserialize(deserializer)? {
+            StructuredSimilarityMetric::Cosine { embedding_model } => Ok(Self { embedding_model }),
+        }
+    }
+}
+
+/// Embedding models supported by no-code cosine similarity.
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CustomNoCodeEmbeddingModel {
+    /// The local FastEmbed-backed model built into the CLI.
+    Fastembed,
 }
 
 /// Source of the answer choices for a multiple-choice task.
@@ -178,7 +291,7 @@ impl CustomNoCodeParams {
         }
 
         if !self.metrics.is_empty()
-            && matches!(self.style, CustomNoCodeStyleConfig::ExactMatch { .. })
+            && !matches!(self.style, CustomNoCodeStyleConfig::MultipleChoice { .. })
         {
             bail!("custom_nocode `metrics` are only supported for multiple-choice evaluations");
         }
@@ -322,6 +435,108 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_custom_nocode_similarity_metrics() {
+        let levenshtein = r#"
+            [benchmarks.similarity]
+            type = "custom_nocode"
+            style = { type = "similarity", golden_column = "answer", metric = "levenshtein" }
+            dataset = { name = "fixture/qa" }
+            prompt_template_file = "prompts/qa.txt"
+        "#;
+        let config: WorkspaceConfig = toml::from_str(levenshtein).unwrap();
+        let Some(BenchmarkConfig::CustomNoCode(benchmark)) = config.benchmarks.get("similarity")
+        else {
+            panic!("missing similarity benchmark");
+        };
+        assert!(matches!(
+            benchmark.params.style,
+            CustomNoCodeStyleConfig::Similarity {
+                metric: CustomNoCodeSimilarityMetric::Levenshtein(_),
+                ..
+            }
+        ));
+        let serialized = serde_json::to_value(&benchmark.params.style).unwrap();
+        assert_eq!(serialized["metric"], "levenshtein");
+
+        let cosine = r#"
+            [benchmarks.similarity]
+            type = "custom_nocode"
+            style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
+            dataset = { name = "fixture/qa" }
+            prompt_template_file = "prompts/qa.txt"
+        "#;
+        let config: WorkspaceConfig = toml::from_str(cosine).unwrap();
+        let Some(BenchmarkConfig::CustomNoCode(benchmark)) = config.benchmarks.get("similarity")
+        else {
+            panic!("missing similarity benchmark");
+        };
+        assert!(matches!(
+            benchmark.params.style,
+            CustomNoCodeStyleConfig::Similarity {
+                metric: CustomNoCodeSimilarityMetric::Cosine(CustomNoCodeCosineMetric {
+                    embedding_model: CustomNoCodeEmbeddingModel::Fastembed,
+                    ..
+                }),
+                ..
+            }
+        ));
+        let serialized = serde_json::to_value(&benchmark.params.style).unwrap();
+        assert_eq!(serialized["metric"]["type"], "cosine");
+        assert_eq!(serialized["metric"]["embedding_model"], "fastembed");
+    }
+
+    #[test]
+    fn similarity_rejects_invalid_metric_shapes() {
+        for style in [
+            r#"{ type = "similarity", golden_column = "answer", metric = "cosine" }"#,
+            r#"{ type = "similarity", golden_column = "answer", metric = { type = "cosine" } }"#,
+            r#"{ type = "similarity", golden_column = "answer", metric = { type = "levenshtein", embedding_model = "fastembed" } }"#,
+            r#"{ type = "similarity", golden_column = "answer", metric = "levenshtein", embedding_model = "fastembed" }"#,
+        ] {
+            let toml = format!(
+                r#"
+                [benchmarks.invalid]
+                type = "custom_nocode"
+                style = {style}
+                dataset = {{ name = "fixture/qa" }}
+                prompt_template_file = "prompts/qa.txt"
+                "#
+            );
+            assert!(
+                toml::from_str::<WorkspaceConfig>(&toml).is_err(),
+                "unexpectedly accepted style: {style}"
+            );
+        }
+    }
+
+    #[test]
+    fn cosine_metric_errors_explain_required_table_and_embedding_model() {
+        let benchmark = |style: &str| {
+            toml::from_str::<WorkspaceConfig>(&format!(
+                r#"
+                [benchmarks.invalid]
+                type = "custom_nocode"
+                style = {style}
+                dataset = {{ name = "fixture/qa" }}
+                prompt_template_file = "prompts/qa.txt"
+                "#
+            ))
+            .unwrap_err()
+            .to_string()
+        };
+
+        let shorthand =
+            benchmark(r#"{ type = "similarity", golden_column = "answer", metric = "cosine" }"#);
+        assert!(shorthand.contains("must be a table"));
+        assert!(shorthand.contains("embedding_model"));
+
+        let missing_model = benchmark(
+            r#"{ type = "similarity", golden_column = "answer", metric = { type = "cosine" } }"#,
+        );
+        assert!(missing_model.contains("embedding_model"));
+    }
+
+    #[test]
     fn custom_nocode_missing_required_field_errors() {
         let toml = r#"
             [benchmarks.nocode_custom]
@@ -391,7 +606,14 @@ mod tests {
         ))
         .unwrap();
 
-        for name in ["simpleqa-verified", "medqa", "medmcqa", "mmlu-pro", "gpqa"] {
+        for name in [
+            "simpleqa-verified",
+            "financebench",
+            "medqa",
+            "medmcqa",
+            "mmlu-pro",
+            "gpqa",
+        ] {
             assert!(
                 matches!(
                     config.benchmarks.get(name),

@@ -7,6 +7,47 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
+/// A similarity scorer resolved once and shared by every row in a run.
+#[derive(Clone)]
+pub(super) struct SimilarityMetric {
+    pub(super) name: &'static str,
+    pub(super) embedding_model: Option<&'static str>,
+    pub(super) metric: Arc<dyn crate::similarity::SimilarityMetric>,
+}
+
+impl SimilarityMetric {
+    /// Resolve the configured similarity metric when the selected style needs one.
+    pub(super) fn new(style: &crate::config::CustomNoCodeStyleConfig) -> Result<Option<Self>> {
+        let crate::config::CustomNoCodeStyleConfig::Similarity { metric, .. } = style else {
+            return Ok(None);
+        };
+
+        let resolved = match metric {
+            crate::config::CustomNoCodeSimilarityMetric::Levenshtein(_) => Self {
+                name: "levenshtein",
+                embedding_model: None,
+                metric: crate::similarity::build_similarity_metric(
+                    crate::similarity::SimilarityMetricName::Levenshtein,
+                )?,
+            },
+            crate::config::CustomNoCodeSimilarityMetric::Cosine(config) => {
+                let embedding_model = match config.embedding_model {
+                    crate::config::CustomNoCodeEmbeddingModel::Fastembed => "fastembed",
+                };
+                Self {
+                    name: "cosine",
+                    embedding_model: Some(embedding_model),
+                    metric: crate::similarity::build_similarity_metric(
+                        crate::similarity::SimilarityMetricName::Cosine,
+                    )?,
+                }
+            }
+        };
+
+        Ok(Some(resolved))
+    }
+}
+
 /// A validated prompt template and the Jinja environment
 /// used to render it.
 pub(super) struct LoadedTemplate {

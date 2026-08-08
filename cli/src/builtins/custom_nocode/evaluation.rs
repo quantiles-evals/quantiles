@@ -5,14 +5,95 @@ use super::data::{DatasetRow, PreparedRow};
 use super::metrics::SampleResult;
 use crate::builtins::common::{hash_input, run_timed_step};
 
-/// Per-row step output stored as JSON in the step record.
+/// Style-specific step output for each row, stored as JSON in the step
+/// record.
 #[derive(Debug, Serialize, Deserialize)]
-struct RowOutput {
-    input: String,
-    response: String,
-    parsed_response: Option<String>,
-    golden: String,
-    is_correct: bool,
+#[serde(rename_all = "lowercase")]
+enum RowOutput {
+    Classification {
+        input: String,
+        response: String,
+        parsed_response: Option<String>,
+        golden: String,
+        is_correct: bool,
+    },
+    Similarity {
+        input: String,
+        response: String,
+        golden: String,
+        similarity_name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        embedding_model: Option<String>,
+        similarity_score: f64,
+    },
+}
+
+impl RowOutput {
+    /// Persist per-step metrics for this row.
+    async fn emit_row_metrics(
+        &self,
+        metrics_store: &crate::metrics_store::MetricsStore,
+        run_id: i64,
+        step_id: i64,
+    ) {
+        match self {
+            Self::Classification {
+                parsed_response,
+                is_correct,
+                ..
+            } => {
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "is_correct",
+                        if *is_correct { 1.0 } else { 0.0 },
+                        None,
+                    )
+                    .await;
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "response_parsed",
+                        if parsed_response.is_some() { 1.0 } else { 0.0 },
+                        None,
+                    )
+                    .await;
+            }
+            Self::Similarity {
+                similarity_score, ..
+            } => {
+                metrics_store
+                    .emit(
+                        run_id,
+                        Some(step_id),
+                        "similarity_score",
+                        *similarity_score,
+                        None,
+                    )
+                    .await;
+            }
+        }
+    }
+}
+
+/// Canonical serialized scoring configuration used in durable step hashes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ScoringIdentity(String);
+
+impl ScoringIdentity {
+    /// Build an identity from a no-code scoring style.
+    pub(super) fn from_style(style: &crate::config::CustomNoCodeStyleConfig) -> Result<Self> {
+        let style_as_string = serde_json::to_string(style)?;
+        Ok(Self(style_as_string))
+    }
+}
+
+impl std::fmt::Display for ScoringIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
 }
 
 pub(super) struct EvaluateRowArgs<'a> {
@@ -22,10 +103,61 @@ pub(super) struct EvaluateRowArgs<'a> {
     pub(super) template_str: &'a str,
     pub(super) env: &'a jinja::Environment<'a>,
     pub(super) model_name: &'a str,
+    /// Scoring identity included in this row's durable step hash.
+    pub(super) scoring_identity: &'a ScoringIdentity,
+    /// Resolved scorer for a similarity-style row.
+    pub(super) similarity: Option<&'a super::runtime::SimilarityMetric>,
     pub(super) llm: &'a std::sync::Arc<dyn crate::llm::LLMSampler>,
     pub(super) db: &'a sea_orm::DatabaseConnection,
     pub(super) metrics_store: &'a crate::metrics_store::MetricsStore,
     pub(super) run_id: i64,
+}
+
+impl EvaluateRowArgs<'_> {
+    /// Sample and score this rendered row and return its durable output.
+    async fn evaluate_response(&self, rendered: &str, golden: &str) -> Result<RowOutput> {
+        let model_response = self
+            .llm
+            .sample(rendered)
+            .await
+            .with_context(|| format!("failed to sample LLM for row {}", self.i))?;
+
+        match &self.prepared {
+            PreparedRow::Similarity { .. } => {
+                let similarity = self
+                    .similarity
+                    .context("similarity style did not initialize a similarity metric")?;
+                let similarity_score = similarity
+                    .metric
+                    .compute(&model_response, golden)
+                    .await
+                    .with_context(|| format!("failed to compute similarity for row {}", self.i))?;
+                Ok(RowOutput::Similarity {
+                    input: rendered.to_owned(),
+                    response: model_response,
+                    golden: golden.to_owned(),
+                    similarity_name: similarity.name.to_owned(),
+                    embedding_model: similarity.embedding_model.map(str::to_owned),
+                    similarity_score,
+                })
+            }
+            PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => {
+                let parsed_response = match self.prepared.response_labels() {
+                    Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
+                    None => Some(model_response.trim().to_owned()),
+                };
+                let is_correct = parsed_response.as_deref() == Some(golden.trim());
+
+                Ok(RowOutput::Classification {
+                    input: rendered.to_owned(),
+                    response: model_response,
+                    parsed_response,
+                    golden: golden.to_owned(),
+                    is_correct,
+                })
+            }
+        }
+    }
 }
 
 /// Render, sample, score, and record one normalized dataset row.
@@ -34,20 +166,18 @@ pub(super) async fn evaluate_row(
     benchmark_name: &str,
     args: EvaluateRowArgs<'_>,
 ) -> Result<SampleResult> {
-    let prepared = args.prepared;
-
     let rendered = args
         .env
         .render_str(
             args.template_str,
-            jinja::context!(row => args.row, choices => prepared.choices()),
+            jinja::context!(row => args.row, choices => args.prepared.choices()),
         )
         .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
-    let golden = prepared.golden().to_owned();
+    let golden = args.prepared.golden().to_owned();
     let input_hash = hash_input(&format!(
-        "{rendered}\ngolden={}\nmodel={}\nworkflow={benchmark_name}",
-        golden, args.model_name
+        "{rendered}\ngolden={}\nmodel={}\nworkflow={benchmark_name}\nscoring={}",
+        golden, args.model_name, args.scoring_identity
     ));
     let step_key = format!("row-{}", args.i);
 
@@ -57,56 +187,28 @@ pub(super) async fn evaluate_row(
         args.run_id,
         &step_key,
         &input_hash,
-        async {
-            let model_response = args
-                .llm
-                .sample(&rendered)
-                .await
-                .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
-
-            let parsed_response = match prepared.response_labels() {
-                Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
-                None => Some(model_response.trim().to_owned()),
-            };
-            let is_correct = parsed_response.as_deref() == Some(golden.trim());
-
-            Ok(RowOutput {
-                input: rendered.clone(),
-                response: model_response,
-                parsed_response,
-                golden: golden.clone(),
-                is_correct,
-            })
-        },
+        args.evaluate_response(&rendered, &golden),
     )
     .await?;
 
+    // only emit metrics if the step was actually run. run_timed_step returns step_id=None
+    // if the step was cached
     if let Some(step_id) = step_id {
-        args.metrics_store
-            .emit(
-                args.run_id,
-                Some(step_id),
-                "is_correct",
-                if output.is_correct { 1.0 } else { 0.0 },
-                None,
-            )
-            .await;
-        args.metrics_store
-            .emit(
-                args.run_id,
-                Some(step_id),
-                "response_parsed",
-                if output.parsed_response.is_some() {
-                    1.0
-                } else {
-                    0.0
-                },
-                None,
-            )
+        output
+            .emit_row_metrics(args.metrics_store, args.run_id, step_id)
             .await;
     }
+    Ok(sample_result(&output))
+}
 
-    Ok(SampleResult::new(output.is_correct))
+/// Convert a row output into the sample value used for aggregate metrics.
+fn sample_result(output: &RowOutput) -> SampleResult {
+    match output {
+        RowOutput::Classification { is_correct, .. } => SampleResult::Classification(*is_correct),
+        RowOutput::Similarity {
+            similarity_score, ..
+        } => SampleResult::Similarity(*similarity_score),
+    }
 }
 
 /// Extract a configured choice label from a direct response or its final few tokens.
@@ -135,7 +237,17 @@ fn extract_choice_label(response: &str, labels: &[String]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use serde_json::json;
+
+    struct FixedSampler;
+
+    #[async_trait]
+    impl crate::llm::LLMSampler for FixedSampler {
+        async fn sample(&self, _prompt: &str) -> Result<String> {
+            Ok("hello".to_owned())
+        }
+    }
 
     #[test]
     /// Verifies templates can access arbitrary fields through the `row` variable.
@@ -175,5 +287,187 @@ mod tests {
             Some("C")
         );
         assert_eq!(extract_choice_label("unknown", &labels), None);
+    }
+
+    #[test]
+    fn row_outputs_use_lowercase_tags() {
+        let classification = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            parsed_response: Some("answer".to_owned()),
+            golden: "answer".to_owned(),
+            is_correct: true,
+        };
+        let similarity = RowOutput::Similarity {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            golden: "answer".to_owned(),
+            similarity_name: "levenshtein".to_owned(),
+            embedding_model: None,
+            similarity_score: 1.0,
+        };
+
+        let classification = serde_json::to_value(classification).unwrap();
+        let similarity = serde_json::to_value(similarity).unwrap();
+        assert!(classification.get("classification").is_some());
+        assert!(similarity.get("similarity").is_some());
+    }
+
+    #[tokio::test]
+    async fn emits_classification_metric_values_for_parsed_and_unparsed_responses() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "classification-metrics-test", None)
+            .await
+            .unwrap();
+        let parsed = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "answer".to_owned(),
+            parsed_response: Some("answer".to_owned()),
+            golden: "answer".to_owned(),
+            is_correct: true,
+        };
+        let unparsed = RowOutput::Classification {
+            input: "question".to_owned(),
+            response: "unknown".to_owned(),
+            parsed_response: None,
+            golden: "answer".to_owned(),
+            is_correct: false,
+        };
+
+        parsed.emit_row_metrics(&metrics_store, run_id, 7).await;
+        unparsed.emit_row_metrics(&metrics_store, run_id, 8).await;
+        metrics_store.flush(run_id).await.unwrap();
+
+        let metrics = metrics_store.list_for_run(run_id).await.unwrap();
+        let metric_value = |step_id, metric_name| {
+            metrics
+                .iter()
+                .find(|metric| metric.step_id == Some(step_id) && metric.metric_name == metric_name)
+                .unwrap()
+                .metric_value
+        };
+        assert!((metric_value(7, "is_correct") - 1.0).abs() < f64::EPSILON);
+        assert!((metric_value(7, "response_parsed") - 1.0).abs() < f64::EPSILON);
+        assert!(metric_value(8, "is_correct").abs() < f64::EPSILON);
+        assert!(metric_value(8, "response_parsed").abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn evaluate_response_requires_a_similarity_metric() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "missing-similarity-metric-test", None)
+            .await
+            .unwrap();
+        let row: DatasetRow = serde_json::from_value(json!({"question": "say hello"})).unwrap();
+        let env = jinja::Environment::new();
+        let llm: std::sync::Arc<dyn crate::llm::LLMSampler> = std::sync::Arc::new(FixedSampler);
+        let scoring_identity = ScoringIdentity("similarity".to_owned());
+        let args = EvaluateRowArgs {
+            i: 0,
+            row: &row,
+            prepared: PreparedRow::Similarity {
+                golden: "hello".to_owned(),
+            },
+            template_str: "{{ row.question }}",
+            env: &env,
+            model_name: "fixed",
+            scoring_identity: &scoring_identity,
+            similarity: None,
+            llm: &llm,
+            db: &db,
+            metrics_store: &metrics_store,
+            run_id,
+        };
+
+        let error = args
+            .evaluate_response("say hello", "hello")
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("similarity style did not initialize a similarity metric")
+        );
+    }
+
+    #[tokio::test]
+    async fn evaluates_and_records_levenshtein_similarity() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "similarity-test", None)
+            .await
+            .unwrap();
+        let style = crate::config::CustomNoCodeStyleConfig::Similarity {
+            golden_column: "answer".to_owned(),
+            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(
+                crate::config::CustomNoCodeLevenshteinMetric::Levenshtein,
+            ),
+        };
+        let row: DatasetRow = serde_json::from_value(json!({
+            "question": "say hello",
+            "answer": "hello"
+        }))
+        .unwrap();
+        let prepared = super::super::data::prepare_row(0, &row, &style).unwrap();
+        let similarity = super::super::runtime::SimilarityMetric::new(&style)
+            .unwrap()
+            .unwrap();
+        let env = jinja::Environment::new();
+        let llm: std::sync::Arc<dyn crate::llm::LLMSampler> = std::sync::Arc::new(FixedSampler);
+        let scoring_identity = ScoringIdentity::from_style(&style).unwrap();
+
+        let result = evaluate_row(
+            "similarity-test",
+            EvaluateRowArgs {
+                i: 0,
+                row: &row,
+                prepared,
+                template_str: "{{ row.question }}",
+                env: &env,
+                model_name: "fixed",
+                scoring_identity: &scoring_identity,
+                similarity: Some(&similarity),
+                llm: &llm,
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            matches!(result, SampleResult::Similarity(score) if (score - 1.0).abs() < f64::EPSILON)
+        );
+        metrics_store.flush(run_id).await.unwrap();
+        let metrics = metrics_store.list_for_run(run_id).await.unwrap();
+        assert!(metrics.iter().any(|metric| {
+            metric.metric_name == "similarity_score"
+                && (metric.metric_value - 1.0).abs() < f64::EPSILON
+        }));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.metric_name == "is_correct")
+        );
+
+        let steps = crate::db::list_steps_for_run(&db, run_id).await.unwrap();
+        let output: serde_json::Value =
+            serde_json::from_str(steps[0].output.as_deref().unwrap()).unwrap();
+        let output = &output["similarity"];
+        assert_eq!(output["similarity_name"], "levenshtein");
+        assert_eq!(output["similarity_score"], 1.0);
+        assert!(output.get("embedding_model").is_none());
     }
 }

@@ -20,3 +20,17 @@ impl SimilarityMetric for LevenshteinSimilarity {
         Ok(score.clamp(0.0, 1.0))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn normalizes_levenshtein_similarity() {
+        let metric = LevenshteinSimilarity;
+        assert!((metric.compute("", "").await.unwrap() - 1.0).abs() < f64::EPSILON);
+        assert!((metric.compute("same", "same").await.unwrap() - 1.0).abs() < f64::EPSILON);
+        assert!((metric.compute("kitten", "sitting").await.unwrap() - 4.0 / 7.0).abs() < 1e-12);
+        assert!(metric.compute("abc", "xyz").await.unwrap().abs() < f64::EPSILON);
+    }
+}
