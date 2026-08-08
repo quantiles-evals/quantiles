@@ -25,12 +25,12 @@ pub enum CustomNoCodeStyleConfig {
 }
 
 /// Similarity metric configuration for a no-code benchmark.
-///
-/// Levenshtein uses the string form `"levenshtein"`. Cosine uses a table so its
-/// required embedding model is explicit: `{ type = "cosine", embedding_model = "fastembed" }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CustomNoCodeSimilarityMetric {
+    /// Levenshtein uses the string form `"levenshtein"`
     Levenshtein(CustomNoCodeLevenshteinMetric),
+    /// Cosine uses a table so that we can make its (required) embedding model
+    /// explicit: `{ type = "cosine", embedding_model = "fastembed" }`.
     Cosine(CustomNoCodeCosineMetric),
 }
 
