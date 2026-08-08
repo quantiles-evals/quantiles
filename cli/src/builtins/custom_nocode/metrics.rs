@@ -308,6 +308,7 @@ fn safe_ratio(numerator: f64, denominator: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::db::StepStatus;
+    use serde::Serialize;
     use serde_json::json;
     use time::OffsetDateTime;
 
@@ -516,21 +517,29 @@ mod tests {
     }
 
     fn legacy_step(id: i64, golden: &str, parsed_response: Option<&str>) -> StepSummary {
+        #[derive(Serialize)]
+        struct LegacyRowOutput<'a> {
+            input: &'a str,
+            response: &'a str,
+            parsed_response: Option<&'a str>,
+            golden: &'a str,
+            is_correct: bool,
+        }
+
+        let output = LegacyRowOutput {
+            input: "question",
+            response: parsed_response.unwrap_or("unparsed"),
+            parsed_response,
+            golden,
+            is_correct: parsed_response == Some(golden),
+        };
+
         StepSummary {
             id,
             step_key: format!("row-{}", id - 1),
             input_hash: format!("hash-{id}"),
             status: StepStatus::Completed,
-            output: Some(
-                json!({
-                    "input": "question",
-                    "response": parsed_response.unwrap_or("unparsed"),
-                    "parsed_response": parsed_response,
-                    "golden": golden,
-                    "is_correct": parsed_response == Some(golden)
-                })
-                .to_string(),
-            ),
+            output: Some(serde_json::to_string(&output).unwrap()),
             error: None,
             started_at: OffsetDateTime::UNIX_EPOCH,
             finished_at: Some(OffsetDateTime::UNIX_EPOCH),
