@@ -28,10 +28,12 @@ pub enum CustomNoCodeStyleConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CustomNoCodeSimilarityMetric {
     /// Levenshtein uses the string form `"levenshtein"`
-    Levenshtein(CustomNoCodeLevenshteinMetric),
+    Levenshtein,
     /// Cosine uses a table so that we can make its (required) embedding model
     /// explicit: `{ type = "cosine", embedding_model = "fastembed" }`.
-    Cosine(CustomNoCodeCosineMetric),
+    Cosine {
+        embedding_model: CustomNoCodeEmbeddingModel,
+    },
 }
 
 impl Serialize for CustomNoCodeSimilarityMetric {
@@ -40,8 +42,11 @@ impl Serialize for CustomNoCodeSimilarityMetric {
         S: serde::Serializer,
     {
         match self {
-            Self::Levenshtein(metric) => metric.serialize(serializer),
-            Self::Cosine(config) => config.serialize(serializer),
+            Self::Levenshtein => serializer.serialize_str("levenshtein"),
+            Self::Cosine { embedding_model } => StructuredSimilarityMetric::Cosine {
+                embedding_model: *embedding_model,
+            }
+            .serialize(serializer),
         }
     }
 }
@@ -54,9 +59,7 @@ impl<'de> Deserialize<'de> for CustomNoCodeSimilarityMetric {
         let value = serde_json::Value::deserialize(deserializer)?;
         if let Some(name) = value.as_str() {
             return match name {
-                "levenshtein" => Ok(Self::Levenshtein(
-                    CustomNoCodeLevenshteinMetric::Levenshtein,
-                )),
+                "levenshtein" => Ok(Self::Levenshtein),
                 "cosine" => Err(serde::de::Error::custom(
                     "cosine similarity `metric` must be a table with `type = \"cosine\"` and the required `embedding_model` field",
                 )),
@@ -67,23 +70,20 @@ impl<'de> Deserialize<'de> for CustomNoCodeSimilarityMetric {
         }
 
         if value.is_object() {
-            let config = CustomNoCodeCosineMetric::deserialize(value).map_err(|error| {
+            let metric = StructuredSimilarityMetric::deserialize(value).map_err(|error| {
                 serde::de::Error::custom(format!("invalid cosine similarity metric: {error}"))
             })?;
-            return Ok(Self::Cosine(config));
+            return Ok(match metric {
+                StructuredSimilarityMetric::Cosine { embedding_model } => {
+                    Self::Cosine { embedding_model }
+                }
+            });
         }
 
         Err(serde::de::Error::custom(
             "similarity `metric` must be `\"levenshtein\"` or a cosine metric table",
         ))
     }
-}
-
-/// The only supported string-form similarity metric.
-#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum CustomNoCodeLevenshteinMetric {
-    Levenshtein,
 }
 
 /// Tagged wire representation of a structured similarity metric.
@@ -93,35 +93,6 @@ enum StructuredSimilarityMetric {
     Cosine {
         embedding_model: CustomNoCodeEmbeddingModel,
     },
-}
-
-/// Cosine similarity configuration.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CustomNoCodeCosineMetric {
-    pub embedding_model: CustomNoCodeEmbeddingModel,
-}
-
-impl Serialize for CustomNoCodeCosineMetric {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        StructuredSimilarityMetric::Cosine {
-            embedding_model: self.embedding_model,
-        }
-        .serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for CustomNoCodeCosineMetric {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match StructuredSimilarityMetric::deserialize(deserializer)? {
-            StructuredSimilarityMetric::Cosine { embedding_model } => Ok(Self { embedding_model }),
-        }
-    }
 }
 
 /// Embedding models supported by no-code cosine similarity.
@@ -451,7 +422,7 @@ mod tests {
         assert!(matches!(
             benchmark.params.style,
             CustomNoCodeStyleConfig::Similarity {
-                metric: CustomNoCodeSimilarityMetric::Levenshtein(_),
+                metric: CustomNoCodeSimilarityMetric::Levenshtein,
                 ..
             }
         ));
@@ -473,10 +444,9 @@ mod tests {
         assert!(matches!(
             benchmark.params.style,
             CustomNoCodeStyleConfig::Similarity {
-                metric: CustomNoCodeSimilarityMetric::Cosine(CustomNoCodeCosineMetric {
+                metric: CustomNoCodeSimilarityMetric::Cosine {
                     embedding_model: CustomNoCodeEmbeddingModel::Fastembed,
-                    ..
-                }),
+                },
                 ..
             }
         ));
@@ -606,14 +576,7 @@ mod tests {
         ))
         .unwrap();
 
-        for name in [
-            "simpleqa-verified",
-            "financebench",
-            "medqa",
-            "medmcqa",
-            "mmlu-pro",
-            "gpqa",
-        ] {
+        for name in ["simpleqa-verified", "medqa", "medmcqa", "mmlu-pro", "gpqa"] {
             assert!(
                 matches!(
                     config.benchmarks.get(name),

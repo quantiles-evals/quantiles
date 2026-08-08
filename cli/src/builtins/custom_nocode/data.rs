@@ -535,9 +535,7 @@ mod tests {
     fn prepares_similarity_golden_value() {
         let config = crate::config::CustomNoCodeStyleConfig::Similarity {
             golden_column: "answer".to_owned(),
-            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(
-                crate::config::CustomNoCodeLevenshteinMetric::Levenshtein,
-            ),
+            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein,
         };
         let row = dataset_row(json!({"answer": 42}));
 

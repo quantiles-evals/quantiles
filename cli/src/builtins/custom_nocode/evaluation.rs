@@ -7,7 +7,7 @@ use crate::builtins::common::{hash_input, run_timed_step};
 
 /// Style-specific step output for each row, stored as JSON in the step
 /// record.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum RowOutput {
     Classification {
@@ -26,6 +26,93 @@ enum RowOutput {
         embedding_model: Option<String>,
         similarity_score: f64,
     },
+}
+
+/// Compatibility wire format used only when reading durable row outputs.
+///
+/// New runs write lowercase tagged outputs, while runs created before similarity
+/// support stored classification fields directly at the top level.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum RowOutputWire {
+    /// Reads the lowercase tagged format written by current versions.
+    Tagged(TaggedRowOutput),
+    /// Reads the legacy flat classification format so old steps remain reusable.
+    LegacyClassification(LegacyClassificationRowOutput),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum TaggedRowOutput {
+    Classification {
+        input: String,
+        response: String,
+        parsed_response: Option<String>,
+        golden: String,
+        is_correct: bool,
+    },
+    Similarity {
+        input: String,
+        response: String,
+        golden: String,
+        similarity_name: String,
+        embedding_model: Option<String>,
+        similarity_score: f64,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyClassificationRowOutput {
+    input: String,
+    response: String,
+    parsed_response: Option<String>,
+    golden: String,
+    is_correct: bool,
+}
+
+impl<'de> Deserialize<'de> for RowOutput {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match RowOutputWire::deserialize(deserializer)? {
+            RowOutputWire::Tagged(TaggedRowOutput::Classification {
+                input,
+                response,
+                parsed_response,
+                golden,
+                is_correct,
+            })
+            | RowOutputWire::LegacyClassification(LegacyClassificationRowOutput {
+                input,
+                response,
+                parsed_response,
+                golden,
+                is_correct,
+            }) => Self::Classification {
+                input,
+                response,
+                parsed_response,
+                golden,
+                is_correct,
+            },
+            RowOutputWire::Tagged(TaggedRowOutput::Similarity {
+                input,
+                response,
+                golden,
+                similarity_name,
+                embedding_model,
+                similarity_score,
+            }) => Self::Similarity {
+                input,
+                response,
+                golden,
+                similarity_name,
+                embedding_model,
+                similarity_score,
+            },
+        })
+    }
 }
 
 impl RowOutput {
@@ -187,10 +274,14 @@ pub(super) async fn evaluate_row(
         .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
     let golden = args.prepared.golden().to_owned();
-    let input_hash = hash_input(&format!(
-        "{rendered}\ngolden={}\nmodel={}\nworkflow={benchmark_name}\nscoring={}",
-        golden, args.model_name, args.scoring_identity
-    ));
+    let input_hash = row_input_hash(
+        benchmark_name,
+        &rendered,
+        &golden,
+        args.model_name,
+        &args.prepared,
+        args.scoring_identity,
+    );
     let step_key = format!("row-{}", args.i);
 
     let (output, step_id) = run_timed_step(
@@ -211,6 +302,31 @@ pub(super) async fn evaluate_row(
             .await;
     }
     Ok(output.sample_result())
+}
+
+/// Build a durable row hash without invalidating classification caches that
+/// used a cache-key format prior to the introduction of similarity evaluations.
+///
+/// Exact-match and multiple-choice rows intentionally retain a hash format
+/// that does not include the scoring identity suffix.
+///
+/// Similarity evals append their scoring identity so changing the metric or
+/// embedding model invalidates only similarity results.
+fn row_input_hash(
+    benchmark_name: &str,
+    rendered: &str,
+    golden: &str,
+    model_name: &str,
+    prepared: &PreparedRow,
+    scoring_identity: &ScoringIdentity,
+) -> String {
+    let scoring_suffix = match prepared {
+        PreparedRow::Similarity { .. } => format!("\nscoring={scoring_identity}"),
+        PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => String::new(),
+    };
+    hash_input(&format!(
+        "{rendered}\ngolden={golden}\nmodel={model_name}\nworkflow={benchmark_name}{scoring_suffix}"
+    ))
 }
 
 /// Extract a configured choice label from a direct response or its final few tokens.
@@ -315,6 +431,79 @@ mod tests {
         assert!(similarity.get("similarity").is_some());
     }
 
+    #[test]
+    fn reads_legacy_flat_classification_outputs() {
+        let output: RowOutput = serde_json::from_value(json!({
+            "input": "question",
+            "response": "answer",
+            "parsed_response": "answer",
+            "golden": "answer",
+            "is_correct": true
+        }))
+        .unwrap();
+
+        assert!(matches!(
+            output,
+            RowOutput::Classification {
+                parsed_response: Some(response),
+                is_correct: true,
+                ..
+            } if response == "answer"
+        ));
+    }
+
+    #[test]
+    fn preserves_classification_hashes_and_scopes_similarity_identity() {
+        let exact_match = PreparedRow::ExactMatch {
+            golden: "answer".to_owned(),
+        };
+        let multiple_choice = PreparedRow::MultipleChoice {
+            choices: Vec::new(),
+            golden_label: "answer".to_owned(),
+            response_labels: Vec::new(),
+        };
+        let similarity = PreparedRow::Similarity {
+            golden: "answer".to_owned(),
+        };
+        let first_identity = ScoringIdentity("levenshtein".to_owned());
+        let second_identity = ScoringIdentity("cosine".to_owned());
+        let legacy_hash =
+            hash_input("prompt\ngolden=answer\nmodel=fixed\nworkflow=similarity-test");
+
+        for prepared in [&exact_match, &multiple_choice] {
+            assert_eq!(
+                row_input_hash(
+                    "similarity-test",
+                    "prompt",
+                    "answer",
+                    "fixed",
+                    prepared,
+                    &first_identity,
+                ),
+                legacy_hash
+            );
+        }
+
+        let first_similarity_hash = row_input_hash(
+            "similarity-test",
+            "prompt",
+            "answer",
+            "fixed",
+            &similarity,
+            &first_identity,
+        );
+        let second_similarity_hash = row_input_hash(
+            "similarity-test",
+            "prompt",
+            "answer",
+            "fixed",
+            &similarity,
+            &second_identity,
+        );
+        assert_ne!(first_similarity_hash, legacy_hash);
+        assert_ne!(first_similarity_hash, second_similarity_hash);
+    }
+
     #[tokio::test]
     async fn emits_classification_metric_values_for_parsed_and_unparsed_responses() {
         let tmpdir = tempfile::tempdir().unwrap();
@@ -412,9 +601,7 @@ mod tests {
             .unwrap();
         let style = crate::config::CustomNoCodeStyleConfig::Similarity {
             golden_column: "answer".to_owned(),
-            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(
-                crate::config::CustomNoCodeLevenshteinMetric::Levenshtein,
-            ),
+            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein,
         };
         let row: DatasetRow = serde_json::from_value(json!({
             "question": "say hello",

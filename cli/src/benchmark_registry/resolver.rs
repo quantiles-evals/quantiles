@@ -108,7 +108,7 @@ mod tests {
         assert!(matches!(
             benchmark.config.params.style,
             crate::config::CustomNoCodeStyleConfig::Similarity {
-                metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(_),
+                metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein,
                 ..
             }
         ));

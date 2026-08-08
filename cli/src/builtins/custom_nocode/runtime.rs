@@ -23,15 +23,15 @@ impl SimilarityMetric {
         };
 
         let resolved = match metric {
-            crate::config::CustomNoCodeSimilarityMetric::Levenshtein(_) => Self {
+            crate::config::CustomNoCodeSimilarityMetric::Levenshtein => Self {
                 name: "levenshtein",
                 embedding_model: None,
                 metric: crate::similarity::build_similarity_metric(
                     crate::similarity::SimilarityMetricName::Levenshtein,
                 )?,
             },
-            crate::config::CustomNoCodeSimilarityMetric::Cosine(config) => {
-                let embedding_model = match config.embedding_model {
+            crate::config::CustomNoCodeSimilarityMetric::Cosine { embedding_model } => {
+                let embedding_model = match embedding_model {
                     crate::config::CustomNoCodeEmbeddingModel::Fastembed => "fastembed",
                 };
                 Self {

@@ -24,10 +24,14 @@ pub struct OutputMetric {
     pub value: f64,
 }
 
-/// Tagged durable row output read when computing classification aggregates.
+/// Durable classification output read from current tagged or legacy flat records.
 #[derive(Debug, Deserialize)]
-struct StoredRowOutput {
-    classification: StoredClassificationOutput,
+#[serde(untagged)]
+enum StoredRowOutput {
+    Tagged {
+        classification: StoredClassificationOutput,
+    },
+    Legacy(StoredClassificationOutput),
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,9 +169,13 @@ pub fn compute_output_metrics(
         .map(|(step, output)| {
             let output: StoredRowOutput = serde_json::from_str(output)
                 .with_context(|| format!("failed to parse output for step `{}`", step.step_key))?;
+            let output = match output {
+                StoredRowOutput::Tagged { classification }
+                | StoredRowOutput::Legacy(classification) => classification,
+            };
             Ok(MultipleChoiceResult {
-                golden_label: output.classification.golden,
-                predicted_label: output.classification.parsed_response,
+                golden_label: output.golden,
+                predicted_label: output.parsed_response,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -431,7 +439,7 @@ mod tests {
         .to_string();
         let steps = vec![
             step(1, "A", Some("A")),
-            step(2, "A", Some("B")),
+            legacy_step(2, "A", Some("B")),
             step(3, "B", None),
         ];
 
@@ -498,6 +506,28 @@ mod tests {
                         "golden": golden,
                         "is_correct": parsed_response == Some(golden)
                     }
+                })
+                .to_string(),
+            ),
+            error: None,
+            started_at: OffsetDateTime::UNIX_EPOCH,
+            finished_at: Some(OffsetDateTime::UNIX_EPOCH),
+        }
+    }
+
+    fn legacy_step(id: i64, golden: &str, parsed_response: Option<&str>) -> StepSummary {
+        StepSummary {
+            id,
+            step_key: format!("row-{}", id - 1),
+            input_hash: format!("hash-{id}"),
+            status: StepStatus::Completed,
+            output: Some(
+                json!({
+                    "input": "question",
+                    "response": parsed_response.unwrap_or("unparsed"),
+                    "parsed_response": parsed_response,
+                    "golden": golden,
+                    "is_correct": parsed_response == Some(golden)
                 })
                 .to_string(),
             ),
