@@ -26,6 +26,12 @@ pub struct OutputMetric {
 
 #[derive(Debug, Deserialize)]
 struct StoredRowOutput {
+    #[serde(rename = "Classification")]
+    classification: StoredClassificationOutput,
+}
+
+#[derive(Debug, Deserialize)]
+struct StoredClassificationOutput {
     parsed_response: Option<String>,
     golden: String,
 }
@@ -160,8 +166,8 @@ pub fn compute_output_metrics(
             let output: StoredRowOutput = serde_json::from_str(output)
                 .with_context(|| format!("failed to parse output for step `{}`", step.step_key))?;
             Ok(MultipleChoiceResult {
-                golden_label: output.golden,
-                predicted_label: output.parsed_response,
+                golden_label: output.classification.golden,
+                predicted_label: output.classification.parsed_response,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -485,11 +491,13 @@ mod tests {
             status: StepStatus::Completed,
             output: Some(
                 json!({
-                    "input": "question",
-                    "response": parsed_response.unwrap_or("unparsed"),
-                    "parsed_response": parsed_response,
-                    "golden": golden,
-                    "is_correct": parsed_response == Some(golden)
+                    "Classification": {
+                        "input": "question",
+                        "response": parsed_response.unwrap_or("unparsed"),
+                        "parsed_response": parsed_response,
+                        "golden": golden,
+                        "is_correct": parsed_response == Some(golden)
+                    }
                 })
                 .to_string(),
             ),

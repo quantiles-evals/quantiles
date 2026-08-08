@@ -8,7 +8,6 @@ use crate::builtins::common::{hash_input, run_timed_step};
 /// Style-specific step output for each row, stored as JSON in the step
 /// record.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
 enum RowOutput {
     Classification {
         input: String,
@@ -65,22 +64,19 @@ pub(super) struct EvaluateRowArgs<'a> {
 
 /// Render, sample, score, and record one normalized dataset row.
 /// Returns the style-specific sample result used for aggregate metrics.
-#[expect(clippy::too_many_lines)]
 pub(super) async fn evaluate_row(
     benchmark_name: &str,
     args: EvaluateRowArgs<'_>,
 ) -> Result<SampleResult> {
-    let prepared = args.prepared;
-
     let rendered = args
         .env
         .render_str(
             args.template_str,
-            jinja::context!(row => args.row, choices => prepared.choices()),
+            jinja::context!(row => args.row, choices => args.prepared.choices()),
         )
         .with_context(|| format!("row {}: failed to render prompt template", args.i))?;
 
-    let golden = prepared.golden().to_owned();
+    let golden = args.prepared.golden().to_owned();
     let input_hash = hash_input(&format!(
         "{rendered}\ngolden={}\nmodel={}\nworkflow={benchmark_name}\nscoring={}",
         golden, args.model_name, args.scoring_identity
@@ -93,98 +89,119 @@ pub(super) async fn evaluate_row(
         args.run_id,
         &step_key,
         &input_hash,
-        async {
-            let model_response = args
-                .llm
-                .sample(&rendered)
-                .await
-                .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
-
-            match &prepared {
-                PreparedRow::Similarity { .. } => {
-                    let similarity = args
-                        .similarity
-                        .context("similarity style did not initialize a similarity metric")?;
-                    let similarity_score = similarity
-                        .metric
-                        .compute(&model_response, &golden)
-                        .await
-                        .with_context(|| {
-                            format!("failed to compute similarity for row {}", args.i)
-                        })?;
-                    Ok(RowOutput::Similarity {
-                        input: rendered.clone(),
-                        response: model_response,
-                        golden: golden.clone(),
-                        similarity_name: similarity.name.to_owned(),
-                        embedding_model: similarity.embedding_model.map(str::to_owned),
-                        similarity_score,
-                    })
-                }
-                PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => {
-                    let parsed_response = match prepared.response_labels() {
-                        Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
-                        None => Some(model_response.trim().to_owned()),
-                    };
-                    let is_correct = parsed_response.as_deref() == Some(golden.trim());
-
-                    Ok(RowOutput::Classification {
-                        input: rendered.clone(),
-                        response: model_response,
-                        parsed_response,
-                        golden: golden.clone(),
-                        is_correct,
-                    })
-                }
-            }
-        },
+        evaluate_response(&args, &rendered, &golden),
     )
     .await?;
 
+    // only emit metrics if the step was actually run. run_timed_step returns step_id=None
+    // if the step was cached
+    if let Some(step_id) = step_id {
+        emit_row_metrics(args.metrics_store, args.run_id, step_id, &output).await;
+    }
+    Ok(sample_result(&output))
+}
+
+async fn evaluate_response(
+    args: &EvaluateRowArgs<'_>,
+    rendered: &str,
+    golden: &str,
+) -> Result<RowOutput> {
+    let model_response = args
+        .llm
+        .sample(rendered)
+        .await
+        .with_context(|| format!("failed to sample LLM for row {}", args.i))?;
+
+    match &args.prepared {
+        PreparedRow::Similarity { .. } => {
+            let similarity = args
+                .similarity
+                .context("similarity style did not initialize a similarity metric")?;
+            let similarity_score = similarity
+                .metric
+                .compute(&model_response, golden)
+                .await
+                .with_context(|| format!("failed to compute similarity for row {}", args.i))?;
+            Ok(RowOutput::Similarity {
+                input: rendered.to_owned(),
+                response: model_response,
+                golden: golden.to_owned(),
+                similarity_name: similarity.name.to_owned(),
+                embedding_model: similarity.embedding_model.map(str::to_owned),
+                similarity_score,
+            })
+        }
+        PreparedRow::ExactMatch { .. } | PreparedRow::MultipleChoice { .. } => {
+            let parsed_response = match args.prepared.response_labels() {
+                Some(choice_labels) => extract_choice_label(&model_response, choice_labels),
+                None => Some(model_response.trim().to_owned()),
+            };
+            let is_correct = parsed_response.as_deref() == Some(golden.trim());
+
+            Ok(RowOutput::Classification {
+                input: rendered.to_owned(),
+                response: model_response,
+                parsed_response,
+                golden: golden.to_owned(),
+                is_correct,
+            })
+        }
+    }
+}
+
+async fn emit_row_metrics(
+    metrics_store: &crate::metrics_store::MetricsStore,
+    run_id: i64,
+    step_id: i64,
+    output: &RowOutput,
+) {
     match output {
         RowOutput::Classification {
             parsed_response,
             is_correct,
             ..
         } => {
-            if let Some(step_id) = step_id {
-                args.metrics_store
-                    .emit(
-                        args.run_id,
-                        Some(step_id),
-                        "is_correct",
-                        if is_correct { 1.0 } else { 0.0 },
-                        None,
-                    )
-                    .await;
-                args.metrics_store
-                    .emit(
-                        args.run_id,
-                        Some(step_id),
-                        "response_parsed",
-                        if parsed_response.is_some() { 1.0 } else { 0.0 },
-                        None,
-                    )
-                    .await;
-            }
-            Ok(SampleResult::Classification(is_correct))
+            metrics_store
+                .emit(
+                    run_id,
+                    Some(step_id),
+                    "is_correct",
+                    if *is_correct { 1.0 } else { 0.0 },
+                    None,
+                )
+                .await;
+            metrics_store
+                .emit(
+                    run_id,
+                    Some(step_id),
+                    "response_parsed",
+                    if parsed_response.is_some() { 1.0 } else { 0.0 },
+                    None,
+                )
+                .await;
         }
         RowOutput::Similarity {
             similarity_score, ..
         } => {
-            if let Some(step_id) = step_id {
-                args.metrics_store
-                    .emit(
-                        args.run_id,
-                        Some(step_id),
-                        "similarity_score",
-                        similarity_score,
-                        None,
-                    )
-                    .await;
-            }
-            Ok(SampleResult::Similarity(similarity_score))
+            metrics_store
+                .emit(
+                    run_id,
+                    Some(step_id),
+                    "similarity_score",
+                    *similarity_score,
+                    None,
+                )
+                .await;
         }
+    }
+}
+
+fn sample_result(output: &RowOutput) -> SampleResult {
+    match output {
+        RowOutput::Classification { is_correct, .. } => SampleResult::Classification(*is_correct),
+        RowOutput::Similarity {
+            similarity_score, ..
+        } => SampleResult::Similarity(*similarity_score),
     }
 }
 
@@ -333,6 +350,7 @@ mod tests {
         let steps = crate::db::list_steps_for_run(&db, run_id).await.unwrap();
         let output: serde_json::Value =
             serde_json::from_str(steps[0].output.as_deref().unwrap()).unwrap();
+        let output = &output["Similarity"];
         assert_eq!(output["similarity_name"], "levenshtein");
         assert_eq!(output["similarity_score"], 1.0);
         assert!(output.get("embedding_model").is_none());

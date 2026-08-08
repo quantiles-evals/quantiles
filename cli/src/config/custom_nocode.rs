@@ -28,11 +28,22 @@ pub enum CustomNoCodeStyleConfig {
 ///
 /// Levenshtein uses the string form `"levenshtein"`. Cosine uses a table so its
 /// required embedding model is explicit: `{ type = "cosine", embedding_model = "fastembed" }`.
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CustomNoCodeSimilarityMetric {
     Levenshtein(CustomNoCodeLevenshteinMetric),
     Cosine(CustomNoCodeCosineMetric),
+}
+
+impl Serialize for CustomNoCodeSimilarityMetric {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Levenshtein(metric) => metric.serialize(serializer),
+            Self::Cosine(config) => config.serialize(serializer),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for CustomNoCodeSimilarityMetric {
@@ -75,20 +86,41 @@ pub enum CustomNoCodeLevenshteinMetric {
     Levenshtein,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
+enum StructuredSimilarityMetric {
+    Cosine {
+        embedding_model: CustomNoCodeEmbeddingModel,
+    },
+}
+
 /// Cosine similarity configuration.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomNoCodeCosineMetric {
-    #[serde(rename = "type")]
-    pub type_: CustomNoCodeCosineMetricType,
     pub embedding_model: CustomNoCodeEmbeddingModel,
 }
 
-/// The discriminator accepted by a cosine metric table.
-#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum CustomNoCodeCosineMetricType {
-    Cosine,
+impl Serialize for CustomNoCodeCosineMetric {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        StructuredSimilarityMetric::Cosine {
+            embedding_model: self.embedding_model,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for CustomNoCodeCosineMetric {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match StructuredSimilarityMetric::deserialize(deserializer)? {
+            StructuredSimilarityMetric::Cosine { embedding_model } => Ok(Self { embedding_model }),
+        }
+    }
 }
 
 /// Embedding models supported by no-code cosine similarity.
