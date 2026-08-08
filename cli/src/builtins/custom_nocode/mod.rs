@@ -3,11 +3,11 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use self::data::{DatasetRow, prepare_row};
-use self::evaluation::{EvaluateRowArgs, evaluate_row};
+use self::evaluation::{EvaluateRowArgs, ScoringIdentity, evaluate_row};
 use self::metrics::emit_default_aggregate_metrics;
 use self::runtime::{
     LoadedTemplate, load_template, load_template_string, parse_input, resolve_dataset_limit,
-    resolve_sampler_for_style,
+    resolve_sampler_for_style, resolve_similarity_metric,
 };
 use crate::builtins::common::get_max_workers;
 use crate::builtins::dataset_runner::DatasetRunner;
@@ -65,6 +65,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         };
         let max_workers = config.max_workers.unwrap_or_else(get_max_workers);
         let llm = resolve_sampler_for_style(config.model.as_ref(), &config.style)?;
+        let similarity = resolve_similarity_metric(&config.style)?;
+        let scoring_identity = ScoringIdentity::from_style(&config.style)?;
 
         let (manager, info, limit) = resolve_dataset_limit(
             &config.dataset.name,
@@ -86,6 +88,7 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
         let dataset = config.dataset.name.clone();
         let style = Arc::new(config.style.clone());
         let template_str = Arc::new(template_str);
+        let scoring_identity = Arc::new(scoring_identity);
 
         let name = self.name();
         let results = DatasetRunner::new(&manager, &dataset, &info, limit)
@@ -98,6 +101,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                 let template_str = Arc::clone(&template_str);
                 let style = Arc::clone(&style);
                 let env = env.clone();
+                let similarity = similarity.clone();
+                let scoring_identity = Arc::clone(&scoring_identity);
                 async move {
                     let prepared = prepare_row(i, &row, &style)?;
                     let args = EvaluateRowArgs {
@@ -107,6 +112,8 @@ impl BuiltinWorkflow for CustomNoCodeBuiltin {
                         template_str: &template_str,
                         env: &env,
                         model_name: &model_name,
+                        scoring_identity: &scoring_identity,
+                        similarity: similarity.as_ref(),
                         llm: &llm,
                         db: &db,
                         metrics_store: ctx.metrics_store,
@@ -317,6 +324,55 @@ mod tests {
             steps2.len(),
             2,
             "second execution should reuse cached steps instead of creating new ones"
+        );
+
+        let similarity_input = serde_json::to_string(&json!({
+            "style": {
+                "type": "similarity",
+                "golden_column": "answer",
+                "metric": "levenshtein"
+            },
+            "dataset": {"name": "fixture/qa"},
+            "model": "random",
+            "prompt_template_file": template_path.to_str().unwrap(),
+            "limit": 2,
+        }))
+        .unwrap();
+        let similarity_run_id =
+            crate::db::create_run(&db, "test_similarity", Some(&similarity_input))
+                .await
+                .unwrap();
+        let similarity_workflow_name = "test_similarity".to_owned();
+        CustomNoCodeBuiltin::new(similarity_workflow_name.clone())
+            .execute(BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id: similarity_run_id,
+                workflow_name: &similarity_workflow_name,
+                input: Some(&similarity_input),
+                quiet: true,
+            })
+            .await
+            .unwrap();
+        metrics_store.flush(similarity_run_id).await.unwrap();
+
+        let similarity_metrics = metrics_store.list_for_run(similarity_run_id).await.unwrap();
+        assert_eq!(
+            similarity_metrics
+                .iter()
+                .filter(|metric| metric.metric_name == "similarity_score")
+                .count(),
+            2
+        );
+        assert!(
+            similarity_metrics
+                .iter()
+                .any(|metric| metric.metric_name == "mean_similarity")
+        );
+        assert!(
+            !similarity_metrics
+                .iter()
+                .any(|metric| metric.metric_name == "accuracy")
         );
 
         unsafe {

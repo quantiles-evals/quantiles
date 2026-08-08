@@ -8,14 +8,9 @@ use crate::config::{CustomNoCodeMetricName, CustomNoCodeParams, CustomNoCodeStyl
 use crate::db::StepSummary;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct SampleResult {
-    is_correct: bool,
-}
-
-impl SampleResult {
-    pub(super) const fn new(is_correct: bool) -> Self {
-        Self { is_correct }
-    }
+pub(super) enum SampleResult {
+    Classification(bool),
+    Similarity(f64),
 }
 
 /// An aggregate metric computed for output without being persisted.
@@ -37,7 +32,7 @@ struct MultipleChoiceResult {
     predicted_label: Option<String>,
 }
 
-/// Persist only the default accuracy and latency aggregates.
+/// Persist style-specific score aggregates and the default latency aggregates.
 pub(super) async fn emit_default_aggregate_metrics(
     metrics_store: &crate::metrics_store::MetricsStore,
     run_id: i64,
@@ -47,12 +42,51 @@ pub(super) async fn emit_default_aggregate_metrics(
         return Ok(());
     }
 
-    #[expect(clippy::cast_precision_loss)]
-    let accuracy =
-        results.iter().filter(|result| result.is_correct).count() as f64 / results.len() as f64;
-    metrics_store
-        .emit(run_id, None, "accuracy", accuracy, None)
-        .await;
+    match results[0] {
+        SampleResult::Classification(_) => {
+            if results
+                .iter()
+                .any(|result| !matches!(result, SampleResult::Classification(_)))
+            {
+                bail!("custom_nocode run produced mixed scoring result types");
+            }
+            #[expect(clippy::cast_precision_loss)]
+            let accuracy = results
+                .iter()
+                .filter(|result| matches!(result, SampleResult::Classification(true)))
+                .count() as f64
+                / results.len() as f64;
+            metrics_store
+                .emit(run_id, None, "accuracy", accuracy, None)
+                .await;
+        }
+        SampleResult::Similarity(_) => {
+            let scores = results
+                .iter()
+                .map(|result| match result {
+                    SampleResult::Similarity(score) => Ok(*score),
+                    SampleResult::Classification(_) => {
+                        bail!("custom_nocode run produced mixed scoring result types")
+                    }
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let stats = compute_statistics(&scores);
+            for (metric_name, metric_value) in [
+                ("mean_similarity", stats.mean),
+                ("stdev_similarity", stats.std),
+                ("variance_similarity", stats.variance),
+                ("median_similarity", stats.median),
+                ("min_similarity", stats.min),
+                ("max_similarity", stats.max),
+                ("p95_similarity", stats.p95),
+                ("p99_similarity", stats.p99),
+            ] {
+                metrics_store
+                    .emit(run_id, None, metric_name, metric_value, None)
+                    .await;
+            }
+        }
+    }
 
     let latency_values = metrics_store
         .sample_metric_values(run_id, "latency_ms")
@@ -271,9 +305,9 @@ mod tests {
                 .await;
         }
         let results = [
-            SampleResult::new(true),
-            SampleResult::new(false),
-            SampleResult::new(false),
+            SampleResult::Classification(true),
+            SampleResult::Classification(false),
+            SampleResult::Classification(false),
         ];
 
         emit_default_aggregate_metrics(&metrics_store, run_id, &results)
@@ -299,6 +333,43 @@ mod tests {
                 "p99_latency_ms",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn persists_similarity_and_latency_aggregates() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(tmpdir.path().join("metrics")).unwrap();
+        let run_id = 18;
+        for (step_id, latency) in [(1, 10.0), (2, 20.0)] {
+            metrics_store
+                .emit(run_id, Some(step_id), "latency_ms", latency, Some("ms"))
+                .await;
+        }
+        let results = [
+            SampleResult::Similarity(0.25),
+            SampleResult::Similarity(0.75),
+        ];
+
+        emit_default_aggregate_metrics(&metrics_store, run_id, &results)
+            .await
+            .unwrap();
+        metrics_store.flush(run_id).await.unwrap();
+        let aggregates = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        let names = aggregates
+            .iter()
+            .map(|metric| metric.metric_name.as_str())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"mean_similarity"));
+        assert!(names.contains(&"stdev_similarity"));
+        assert!(names.contains(&"p99_similarity"));
+        assert!(names.contains(&"mean_latency_ms"));
+        assert!(!names.contains(&"accuracy"));
+        let mean = aggregates
+            .iter()
+            .find(|metric| metric.metric_name == "mean_similarity")
+            .unwrap();
+        assert!((mean.metric_value - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]

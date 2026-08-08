@@ -112,6 +112,9 @@ pub(super) enum PreparedRow {
     ExactMatch {
         golden: String,
     },
+    Similarity {
+        golden: String,
+    },
     MultipleChoice {
         choices: Vec<PromptChoice>,
         golden_label: String,
@@ -123,7 +126,7 @@ impl PreparedRow {
     /// Return the choices exposed to the prompt template, or an empty slice for exact match.
     pub(super) fn choices(&self) -> &[PromptChoice] {
         match self {
-            Self::ExactMatch { .. } => &[],
+            Self::ExactMatch { .. } | Self::Similarity { .. } => &[],
             Self::MultipleChoice { choices, .. } => choices,
         }
     }
@@ -131,7 +134,7 @@ impl PreparedRow {
     /// Return the normalized golden response used for exact comparison.
     pub(super) fn golden(&self) -> &str {
         match self {
-            Self::ExactMatch { golden } => golden,
+            Self::ExactMatch { golden } | Self::Similarity { golden } => golden,
             Self::MultipleChoice { golden_label, .. } => golden_label,
         }
     }
@@ -139,7 +142,7 @@ impl PreparedRow {
     /// Return valid response labels for multiple choice and `None` for exact match.
     pub(super) fn response_labels(&self) -> Option<&[String]> {
         match self {
-            Self::ExactMatch { .. } => None,
+            Self::ExactMatch { .. } | Self::Similarity { .. } => None,
             Self::MultipleChoice {
                 response_labels, ..
             } => Some(response_labels),
@@ -158,6 +161,10 @@ pub(super) fn prepare_row(
         crate::config::CustomNoCodeStyleConfig::ExactMatch { golden_column } => {
             let golden = row.required_scalar(row_index, golden_column, "golden")?;
             Ok(PreparedRow::ExactMatch { golden })
+        }
+        crate::config::CustomNoCodeStyleConfig::Similarity { golden_column, .. } => {
+            let golden = row.required_scalar(row_index, golden_column, "golden")?;
+            Ok(PreparedRow::Similarity { golden })
         }
         crate::config::CustomNoCodeStyleConfig::MultipleChoice {
             choices: choice_source,
@@ -521,5 +528,21 @@ mod tests {
         let error = prepare_row(4, &row, &config).unwrap_err();
         assert!(error.to_string().contains("row 4"));
         assert!(error.to_string().contains("must be a scalar value"));
+    }
+
+    #[test]
+    fn prepares_similarity_golden_value() {
+        let config = crate::config::CustomNoCodeStyleConfig::Similarity {
+            golden_column: "answer".to_owned(),
+            metric: crate::config::CustomNoCodeSimilarityMetric::Levenshtein(
+                crate::config::CustomNoCodeLevenshteinMetric::Levenshtein,
+            ),
+        };
+        let row = dataset_row(json!({"answer": 42}));
+
+        let prepared = prepare_row(0, &row, &config).unwrap();
+        assert!(matches!(prepared, PreparedRow::Similarity { .. }));
+        assert_eq!(prepared.golden(), "42");
+        assert!(prepared.choices().is_empty());
     }
 }

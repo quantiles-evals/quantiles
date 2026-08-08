@@ -7,6 +7,14 @@ use crate::dataset::DatasetManager;
 use crate::llm::random::RandomSampler;
 use crate::llm::random_label::RandomLabelSampler;
 
+/// A similarity scorer resolved once and shared by every row in a run.
+#[derive(Clone)]
+pub(super) struct ResolvedSimilarityMetric {
+    pub(super) name: &'static str,
+    pub(super) embedding_model: Option<&'static str>,
+    pub(super) metric: Arc<dyn crate::similarity::SimilarityMetric>,
+}
+
 /// A validated prompt template and the Jinja environment
 /// used to render it.
 pub(super) struct LoadedTemplate {
@@ -28,6 +36,39 @@ pub(super) fn resolve_sampler_for_style(
     }
 
     resolve_sampler(model, || Arc::new(RandomSampler::new(80)))
+}
+
+/// Resolve the configured similarity metric, if the selected style needs one.
+pub(super) fn resolve_similarity_metric(
+    style: &crate::config::CustomNoCodeStyleConfig,
+) -> Result<Option<ResolvedSimilarityMetric>> {
+    let crate::config::CustomNoCodeStyleConfig::Similarity { metric, .. } = style else {
+        return Ok(None);
+    };
+
+    let resolved = match metric {
+        crate::config::CustomNoCodeSimilarityMetric::Levenshtein(_) => ResolvedSimilarityMetric {
+            name: "levenshtein",
+            embedding_model: None,
+            metric: crate::similarity::build_similarity_metric(
+                crate::similarity::SimilarityMetricName::Levenshtein,
+            )?,
+        },
+        crate::config::CustomNoCodeSimilarityMetric::Cosine(config) => {
+            let embedding_model = match config.embedding_model {
+                crate::config::CustomNoCodeEmbeddingModel::Fastembed => "fastembed",
+            };
+            ResolvedSimilarityMetric {
+                name: "cosine",
+                embedding_model: Some(embedding_model),
+                metric: crate::similarity::build_similarity_metric(
+                    crate::similarity::SimilarityMetricName::Cosine,
+                )?,
+            }
+        }
+    };
+
+    Ok(Some(resolved))
 }
 
 /// Deserialize and validate the runtime input required by a custom no-code benchmark.

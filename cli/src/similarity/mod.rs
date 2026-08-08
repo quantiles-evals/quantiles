@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -27,6 +29,19 @@ impl std::fmt::Display for SimilarityMetricName {
             Self::Cosine => write!(f, "cosine"),
             Self::Levenshtein => write!(f, "levenshtein"),
         }
+    }
+}
+
+/// Construct one of the similarity metrics built into the CLI.
+///
+/// # Errors
+///
+/// Returns an error when the selected metric cannot be initialized, such as when
+/// the local FastEmbed-backed cosine model is unavailable.
+pub fn build_similarity_metric(name: SimilarityMetricName) -> Result<Arc<dyn SimilarityMetric>> {
+    match name {
+        SimilarityMetricName::Cosine => Ok(Arc::new(vector::CosineSimilarity::try_new()?)),
+        SimilarityMetricName::Levenshtein => Ok(Arc::new(levenshtein::LevenshteinSimilarity)),
     }
 }
 
