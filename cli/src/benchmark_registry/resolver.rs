@@ -18,12 +18,39 @@ pub async fn resolve_and_download(
     benchmark_name: &str,
     remote_url: &str,
 ) -> Result<Option<RemoteBenchmark>> {
+    resolve_and_download_inner(benchmark_name, "", remote_url).await
+}
+
+/// Resolve and download one exact immutable benchmark version.
+///
+/// `Ok(None)` means the registry no longer exposes the requested version.
+///
+/// # Errors
+///
+/// Returns an error for an empty version, invalid endpoints, RPC failures, malformed manifests,
+/// failed downloads, digest mismatches, invalid UTF-8, or invalid no-code definitions.
+pub async fn resolve_and_download_version(
+    benchmark_name: &str,
+    version: &str,
+    remote_url: &str,
+) -> Result<Option<RemoteBenchmark>> {
+    if version.is_empty() {
+        anyhow::bail!("remote benchmark version must not be empty");
+    }
+    resolve_and_download_inner(benchmark_name, version, remote_url).await
+}
+
+async fn resolve_and_download_inner(
+    benchmark_name: &str,
+    version: &str,
+    remote_url: &str,
+) -> Result<Option<RemoteBenchmark>> {
     let endpoint = validate_remote_url(remote_url)?;
-    let Some(response) = resolve_manifest(benchmark_name, &endpoint).await? else {
+    let Some(response) = resolve_manifest(benchmark_name, version, &endpoint).await? else {
         return Ok(None);
     };
 
-    validate_response_identity(benchmark_name, &response)?;
+    validate_response_identity(benchmark_name, version, &response)?;
     let resources = validate_resources(&response.resources, endpoint.scheme() == "http")?;
     let downloaded = download_resources(&resources).await?;
     let remote = RemoteBenchmark::new(benchmark_name, response, downloaded)?;
@@ -35,9 +62,11 @@ mod tests {
     use buffa::Message as _;
     use sha2::{Digest as _, Sha256};
     use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
 
-    use super::super::proto::v1::{BenchmarkResource, ResolveBenchmarkResponse, ResourceKind};
+    use super::super::proto::v1::{
+        BenchmarkResource, ResolveBenchmarkRequest, ResolveBenchmarkResponse, ResourceKind,
+    };
     use super::*;
 
     #[tokio::test]
@@ -80,6 +109,7 @@ mod tests {
             .and(path(
                 "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
             ))
+            .and(RequestedVersion(""))
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("content-type", "application/proto")
@@ -112,6 +142,48 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[tokio::test]
+    async fn rejects_a_response_for_a_different_version() {
+        let server = MockServer::start().await;
+        let response = ResolveBenchmarkResponse {
+            benchmark_name: "remote-test".to_owned(),
+            version: "v2".to_owned(),
+            manifest_sha256: "a".repeat(64),
+            ..Default::default()
+        };
+        Mock::given(method("POST"))
+            .and(path(
+                "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
+            ))
+            .and(RequestedVersion("v1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/proto")
+                    .set_body_bytes(response.encode_to_vec()),
+            )
+            .mount(&server)
+            .await;
+
+        let error = resolve_and_download_version("remote-test", "v1", &server.uri())
+            .await
+            .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("does not match requested version")
+        );
+    }
+
+    struct RequestedVersion(&'static str);
+
+    impl Match for RequestedVersion {
+        fn matches(&self, request: &Request) -> bool {
+            ResolveBenchmarkRequest::decode_from_slice(&request.body)
+                .is_ok_and(|request| request.version == self.0)
+        }
     }
 
     fn resource(

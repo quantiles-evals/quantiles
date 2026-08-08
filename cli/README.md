@@ -79,6 +79,8 @@ When you run `qt run <eval_name>`, the CLI first looks in the local configuratio
 
 When `qt` uses the remote benchmark service, downloaded remote definitions and prompt templates are verified and kept in memory for the run. They will not be cached on disk.
 
+If you run an eval from the remote benchmark registry, the CLI will persist the registry endpoint, immutable benchmark version, and manifest hash. If that run needs to be resumed later with `qt resume`, the CLI will re-download that exact benchmark version again and reject it if the manifest hash changed (the registry guarantees that versions are immutable once published). This behavior means that resuming runs that were started from the benchmark registry requires internet access.
+
 ## Architecture
 
 The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.

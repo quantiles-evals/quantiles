@@ -16,6 +16,7 @@ const MAX_BUNDLE_BYTES: u64 = 50 * 1024 * 1024;
 /// Validate that a response identifies the requested immutable benchmark manifest.
 pub(super) fn validate_response_identity(
     benchmark_name: &str,
+    requested_version: &str,
     response: &ResolveBenchmarkResponse,
 ) -> Result<()> {
     if response.benchmark_name != benchmark_name {
@@ -26,6 +27,12 @@ pub(super) fn validate_response_identity(
     }
     if response.version.is_empty() {
         bail!("remote benchmark response is missing an immutable version");
+    }
+    if !requested_version.is_empty() && response.version != requested_version {
+        bail!(
+            "remote benchmark response version `{}` does not match requested version `{requested_version}`",
+            response.version
+        );
     }
     validate_sha256("manifest", &response.manifest_sha256)?;
     Ok(())

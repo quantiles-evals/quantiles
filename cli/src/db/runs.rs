@@ -6,8 +6,8 @@ use sea_orm::{
 };
 use serde::Deserialize;
 
-use crate::db::entities::{event, step, workflow, workflow_run};
-use crate::db::summaries::{RunStatus, WorkflowRun, WorkflowRunSummary};
+use crate::db::entities::{event, remote_benchmark_run, step, workflow, workflow_run};
+use crate::db::summaries::{RemoteBenchmarkProvenance, RunStatus, WorkflowRun, WorkflowRunSummary};
 use crate::metrics_store::MetricsStore;
 use crate::time::now_utc;
 
@@ -45,6 +45,30 @@ pub async fn create_run(
     workflow_name: &str,
     input: Option<&str>,
 ) -> Result<i64> {
+    create_run_with_remote_provenance(db, workflow_name, input, None).await
+}
+
+/// Create a running eval run with immutable remote benchmark provenance.
+///
+/// # Errors
+///
+/// Returns an error if the run, provenance, or initial event cannot be persisted.
+pub async fn create_remote_benchmark_run(
+    db: &DatabaseConnection,
+    workflow_name: &str,
+    input: Option<&str>,
+    provenance: &RemoteBenchmarkProvenance,
+) -> Result<i64> {
+    create_run_with_remote_provenance(db, workflow_name, input, Some(provenance)).await
+}
+
+/// Create a running eval run with optional remote provenance. Used by `create_run` and `create_remote_benchmark_run`.
+async fn create_run_with_remote_provenance(
+    db: &DatabaseConnection,
+    workflow_name: &str,
+    input: Option<&str>,
+    provenance: Option<&RemoteBenchmarkProvenance>,
+) -> Result<i64> {
     let tx = db.begin().await?;
 
     workflow::Entity::insert(workflow::ActiveModel {
@@ -79,6 +103,18 @@ pub async fn create_run(
 
     let run_id = result.last_insert_id;
 
+    if let Some(provenance) = provenance {
+        remote_benchmark_run::Entity::insert(remote_benchmark_run::ActiveModel {
+            run_id: Set(run_id),
+            benchmark_name: Set(provenance.benchmark_name.clone()),
+            registry_url: Set(provenance.registry_url.clone()),
+            version: Set(provenance.version.clone()),
+            manifest_sha256: Set(provenance.manifest_sha256.clone()),
+        })
+        .exec(&tx)
+        .await?;
+    }
+
     event::Entity::insert(event::ActiveModel {
         run_id: Set(run_id),
         event_type: Set("run.started".to_owned()),
@@ -92,6 +128,26 @@ pub async fn create_run(
     tx.commit().await?;
 
     Ok(run_id)
+}
+
+/// Fetch immutable registry provenance for a run, if it was resolved remotely.
+///
+/// # Errors
+///
+/// Returns an error when the provenance cannot be read.
+pub async fn get_remote_benchmark_provenance(
+    db: &DatabaseConnection,
+    run_id: i64,
+) -> Result<Option<RemoteBenchmarkProvenance>> {
+    Ok(remote_benchmark_run::Entity::find_by_id(run_id)
+        .one(db)
+        .await?
+        .map(|provenance| RemoteBenchmarkProvenance {
+            benchmark_name: provenance.benchmark_name,
+            registry_url: provenance.registry_url,
+            version: provenance.version,
+            manifest_sha256: provenance.manifest_sha256,
+        }))
 }
 
 /// Update an eval run's output without changing status or emitting an event.
@@ -377,6 +433,37 @@ mod tests {
 
         let run = get_run(&db, run_id).await?;
         assert_eq!(run.output.as_deref(), Some("hello world"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_remote_run_persists_registry_provenance() -> Result<()> {
+        let (db, _store, _tmpdir) = test_db().await?;
+        let provenance = RemoteBenchmarkProvenance {
+            benchmark_name: "simpleqa-verified".to_owned(),
+            registry_url: "https://api.quantiles.io".to_owned(),
+            version: "v1".to_owned(),
+            manifest_sha256: "a".repeat(64),
+        };
+
+        let run_id = create_remote_benchmark_run(
+            &db,
+            "simpleqa-verified",
+            Some(r#"{"limit":10}"#),
+            &provenance,
+        )
+        .await?;
+
+        assert_eq!(
+            get_remote_benchmark_provenance(&db, run_id).await?,
+            Some(provenance)
+        );
+        assert!(
+            get_remote_benchmark_provenance(&db, run_id + 1)
+                .await?
+                .is_none()
+        );
 
         Ok(())
     }

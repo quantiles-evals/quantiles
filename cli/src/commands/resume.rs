@@ -12,6 +12,12 @@ use qt::metrics_store::MetricsStore;
 pub(crate) enum ResumePlan {
     Builtin,
     CustomCode(Vec<String>),
+    RemoteBenchmark,
+}
+
+struct RemoteResume {
+    builtin: Box<dyn builtins::BuiltinWorkflow>,
+    manifest_sha256: String,
 }
 
 /// Plan how to resume a run without doing any IO.
@@ -24,12 +30,17 @@ pub(crate) fn plan_resume(
     workflow_name: &str,
     run_status: &RunStatus,
     bench_config: Option<&qt::config::BenchmarkConfig>,
+    remote_provenance: Option<&qt::db::RemoteBenchmarkProvenance>,
 ) -> Result<ResumePlan> {
     if *run_status == RunStatus::Completed {
         bail!(
             "run is already completed; \
              create a new run or resume a running/failed one"
         );
+    }
+
+    if remote_provenance.is_some() {
+        return Ok(ResumePlan::RemoteBenchmark);
     }
 
     match bench_config {
@@ -60,8 +71,8 @@ pub(crate) fn plan_resume(
 ///
 /// # Errors
 ///
-/// Returns an error when the run does not exist, is already completed, the
-/// config file is missing or invalid, or execution fails.
+/// Returns an error when the run does not exist, is already completed, its local
+/// configuration or immutable remote benchmark cannot be restored, or execution fails.
 pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = db::resolve_workspace_root(&cwd, true).await?;
@@ -79,21 +90,119 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
 
     let workflow_name = run.workflow_name.as_str();
     let stored_input = run.input.as_deref();
+    let remote_provenance = db::get_remote_benchmark_provenance(&db, run_id).await?;
 
-    let config = qt::config::load()?;
-    let bench_config = config.benchmarks.get(workflow_name);
+    let config = if remote_provenance.is_some() {
+        None
+    } else {
+        Some(qt::config::load()?)
+    };
+    let bench_config = config
+        .as_ref()
+        .and_then(|config| config.benchmarks.get(workflow_name));
 
-    let plan = plan_resume(workflow_name, &run.status, bench_config)?;
+    let plan = plan_resume(
+        workflow_name,
+        &run.status,
+        bench_config,
+        remote_provenance.as_ref(),
+    )?;
+    let remote_resume = if matches!(plan, ResumePlan::RemoteBenchmark) {
+        Some(prepare_remote_resume(workflow_name, stored_input, remote_provenance.as_ref()).await?)
+    } else {
+        None
+    };
 
     db::resume_run(&db, run_id).await?;
     if !json {
         println!("Resuming eval run {run_id} ({workflow_name})");
     }
 
+    execute_resume_plan(ExecuteResumeArgs {
+        plan,
+        bench_config,
+        remote_resume,
+        db: &db,
+        metrics_store: &metrics_store,
+        run_id,
+        workflow_name,
+        stored_input,
+        json,
+        process_start,
+    })
+    .await
+}
+
+async fn prepare_remote_resume(
+    workflow_name: &str,
+    stored_input: Option<&str>,
+    provenance: Option<&qt::db::RemoteBenchmarkProvenance>,
+) -> Result<RemoteResume> {
+    let provenance = provenance.context("remote benchmark run is missing registry provenance")?;
+    if provenance.benchmark_name != workflow_name {
+        bail!(
+            "stored remote benchmark name `{}` does not match run workflow `{workflow_name}`",
+            provenance.benchmark_name
+        );
+    }
+    let remote = qt::benchmark_registry::resolve_and_download_version(
+        workflow_name,
+        &provenance.version,
+        &provenance.registry_url,
+    )
+    .await?
+    .with_context(|| {
+        format!(
+            "remote benchmark `{workflow_name}` version `{}` is no longer available",
+            provenance.version
+        )
+    })?;
+    if remote.manifest_sha256 != provenance.manifest_sha256 {
+        bail!(
+            "remote benchmark `{workflow_name}` version `{}` manifest changed: expected `{}`, got `{}`",
+            provenance.version,
+            provenance.manifest_sha256,
+            remote.manifest_sha256
+        );
+    }
+    let input = stored_input.context("remote benchmark run is missing stored input")?;
+    let builtin = super::run::remote_benchmark_builtin(workflow_name, input, remote)?;
+    Ok(RemoteResume {
+        builtin,
+        manifest_sha256: provenance.manifest_sha256.clone(),
+    })
+}
+
+struct ExecuteResumeArgs<'a> {
+    plan: ResumePlan,
+    bench_config: Option<&'a qt::config::BenchmarkConfig>,
+    remote_resume: Option<RemoteResume>,
+    db: &'a sea_orm::DatabaseConnection,
+    metrics_store: &'a MetricsStore,
+    run_id: i64,
+    workflow_name: &'a str,
+    stored_input: Option<&'a str>,
+    json: bool,
+    process_start: Instant,
+}
+
+async fn execute_resume_plan(args: ExecuteResumeArgs<'_>) -> Result<()> {
     // TODO: we always re-read the command from the config file on resume.
     // This means that if the config file is edited between `qt run` and
     // `qt resume`, the resumed run will use the updated command. It may be
     // wise to revisit this policy.
+    let ExecuteResumeArgs {
+        plan,
+        bench_config,
+        remote_resume,
+        db,
+        metrics_store,
+        run_id,
+        workflow_name,
+        stored_input,
+        json,
+        process_start,
+    } = args;
     match plan {
         ResumePlan::Builtin => {
             let builtin: Box<dyn builtins::BuiltinWorkflow> = match bench_config {
@@ -110,8 +219,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 _ => None,
             };
             super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
-                db: &db,
-                metrics_store: &metrics_store,
+                db,
+                metrics_store,
                 run_id,
                 workflow_name,
                 builtin,
@@ -119,6 +228,22 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
                 json,
                 process_start,
                 remote_hash: None,
+            })
+            .await
+        }
+        ResumePlan::RemoteBenchmark => {
+            let remote_resume =
+                remote_resume.context("remote benchmark resume was not prepared")?;
+            super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
+                db,
+                metrics_store,
+                run_id,
+                workflow_name,
+                builtin: remote_resume.builtin,
+                input: stored_input,
+                json,
+                process_start,
+                remote_hash: Some(&remote_resume.manifest_sha256),
             })
             .await
         }
@@ -141,6 +266,8 @@ pub async fn resume(run_id: i64, json: bool, process_start: Instant) -> Result<(
 mod tests {
     use super::*;
 
+    static CWD_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     /// Resuming a run whose status is `completed` must be rejected before any execution
     /// begins, because a completed run cannot be meaningfully resumed.
     #[test]
@@ -152,7 +279,7 @@ mod tests {
             model: None,
             max_workers: None,
         });
-        let err = plan_resume("demo", &RunStatus::Completed, Some(&bench)).unwrap_err();
+        let err = plan_resume("demo", &RunStatus::Completed, Some(&bench), None).unwrap_err();
         assert!(err.to_string().contains("already completed"));
     }
 
@@ -167,7 +294,7 @@ mod tests {
             model: None,
             max_workers: None,
         });
-        let plan = plan_resume("demo", &RunStatus::Failed, Some(&bench)).unwrap();
+        let plan = plan_resume("demo", &RunStatus::Failed, Some(&bench), None).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
     }
 
@@ -175,8 +302,28 @@ mod tests {
     /// falling back to the hardcoded builtin registry.
     #[test]
     fn plan_resume_builtin_without_config() {
-        let plan = plan_resume("pubmedqa", &RunStatus::Failed, None).unwrap();
+        let plan = plan_resume("pubmedqa", &RunStatus::Failed, None, None).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
+    }
+
+    #[test]
+    fn plan_resume_prefers_persisted_remote_provenance_over_builtin_name() {
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "simpleqa-verified".to_owned(),
+            registry_url: "https://api.quantiles.io".to_owned(),
+            version: "v1".to_owned(),
+            manifest_sha256: "a".repeat(64),
+        };
+
+        let plan = plan_resume(
+            "simpleqa-verified",
+            &RunStatus::Failed,
+            None,
+            Some(&provenance),
+        )
+        .unwrap();
+
+        assert!(matches!(plan, ResumePlan::RemoteBenchmark));
     }
 
     /// A `custom_code` benchmark with a config section should plan to resume by re-running
@@ -189,7 +336,7 @@ mod tests {
                 command: vec!["python".to_owned(), "eval.py".to_owned()],
                 input: None,
             });
-        let plan = plan_resume("my-eval", &RunStatus::Failed, Some(&bench)).unwrap();
+        let plan = plan_resume("my-eval", &RunStatus::Failed, Some(&bench), None).unwrap();
         assert!(matches!(&plan, ResumePlan::CustomCode(cmd) if cmd == &["python", "eval.py"]));
     }
 
@@ -197,7 +344,7 @@ mod tests {
     /// CLI has no source of truth for what command to execute.
     #[test]
     fn plan_resume_custom_code_without_config_errors() {
-        let err = plan_resume("my-eval", &RunStatus::Failed, None).unwrap_err();
+        let err = plan_resume("my-eval", &RunStatus::Failed, None, None).unwrap_err();
         assert!(err.to_string().contains("no config section found"));
     }
 
@@ -205,7 +352,7 @@ mod tests {
     /// fail immediately with a clear "no config section found" message.
     #[test]
     fn plan_resume_unknown_without_config_errors() {
-        let err = plan_resume("unknown-eval", &RunStatus::Failed, None).unwrap_err();
+        let err = plan_resume("unknown-eval", &RunStatus::Failed, None, None).unwrap_err();
         assert!(err.to_string().contains("no config section found"));
     }
 
@@ -219,7 +366,7 @@ mod tests {
                 command: vec![],
                 input: None,
             });
-        let err = plan_resume("my-eval", &RunStatus::Failed, Some(&bench)).unwrap_err();
+        let err = plan_resume("my-eval", &RunStatus::Failed, Some(&bench), None).unwrap_err();
         assert!(err.to_string().contains("non-empty `command`"));
     }
 
@@ -249,8 +396,62 @@ mod tests {
                 },
             },
         ));
-        let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench)).unwrap();
+        let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench), None).unwrap();
         assert!(matches!(plan, ResumePlan::Builtin));
+    }
+
+    #[tokio::test]
+    async fn unavailable_remote_version_does_not_reset_run_status() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(
+                "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
+            ))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .insert_header("content-type", "application/json")
+                    .set_body_raw(
+                        r#"{"code":"not_found","message":"version does not exist"}"#,
+                        "application/json",
+                    ),
+            )
+            .mount(&server)
+            .await;
+
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "remote-resume-test".to_owned(),
+            registry_url: server.uri(),
+            version: "v1".to_owned(),
+            manifest_sha256: "a".repeat(64),
+        };
+        let run_id =
+            qt::db::create_remote_benchmark_run(&db, "remote-resume-test", Some("{}"), &provenance)
+                .await
+                .unwrap();
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("is no longer available"));
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Failed);
+        assert_eq!(run.error.as_deref(), Some("simulated failure"));
     }
 
     /// A failed `custom_nocode` run can be resumed and re-execute successfully
@@ -261,6 +462,7 @@ mod tests {
         use wiremock::matchers::{method, path};
         use wiremock::{Mock, MockServer, ResponseTemplate};
 
+        let _cwd_guard = CWD_LOCK.lock().await;
         let server = MockServer::start().await;
         let tmpdir = tempfile::tempdir().unwrap();
         let root = tmpdir.path();

@@ -24,6 +24,15 @@ pub struct WorkflowRun {
     pub error: Option<String>,
 }
 
+/// Immutable registry provenance needed to resume a remotely resolved benchmark.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteBenchmarkProvenance {
+    pub benchmark_name: String,
+    pub registry_url: String,
+    pub version: String,
+    pub manifest_sha256: String,
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct StepSummary {
     pub id: i64,

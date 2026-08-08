@@ -2,7 +2,7 @@
 
 pub use self::benchmark::RemoteBenchmark;
 pub use self::client::select_remote_url;
-pub use self::resolver::resolve_and_download;
+pub use self::resolver::{resolve_and_download, resolve_and_download_version};
 
 mod benchmark;
 mod client;
