@@ -7,9 +7,13 @@ use crate::builtins::common::compute_statistics;
 use crate::config::{CustomNoCodeMetricName, CustomNoCodeParams, CustomNoCodeStyleConfig};
 use crate::db::StepSummary;
 
+/// Score used to compute metrics for a single row that are specific
+/// to an evaluation style.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum SampleResult {
+    /// Whether a classification-style response was correct.
     Classification(bool),
+    /// Similarity score for a similarity-style response.
     Similarity(f64),
 }
 
