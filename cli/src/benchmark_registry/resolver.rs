@@ -1,5 +1,7 @@
 use anyhow::Result;
 
+use crate::benchmark_registry::version::Version;
+
 use super::RemoteBenchmark;
 use super::client::{resolve_manifest, validate_remote_url};
 use super::download::download_resources;
@@ -20,15 +22,11 @@ use super::manifest::{validate_resources, validate_response_identity};
 /// digest mismatches, invalid UTF-8, or invalid no-code benchmark definitions.
 pub async fn resolve_and_download(
     benchmark_name: &str,
-    version: Option<&str>,
+    version: Option<Version>,
     remote_url: &str,
 ) -> Result<Option<RemoteBenchmark>> {
-    if version.is_some_and(str::is_empty) {
-        anyhow::bail!("remote benchmark version must not be passed as the empty string");
-    }
-
     let endpoint = validate_remote_url(remote_url)?;
-    let Some(response) = resolve_manifest(benchmark_name, version, &endpoint).await? else {
+    let Some(response) = resolve_manifest(benchmark_name, version.clone(), &endpoint).await? else {
         return Ok(None);
     };
 
@@ -148,27 +146,18 @@ mod tests {
             .mount(&server)
             .await;
 
-        let error = resolve_and_download("remote-test", Some("v1"), &server.uri())
-            .await
-            .unwrap_err();
+        let error = resolve_and_download(
+            "remote-test",
+            Some(Version::new("v1").unwrap()),
+            &server.uri(),
+        )
+        .await
+        .unwrap_err();
 
         assert!(
             error
                 .to_string()
                 .contains("does not match requested version")
-        );
-    }
-
-    #[tokio::test]
-    async fn rejects_an_empty_explicit_version() {
-        let error = resolve_and_download("remote-test", Some(""), "https://api.quantiles.io")
-            .await
-            .unwrap_err();
-
-        assert!(
-            error
-                .to_string()
-                .contains("must not be passed as the empty string")
         );
     }
 

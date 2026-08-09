@@ -4,6 +4,8 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 
+use crate::benchmark_registry::version::Version;
+
 use super::proto::v1::{BenchmarkResource, ResolveBenchmarkResponse, ResourceKind};
 
 /// Maximum number of resources allowed in a remote benchmark manifest.
@@ -16,7 +18,7 @@ const MAX_BUNDLE_BYTES: u64 = 50 * 1024 * 1024;
 /// Validate that a response identifies the requested immutable benchmark manifest.
 pub(super) fn validate_response_identity(
     benchmark_name: &str,
-    requested_version: Option<&str>,
+    requested_version: Option<Version>,
     response: &ResolveBenchmarkResponse,
 ) -> Result<()> {
     if response.benchmark_name != benchmark_name {
@@ -29,7 +31,7 @@ pub(super) fn validate_response_identity(
         bail!("remote benchmark response is missing an immutable version");
     }
     if let Some(version) = requested_version
-        && response.version != version
+        && response.version != version.clone().to_string()
     {
         bail!(
             "remote benchmark response version `{}` does not match requested version `{version}`",

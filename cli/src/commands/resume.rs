@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, bail};
 
+use qt::benchmark_registry::Version;
 use qt::builtins;
 use qt::db;
 use qt::db::RunStatus;
@@ -149,7 +150,7 @@ async fn prepare_remote_resume(
     }
     let remote = qt::benchmark_registry::resolve_and_download(
         workflow_name,
-        Some(&provenance.version),
+        Some(Version::new(&provenance.version)?),
         &provenance.registry_url,
     )
     .await?
@@ -543,6 +544,82 @@ mod tests {
         let run = qt::db::get_run(&db, run_id).await.unwrap();
         assert_eq!(run.status, qt::db::RunStatus::Failed);
         assert_eq!(run.error.as_deref(), Some("simulated failure"));
+    }
+
+    #[tokio::test]
+    async fn unchanged_local_prompt_override_resumes_successfully() {
+        use sha2::{Digest as _, Sha256};
+        use wiremock::MockServer;
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let server = MockServer::start().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let cache_dir = root.join("cache");
+        let manifest_sha256 = mock_remote_registry(&server).await;
+        let prompt_path = root.join("local-prompt.txt");
+        let prompt = "{{ row.question }}\nLocal answer:";
+        std::fs::write(&prompt_path, prompt).unwrap();
+
+        let original_hf = std::env::var("HF_DATASETS_SERVER").ok();
+        let original_cache = std::env::var("QUANTILES_DATASET_CACHE_DIR").ok();
+        unsafe {
+            std::env::set_var("HF_DATASETS_SERVER", server.uri());
+            std::env::set_var("QUANTILES_DATASET_CACHE_DIR", &cache_dir);
+        }
+        cache_fixture_rows(&cache_dir).await;
+
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+        let stored_input = serde_json::json!({
+            "dataset": { "name": "fixture/qa" },
+            "model": "random",
+            "prompt_template_file": prompt_path,
+            "limit": 2,
+            "style": { "type": "exact_match", "golden_column": "answer" }
+        })
+        .to_string();
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "remote-resume-test".to_owned(),
+            registry_url: server.uri(),
+            version: "v1".to_owned(),
+            manifest_sha256,
+            prompt_template_sha256: Some(format!("{:x}", Sha256::digest(prompt.as_bytes()))),
+        };
+        let run_id = qt::db::create_remote_benchmark_run(
+            &db,
+            "remote-resume-test",
+            Some(&stored_input),
+            &provenance,
+        )
+        .await
+        .unwrap();
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+        restore_env("HF_DATASETS_SERVER", original_hf);
+        restore_env("QUANTILES_DATASET_CACHE_DIR", original_cache);
+        result.unwrap();
+
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Completed);
+        assert_eq!(
+            qt::db::list_steps_for_run(&db, run_id).await.unwrap().len(),
+            2
+        );
+        let metrics = metrics_store.list_aggregate_for_run(run_id).await.unwrap();
+        assert!(
+            metrics
+                .iter()
+                .any(|metric| metric.metric_name == "accuracy")
+        );
     }
 
     #[tokio::test]

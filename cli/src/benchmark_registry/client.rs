@@ -8,6 +8,8 @@ use connectrpc::client::{ClientConfig, HttpClient};
 use reqwest::Url;
 use rustls_platform_verifier::ConfigVerifierExt as _;
 
+use crate::benchmark_registry::version::Version;
+
 use super::proto::v1::{
     BenchmarkRegistryServiceClient, ResolveBenchmarkRequest, ResolveBenchmarkResponse,
 };
@@ -61,7 +63,7 @@ pub(super) fn validate_remote_url(remote_url: &str) -> Result<Url> {
 /// Resolve benchmark metadata from the remote `ConnectRPC` service.
 pub(super) async fn resolve_manifest(
     benchmark_name: &str,
-    version: Option<&str>,
+    version: Option<Version>,
     endpoint: &Url,
 ) -> Result<Option<ResolveBenchmarkResponse>> {
     let uri = endpoint
@@ -83,7 +85,11 @@ pub(super) async fn resolve_manifest(
         benchmark_name: benchmark_name.to_owned(),
         // If the version is passed as `None` to this function, send the empty string
         // over RPC
-        version: version.unwrap_or_default().to_owned(),
+        version: if let Some(ver) = version {
+            ver.to_string()
+        } else {
+            String::new()
+        },
         ..Default::default()
     };
 
