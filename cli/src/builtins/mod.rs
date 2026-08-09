@@ -15,7 +15,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::metrics_store::MetricsStore;
 
-/// Context provided to every builtin eval execution.
+/// Context provided to every native evaluation execution.
 pub struct BuiltinContext<'a> {
     pub db: &'a DatabaseConnection,
     pub metrics_store: &'a MetricsStore,
@@ -26,11 +26,11 @@ pub struct BuiltinContext<'a> {
     pub quiet: bool,
 }
 
-/// Trait for builtin evals that run natively inside the CLI.
+/// Trait for evaluations that run natively inside the CLI.
 #[async_trait]
 pub trait BuiltinWorkflow: Send + Sync {
     /// Unique name of the native workflow.
     fn name(&self) -> String;
-    /// Execute the builtin eval and persist its metrics/output.
+    /// Execute the native evaluation and persist its metrics/output.
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()>;
 }
