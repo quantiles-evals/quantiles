@@ -31,7 +31,7 @@ pub(super) fn validate_response_identity(
         bail!("remote benchmark response is missing an immutable version");
     }
     if let Some(version) = requested_version
-        && response.version != version.clone().to_string()
+        && response.version != version.as_str()
     {
         bail!(
             "remote benchmark response version `{}` does not match requested version `{version}`",

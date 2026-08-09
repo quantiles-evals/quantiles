@@ -4,15 +4,21 @@ use anyhow::{Result, bail};
 pub struct Version(String);
 
 impl Version {
+    /// Create a new Version from a version string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the given `ver` string is empty.
     pub fn new(ver: &str) -> Result<Self> {
         if ver.is_empty() {
             bail!("version must not be empty");
         }
-        Ok(Self(ver.to_string()));
+        Ok(Self(ver.to_string()))
     }
 
-    pub(crate) fn to_string(self) -> String {
-        self.0.clone()
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
