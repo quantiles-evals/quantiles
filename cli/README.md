@@ -86,7 +86,7 @@ Registry benchmarks do not use local benchmark configuration sections. Apply sup
 qt run simpleqa-verified --input '{"model":"openai:gpt-5.6","limit":50}'
 ```
 
-Resolving the benchmark and downloading an uncached dataset requires network access. Provider-backed models also require their provider credentials and may incur usage charges.
+Resolving the benchmark and downloading an uncached dataset requires network access. Provider-backed models also require their provider credentials, and the provider may charge you for usage.
 
 If you run an eval from the remote benchmark registry, the CLI will persist the registry endpoint, immutable benchmark version, and manifest hash. If that run needs to be resumed later with `qt resume`, the CLI will re-download that exact benchmark version again and reject it if the manifest hash changed (the registry guarantees that versions are immutable once published). This behavior means that resuming runs that were started from the benchmark registry requires internet access.
 
