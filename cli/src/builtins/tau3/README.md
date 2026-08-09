@@ -36,5 +36,6 @@ locally.
 Official domain parity requires a separately reviewable port of the versioned
 task data, domain policies, databases, exact tool behavior, banking retrieval
 corpus and graders, and full-duplex voice orchestration. Until that work lands,
-only the explicit `tau3-mock` name resolves; `tau3` and the official domain names
-do not.
+`tau3-mock` executes the bundled conformance domain, while `tau3-airline` is
+reserved and returns a not-implemented error. The general `tau3` name and other
+official domain names do not resolve.

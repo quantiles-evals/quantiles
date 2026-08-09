@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::builtins::common::{BuiltinConfig, hash_input, run_timed_step};
+use crate::builtins::common::{hash_input, run_timed_step};
 use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 use crate::llm::Sampler;
 
@@ -24,11 +24,26 @@ const DEFAULT_AGENT_POLICY: &str = "You are a customer-service agent. Follow pol
 /// Native structured-tool-calling conformance benchmark for the Quantiles τ³ harness.
 pub struct Tau3MockBuiltin;
 
+/// Reserved native benchmark name for the forthcoming official airline domain.
+pub struct Tau3AirlineBuiltin;
+
+#[async_trait::async_trait]
+impl BuiltinWorkflow for Tau3AirlineBuiltin {
+    fn name(&self) -> String {
+        "tau3-airline".to_owned()
+    }
+
+    async fn execute(&self, _ctx: BuiltinContext<'_>) -> Result<()> {
+        bail!("tau3-airline is recognized but not implemented yet")
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Tau3Config {
-    #[serde(flatten)]
-    base: BuiltinConfig,
+    model: Option<Sampler>,
+    #[serde(default)]
+    limit: Option<usize>,
     user_model: Option<Sampler>,
     #[serde(default = "default_trials")]
     trials: usize,
@@ -39,7 +54,8 @@ struct Tau3Config {
 impl Default for Tau3Config {
     fn default() -> Self {
         Self {
-            base: BuiltinConfig::default(),
+            model: None,
+            limit: None,
             user_model: None,
             trials: default_trials(),
             max_turns: default_max_turns(),
@@ -111,12 +127,11 @@ impl BuiltinWorkflow for Tau3MockBuiltin {
         if config.max_turns == 0 {
             bail!("max_turns must be > 0");
         }
-        if config.base.limit == Some(0) {
+        if config.limit == Some(0) {
             bail!("limit must be > 0");
         }
 
         let agent_sampler = config
-            .base
             .model
             .as_ref()
             .context("tau3-mock requires `model` (openai, anthropic, or gemini)")?;
@@ -124,7 +139,7 @@ impl BuiltinWorkflow for Tau3MockBuiltin {
         let agent = Arc::new(GenaiToolChatModel::from_sampler(agent_sampler)?);
         let user = Arc::new(GenaiToolChatModel::from_sampler(user_sampler)?);
         let mut tasks = tasks();
-        if let Some(limit) = config.base.limit {
+        if let Some(limit) = config.limit {
             tasks.truncate(limit.min(tasks.len()));
         }
 
@@ -370,8 +385,39 @@ mod tests {
     }
 
     #[test]
-    fn resolver_exposes_only_explicit_conformance_name() {
+    fn resolver_exposes_explicit_tau3_names() {
         assert!(crate::builtins::resolve("tau3-mock").is_some());
+        assert!(crate::builtins::resolve("tau3-airline").is_some());
         assert!(crate::builtins::resolve("tau3").is_none());
+    }
+
+    #[tokio::test]
+    async fn airline_placeholder_returns_not_implemented_error() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "tau3-airline", None)
+            .await
+            .unwrap();
+        let builtin = crate::builtins::resolve("tau3-airline").unwrap();
+
+        let error = builtin
+            .execute(BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+                workflow_name: "tau3-airline",
+                input: None,
+                quiet: true,
+            })
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "tau3-airline is recognized but not implemented yet"
+        );
     }
 }
