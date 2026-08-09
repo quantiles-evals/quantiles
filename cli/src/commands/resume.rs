@@ -11,7 +11,7 @@ use qt::metrics_store::MetricsStore;
 /// Result of planning how to resume a run.
 #[derive(Debug)]
 pub(crate) enum ResumePlan {
-    Builtin,
+    CustomNoCode,
     CustomCode(Vec<String>),
     RemoteBenchmark,
 }
@@ -52,20 +52,13 @@ pub(crate) fn plan_resume(
                 qt::config::BenchmarkConfig::CustomCode(c) => {
                     Ok(ResumePlan::CustomCode(c.command.clone()))
                 }
-                qt::config::BenchmarkConfig::Builtin(_)
-                | qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::Builtin),
+                qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::CustomNoCode),
             }
         }
-        None => {
-            if builtins::resolve(workflow_name).is_some() {
-                Ok(ResumePlan::Builtin)
-            } else {
-                bail!(
-                    "no config section found for benchmark `{workflow_name}`; \
-                     cannot resume custom eval without config"
-                );
-            }
-        }
+        None => bail!(
+            "no config section found for benchmark `{workflow_name}`; \
+             cannot resume custom eval without config"
+        ),
     }
 }
 
@@ -219,27 +212,20 @@ async fn execute_resume_plan(args: ExecuteResumeArgs<'_>) -> Result<()> {
         process_start,
     } = args;
     match plan {
-        ResumePlan::Builtin => {
-            let builtin: Box<dyn builtins::BuiltinWorkflow> = match bench_config {
-                Some(qt::config::BenchmarkConfig::CustomNoCode(_)) => {
-                    Box::new(builtins::CustomNoCodeBuiltin::new(workflow_name.to_owned()))
-                }
-                _ => builtins::resolve(workflow_name)
-                    .with_context(|| format!("builtin `{workflow_name}` not found"))?,
+        ResumePlan::CustomNoCode => {
+            let Some(qt::config::BenchmarkConfig::CustomNoCode(config)) = bench_config else {
+                unreachable!("custom no-code resume plan requires custom no-code config");
             };
-            let custom_nocode_input = match bench_config {
-                Some(qt::config::BenchmarkConfig::CustomNoCode(config)) => {
-                    Some(super::run::assemble_custom_nocode_input(config, None)?)
-                }
-                _ => None,
-            };
+            let builtin: Box<dyn builtins::BuiltinWorkflow> =
+                Box::new(builtins::CustomNoCodeBuiltin::new(workflow_name.to_owned()));
+            let custom_nocode_input = super::run::assemble_custom_nocode_input(config, None)?;
             super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
                 db,
                 metrics_store,
                 run_id,
                 workflow_name,
                 builtin,
-                input: custom_nocode_input.as_deref().or(stored_input),
+                input: Some(&custom_nocode_input),
                 json,
                 process_start,
                 remote_hash: None,
@@ -301,38 +287,14 @@ mod tests {
     /// begins, because a completed run cannot be meaningfully resumed.
     #[test]
     fn plan_resume_completed_run_errors() {
-        let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
-            type_: "builtin".to_owned(),
-            samples: None,
-            dataset: "hf://quantiles/PubMedQA".to_owned(),
-            model: None,
-            max_workers: None,
-        });
+        let bench =
+            qt::config::BenchmarkConfig::CustomCode(qt::config::CustomCodeBenchmarkConfig {
+                type_: "custom_code".to_owned(),
+                command: vec!["python".to_owned(), "eval.py".to_owned()],
+                input: None,
+            });
         let err = plan_resume("demo", &RunStatus::Completed, Some(&bench), None).unwrap_err();
         assert!(err.to_string().contains("already completed"));
-    }
-
-    /// A builtin benchmark with a valid config section should plan to resume as a builtin,
-    /// using the stored input from the database.
-    #[test]
-    fn plan_resume_builtin_with_config() {
-        let bench = qt::config::BenchmarkConfig::Builtin(qt::config::BuiltinBenchmarkConfig {
-            type_: "builtin".to_owned(),
-            samples: Some(10),
-            dataset: "hf://quantiles/PubMedQA".to_owned(),
-            model: None,
-            max_workers: None,
-        });
-        let plan = plan_resume("demo", &RunStatus::Failed, Some(&bench), None).unwrap();
-        assert!(matches!(plan, ResumePlan::Builtin));
-    }
-
-    /// A builtin benchmark that has no config section can still be resumed by name lookup,
-    /// falling back to the hardcoded builtin registry.
-    #[test]
-    fn plan_resume_builtin_without_config() {
-        let plan = plan_resume("pubmedqa", &RunStatus::Failed, None, None).unwrap();
-        assert!(matches!(plan, ResumePlan::Builtin));
     }
 
     #[test]
@@ -378,7 +340,7 @@ mod tests {
         assert!(err.to_string().contains("no config section found"));
     }
 
-    /// An unknown workflow name with neither a config section nor a builtin match must
+    /// An unknown workflow name with no config section must
     /// fail immediately with a clear "no config section found" message.
     #[test]
     fn plan_resume_unknown_without_config_errors() {
@@ -400,7 +362,7 @@ mod tests {
         assert!(err.to_string().contains("non-empty `command`"));
     }
 
-    /// A `custom_nocode` benchmark should plan to resume as a builtin so that the
+    /// A `custom_nocode` benchmark should plan to resume natively so that the
     /// CLI can re-run the no-code workflow natively without spawning an external command.
     #[test]
     fn plan_resume_custom_nocode_with_config() {
@@ -427,7 +389,7 @@ mod tests {
             },
         ));
         let plan = plan_resume("nocode_custom", &RunStatus::Failed, Some(&bench), None).unwrap();
-        assert!(matches!(plan, ResumePlan::Builtin));
+        assert!(matches!(plan, ResumePlan::CustomNoCode));
     }
 
     #[tokio::test]

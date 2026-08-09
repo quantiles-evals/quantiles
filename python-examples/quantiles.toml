@@ -1,4 +1,4 @@
-# PubMedQA built with the Python SDK (not using the built-in benchmark)
+# PubMedQA built with the Python SDK instead of the registry-backed benchmark
 [benchmarks.custom_pubmedqa]
 type = "custom_code"
 command = ["uv", "run", "src/pubmedqa.py"]
