@@ -88,6 +88,10 @@ qt run simpleqa-verified --input '{"model":"openai:gpt-5.6","limit":50}'
 
 Resolving the benchmark and downloading an uncached dataset requires network access. Provider-backed models also require their provider credentials and may incur usage charges.
 
+If you run an eval from the remote benchmark registry, the CLI will persist the registry endpoint, immutable benchmark version, and manifest hash. If that run needs to be resumed later with `qt resume`, the CLI will re-download that exact benchmark version again and reject it if the manifest hash changed (the registry guarantees that versions are immutable once published). This behavior means that resuming runs that were started from the benchmark registry requires internet access.
+
+When `--input` overrides a remote benchmark's `prompt_template_file` with a local file, `qt` also persists the file's SHA-256 hash. On resume, `qt` reads the local prompt into memory and rejects the resume before changing the run status if its contents no longer match the stored hash.
+
 ## Architecture
 
 The Quantiles CLI, `qt`, keeps execution simple: your code runs locally, while `qt` handles durability and observability.

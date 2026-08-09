@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use sea_orm::schema::Schema;
 use sea_orm::{ConnectionTrait, DatabaseConnection, EntityName, Statement};
 
-use crate::db::entities::{event, step, workflow, workflow_run};
+use crate::db::entities::{event, remote_benchmark_run, step, workflow, workflow_run};
 
 pub(super) async fn apply_schema(db: &DatabaseConnection) -> Result<()> {
     db.execute(Statement::from_string(
@@ -36,6 +36,7 @@ pub(super) async fn apply_schema(db: &DatabaseConnection) -> Result<()> {
 
     create_table!(workflow);
     create_table!(workflow_run);
+    create_table!(remote_benchmark_run);
     create_table!(step);
     create_table!(event);
 

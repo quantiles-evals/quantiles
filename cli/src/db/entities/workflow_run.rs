@@ -28,6 +28,8 @@ pub enum Relation {
     Steps,
     #[sea_orm(has_many = "super::event::Entity")]
     Events,
+    #[sea_orm(has_one = "super::remote_benchmark_run::Entity")]
+    RemoteBenchmarkRun,
 }
 
 impl Related<super::workflow::Entity> for Entity {
@@ -45,6 +47,12 @@ impl Related<super::step::Entity> for Entity {
 impl Related<super::event::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Events.def()
+    }
+}
+
+impl Related<super::remote_benchmark_run::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RemoteBenchmarkRun.def()
     }
 }
 

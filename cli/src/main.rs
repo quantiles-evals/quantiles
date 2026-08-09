@@ -1,12 +1,30 @@
 mod cli;
 mod commands;
 
+use std::process::ExitCode;
 use std::time::Instant;
 
 use anyhow::Result;
 use clap::Parser;
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
+    let cli = cli::Cli::parse();
+    let json_errors = matches!(&cli.command, Some(cli::Command::Resume { json: true, .. }));
+
+    match try_main(cli) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) if json_errors => {
+            println!("{}", serde_json::json!({ "error": format!("{error:#}") }));
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("Error: {error:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn try_main(cli: cli::Cli) -> Result<()> {
     // `fastembed`'s dependency tree enables another Rustls crypto provider alongside AWS-LC.
     // Install AWS-LC explicitly, to avoid Rustls-related panics when multiple providers are
     // enabled.
@@ -22,12 +40,10 @@ fn main() -> Result<()> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(async_main(process_start))
+        .block_on(async_main(cli, process_start))
 }
 
-async fn async_main(process_start: Instant) -> Result<()> {
-    let cli = cli::Cli::parse();
-
+async fn async_main(cli: cli::Cli, process_start: Instant) -> Result<()> {
     if cli.version {
         println!("{}", cli::VERSION);
         return Ok(());

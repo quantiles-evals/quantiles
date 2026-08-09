@@ -8,6 +8,7 @@ use super::proto::v1::{ResolveBenchmarkResponse, ResourceKind};
 use crate::config::{BenchmarkConfig, CustomNoCodeBenchmarkConfig, WorkspaceConfig};
 
 /// A downloaded benchmark ready to execute without materializing its resources on disk.
+#[derive(Debug)]
 pub struct RemoteBenchmark {
     pub config: CustomNoCodeBenchmarkConfig,
     pub prompt_template: String,
