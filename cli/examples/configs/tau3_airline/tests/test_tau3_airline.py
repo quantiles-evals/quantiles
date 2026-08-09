@@ -60,6 +60,34 @@ def test_summarize_results_uses_official_rewards() -> None:
   }
 
 
+def test_infrastructure_failures_extracts_upstream_error() -> None:
+  failures = tau3_airline.infrastructure_failures(
+    {
+      "simulations": [
+        {
+          "task_id": "0",
+          "trial": 0,
+          "termination_reason": "infrastructure_error",
+          "info": {"error": "provider denied model access"},
+        },
+        {
+          "task_id": "1",
+          "trial": 0,
+          "termination_reason": "agent_stop",
+        },
+      ]
+    }
+  )
+
+  assert failures == [
+    {
+      "task_id": "0",
+      "trial": 0,
+      "error": "provider denied model access",
+    }
+  ]
+
+
 @dataclass
 class _FakeResults:
   payload: dict[str, object]
@@ -103,4 +131,36 @@ def test_run_tau3_requires_upstream_data_checkout(tmp_path: Path) -> None:
   config = tau3_airline.Tau3AirlineConfig(data_dir=str(tmp_path / "missing"))
 
   with pytest.raises(FileNotFoundError, match="tau3 data directory not found"):
+    tau3_airline.run_tau3(config)
+
+
+def test_run_tau3_raises_for_upstream_infrastructure_failure(
+  monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+  def fake_config(**kwargs: object) -> object:
+    return kwargs
+
+  def fake_run_domain(_config: object) -> _FakeResults:
+    return _FakeResults(
+      {
+        "simulations": [
+          {
+            "task_id": "0",
+            "trial": 0,
+            "termination_reason": "infrastructure_error",
+            "info": {"error": "provider denied model access"},
+          }
+        ]
+      }
+    )
+
+  monkeypatch.setattr(tau3_airline, "_load_tau3", lambda: (fake_run_domain, fake_config))
+  data_dir = tmp_path / "data"
+  data_dir.mkdir()
+  config = tau3_airline.Tau3AirlineConfig(data_dir=str(data_dir))
+
+  with pytest.raises(
+    RuntimeError,
+    match=r"tau3 reported 1 infrastructure failure\(s\); task 0, trial 0: provider denied",
+  ):
     tau3_airline.run_tau3(config)

@@ -40,7 +40,7 @@ qt show <run_id>
 qt compare <run_id-a> <run_id-b>
 ```
 
-This minimal adapter stores the complete upstream result inside one Quantiles step. It does not create one step per simulation, stream message or tool-call events, provide an external-agent bridge, or isolate the Python process from the host.
+This minimal adapter stores the complete upstream result inside one Quantiles step. If τ³ reports an `infrastructure_error`, such as a provider authentication or model-access failure, the adapter fails the Quantiles step and run instead of recording a zero-score result. It does not create one step per simulation, stream message or tool-call events, provide an external-agent bridge, or isolate the Python process from the host.
 
 ## Test
 

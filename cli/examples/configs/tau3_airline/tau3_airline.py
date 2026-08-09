@@ -125,6 +125,29 @@ def summarize_results(upstream: dict[str, JsonValue]) -> dict[str, JsonValue]:
   }
 
 
+def infrastructure_failures(upstream: dict[str, JsonValue]) -> list[dict[str, JsonValue]]:
+  raw_simulations = upstream.get("simulations", [])
+  simulations = raw_simulations if isinstance(raw_simulations, list) else []
+  failures: list[dict[str, JsonValue]] = []
+
+  for simulation in simulations:
+    if not isinstance(simulation, dict):
+      continue
+    if simulation.get("termination_reason") != "infrastructure_error":
+      continue
+    info = simulation.get("info")
+    error = info.get("error") if isinstance(info, dict) else None
+    failures.append(
+      {
+        "task_id": simulation.get("task_id"),
+        "trial": simulation.get("trial"),
+        "error": error if isinstance(error, str) else "unknown infrastructure error",
+      }
+    )
+
+  return failures
+
+
 def _load_tau3() -> tuple[RunDomain, TextRunConfigFactory]:
   from tau2.data_model.simulation import TextRunConfig
   from tau2.run import run_domain
@@ -162,6 +185,13 @@ def run_tau3(config: Tau3AirlineConfig) -> dict[str, JsonValue]:
     verbose_logs=False,
   )
   upstream = run_domain(upstream_config).model_dump(mode="json")
+  failures = infrastructure_failures(upstream)
+  if failures:
+    first = failures[0]
+    raise RuntimeError(
+      f"tau3 reported {len(failures)} infrastructure failure(s); "
+      f"task {first['task_id']}, trial {first['trial']}: {first['error']}"
+    )
   return {
     "benchmark": "tau3-airline",
     "config": config.to_json(),
