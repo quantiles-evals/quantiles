@@ -7,6 +7,7 @@ mod output;
 mod pubmedqa;
 mod similarity;
 mod simpleqa_verified;
+mod tau3;
 
 pub use custom_nocode::CustomNoCodeBuiltin;
 pub use custom_nocode::metrics::{
@@ -49,6 +50,8 @@ pub fn resolve(name: &str) -> Option<Box<dyn BuiltinWorkflow>> {
         Some(Box::new(pubmedqa::PubmedqaBuiltin))
     } else if name == simpleqa_verified::SimpleqaVerifiedBuiltin.name() {
         Some(Box::new(simpleqa_verified::SimpleqaVerifiedBuiltin))
+    } else if name == tau3::Tau3MockBuiltin.name() {
+        Some(Box::new(tau3::Tau3MockBuiltin))
     } else {
         None
     }

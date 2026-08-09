@@ -37,6 +37,7 @@ The CLI supports three evaluation types:
 
 - [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) run predefined datasets and scoring methods. They work without configuration, but you can override settings such as the model, sample count, and concurrency.
 - [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration. Supported scoring styles include exact match, multiple choice, and text similarity.
+- `tau3-mock` is a native structured-tool-calling conformance benchmark for the in-process τ³-style agent harness. It records tool trajectories, isolated environment state, component rewards, and `pass_at_k`; it is not an official τ³ leaderboard domain. See [`src/builtins/tau3/README.md`](src/builtins/tau3/README.md).
 - [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
 Add a `quantiles.toml` or `.quantiles.toml` file to configure an evaluation. For example:

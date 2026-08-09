@@ -57,6 +57,12 @@ qt run simpleqa-verified
 
 > The command above runs [`simpleqa-verified`](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) with a demo model that generates random text. It validates the evaluation workflow without requiring provider API keys or incurring inference costs. Do not use its results to draw conclusions about model quality.
 
+The CLI also includes `tau3-mock`, a small native conformance benchmark for
+structured tool calling, model-driven user simulation, mutable task
+environments, trajectory recording, component rewards, and `pass_at_k`. It is
+not an official τ³ leaderboard domain; see the
+[`tau3-mock` implementation notes](cli/src/builtins/tau3/README.md).
+
 Inspect the recorded run:
 
 ```bash
