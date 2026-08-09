@@ -62,6 +62,8 @@ structured tool calling, model-driven user simulation, mutable task
 environments, trajectory recording, component rewards, and `pass_at_k`. It is
 not an official τ³ leaderboard domain; see the
 [`tau3-mock` implementation notes](cli/src/builtins/tau3/README.md).
+Running `qt run tau3-mock` uses a local deterministic structured-tool demo model
+to validate the harness without provider calls.
 The `tau3-airline` name is reserved for the forthcoming airline implementation
 and currently returns a not-implemented error.
 

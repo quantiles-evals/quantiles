@@ -64,6 +64,111 @@ pub(crate) trait ToolChatModel: Send + Sync {
     ) -> Result<ModelTurn>;
 }
 
+/// Local deterministic model used to validate the bundled mock harness without
+/// making provider calls. It intentionally supports only the bundled mock task.
+pub(crate) struct Tau3DemoToolChatModel {
+    role: DemoRole,
+}
+
+enum DemoRole {
+    Agent,
+    User,
+}
+
+impl Tau3DemoToolChatModel {
+    pub(crate) const NAME: &'static str = "tau3-demo";
+
+    pub(crate) const fn agent() -> Self {
+        Self {
+            role: DemoRole::Agent,
+        }
+    }
+
+    pub(crate) const fn user() -> Self {
+        Self {
+            role: DemoRole::User,
+        }
+    }
+
+    fn generate_agent(messages: &[ModelMessage], tools: &[ToolDefinition]) -> Result<ModelTurn> {
+        let tool_call = match messages.last() {
+            Some(ModelMessage::User { .. }) => ToolInvocation {
+                call_id: "tau3-demo-get-customer".to_owned(),
+                name: "get_customer".to_owned(),
+                arguments: serde_json::json!({"customer_id": "C-100"}),
+                thought_signatures: None,
+            },
+            Some(ModelMessage::Tool { results })
+                if results
+                    .last()
+                    .is_some_and(|result| result.name == "get_customer") =>
+            {
+                ToolInvocation {
+                    call_id: "tau3-demo-update-email".to_owned(),
+                    name: "update_customer_email".to_owned(),
+                    arguments: serde_json::json!({
+                        "customer_id": "C-100",
+                        "email": "morgan.lee@example.com"
+                    }),
+                    thought_signatures: None,
+                }
+            }
+            Some(ModelMessage::Tool { results })
+                if results
+                    .last()
+                    .is_some_and(|result| result.name == "update_customer_email") =>
+            {
+                return Ok(ModelTurn {
+                    content: Some("Your email is now morgan.lee@example.com.".to_owned()),
+                    tool_calls: Vec::new(),
+                });
+            }
+            _ => bail!("tau3 demo agent received an unexpected conversation state"),
+        };
+
+        if !tools.iter().any(|tool| tool.name == tool_call.name) {
+            bail!("tau3 demo agent requires the `{}` tool", tool_call.name);
+        }
+        Ok(ModelTurn {
+            content: None,
+            tool_calls: vec![tool_call],
+        })
+    }
+
+    fn generate_user(messages: &[ModelMessage], tools: &[ToolDefinition]) -> Result<ModelTurn> {
+        if !tools.is_empty() {
+            bail!("tau3 demo user does not support tools");
+        }
+        let Some(ModelMessage::User { content: prompt }) = messages.last() else {
+            bail!("tau3 demo user received an unexpected conversation state");
+        };
+        let content = if prompt == "Begin the conversation as the customer." {
+            "Please change my email to morgan.lee@example.com. My customer ID is C-100."
+        } else {
+            "<END>"
+        };
+        Ok(ModelTurn {
+            content: Some(content.to_owned()),
+            tool_calls: Vec::new(),
+        })
+    }
+}
+
+#[async_trait]
+impl ToolChatModel for Tau3DemoToolChatModel {
+    async fn generate(
+        &self,
+        _system: &str,
+        messages: &[ModelMessage],
+        tools: &[ToolDefinition],
+    ) -> Result<ModelTurn> {
+        match self.role {
+            DemoRole::Agent => Self::generate_agent(messages, tools),
+            DemoRole::User => Self::generate_user(messages, tools),
+        }
+    }
+}
+
 pub(crate) struct GenaiToolChatModel {
     client: genai::Client,
     model: String,

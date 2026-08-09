@@ -39,7 +39,9 @@ pub async fn run(
             run_configured_benchmark(workflow_name, cli_input, json, process_start, bench).await
         }
         None => {
-            if let Some(remote) =
+            if let Some(builtin) = builtins::resolve(workflow_name) {
+                run_native_benchmark(workflow_name, cli_input, json, process_start, builtin).await
+            } else if let Some(remote) =
                 qt::benchmark_registry::resolve_and_download(workflow_name, None, &remote_url)
                     .await?
             {
@@ -52,8 +54,6 @@ pub async fn run(
                     remote,
                 )
                 .await
-            } else if let Some(builtin) = builtins::resolve(workflow_name) {
-                run_native_benchmark(workflow_name, cli_input, json, process_start, builtin).await
             } else {
                 bail!("no config section found for benchmark `{workflow_name}`");
             }

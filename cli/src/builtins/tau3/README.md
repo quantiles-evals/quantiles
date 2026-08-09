@@ -16,7 +16,16 @@ the official τ³-bench 1.0.1 airline, retail, telecom, banking-knowledge, or vo
 tracks, and its scores must not be submitted to or compared with the official
 leaderboard.
 
-Run it with separate agent and user models:
+Run it without configuration to use the local deterministic structured-tool
+demo model for both the agent and simulated user:
+
+```console
+qt run tau3-mock
+```
+
+The demo run validates the harness without making network calls and is not
+model-quality evidence. To evaluate a provider model, pass separate agent and
+user models:
 
 ```console
 qt run tau3-mock --input '{

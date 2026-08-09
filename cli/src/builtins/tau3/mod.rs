@@ -9,7 +9,7 @@ use crate::builtins::{BuiltinContext, BuiltinWorkflow};
 use crate::llm::Sampler;
 
 use environment::{MockEnvironment, MockState, ToolEnvironment};
-use model::GenaiToolChatModel;
+use model::{GenaiToolChatModel, Tau3DemoToolChatModel, ToolChatModel};
 use orchestrator::{RunConversation, Trajectory, run_conversation, visible_transcript};
 use scoring::{Scores, pass_at_k, score};
 
@@ -107,6 +107,48 @@ struct RunOutput {
     trials_completed: usize,
 }
 
+struct ResolvedModels {
+    agent: Arc<dyn ToolChatModel>,
+    user: Arc<dyn ToolChatModel>,
+    agent_name: String,
+    user_name: String,
+}
+
+fn resolve_models(config: &Tau3Config) -> Result<ResolvedModels> {
+    let (agent, agent_name): (Arc<dyn ToolChatModel>, String) = match &config.model {
+        Some(sampler) => (
+            Arc::new(GenaiToolChatModel::from_sampler(sampler)?),
+            sampler.to_string(),
+        ),
+        None => (
+            Arc::new(Tau3DemoToolChatModel::agent()),
+            Tau3DemoToolChatModel::NAME.to_owned(),
+        ),
+    };
+    let (user, user_name): (Arc<dyn ToolChatModel>, String) = match &config.user_model {
+        Some(sampler) => (
+            Arc::new(GenaiToolChatModel::from_sampler(sampler)?),
+            sampler.to_string(),
+        ),
+        None if config.model.is_some() => (
+            Arc::new(GenaiToolChatModel::from_sampler(
+                config.model.as_ref().expect("model is present"),
+            )?),
+            agent_name.clone(),
+        ),
+        None => (
+            Arc::new(Tau3DemoToolChatModel::user()),
+            Tau3DemoToolChatModel::NAME.to_owned(),
+        ),
+    };
+    Ok(ResolvedModels {
+        agent,
+        user,
+        agent_name,
+        user_name,
+    })
+}
+
 #[async_trait::async_trait]
 impl BuiltinWorkflow for Tau3MockBuiltin {
     fn name(&self) -> String {
@@ -131,13 +173,7 @@ impl BuiltinWorkflow for Tau3MockBuiltin {
             bail!("limit must be > 0");
         }
 
-        let agent_sampler = config
-            .model
-            .as_ref()
-            .context("tau3-mock requires `model` (openai, anthropic, or gemini)")?;
-        let user_sampler = config.user_model.as_ref().unwrap_or(agent_sampler);
-        let agent = Arc::new(GenaiToolChatModel::from_sampler(agent_sampler)?);
-        let user = Arc::new(GenaiToolChatModel::from_sampler(user_sampler)?);
+        let models = resolve_models(&config)?;
         let mut tasks = tasks();
         if let Some(limit) = config.limit {
             tasks.truncate(limit.min(tasks.len()));
@@ -146,8 +182,8 @@ impl BuiltinWorkflow for Tau3MockBuiltin {
         let run_input = RunInput {
             harness_version: HARNESS_VERSION,
             domain: "mock",
-            agent_model: agent_sampler.to_string(),
-            user_model: user_sampler.to_string(),
+            agent_model: models.agent_name.clone(),
+            user_model: models.user_name.clone(),
             tasks: tasks.len(),
             trials: config.trials,
             max_turns: config.max_turns,
@@ -161,11 +197,11 @@ impl BuiltinWorkflow for Tau3MockBuiltin {
             for trial in 0..config.trials {
                 let step_key = format!("task-{}-trial-{trial}", task.id);
                 let input_hash = hash_input(&format!(
-                    "{HARNESS_VERSION}\ntask={}\nagent={agent_sampler}\nuser={user_sampler}\nmax_turns={}",
-                    task.id, config.max_turns
+                    "{HARNESS_VERSION}\ntask={}\nagent={}\nuser={}\nmax_turns={}",
+                    task.id, models.agent_name, models.user_name, config.max_turns
                 ));
-                let agent = Arc::clone(&agent);
-                let user = Arc::clone(&user);
+                let agent = Arc::clone(&models.agent);
+                let user = Arc::clone(&models.user);
                 let task = task.clone();
                 let (output, step_id) = run_timed_step(
                     ctx.db,
@@ -419,5 +455,36 @@ mod tests {
             error.to_string(),
             "tau3-airline is recognized but not implemented yet"
         );
+    }
+
+    #[tokio::test]
+    async fn mock_defaults_to_local_structured_tool_demo_models() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        crate::db::init_workspace(tmpdir.path()).await.unwrap();
+        let db = crate::db::open_workspace(tmpdir.path()).await.unwrap();
+        let metrics_store =
+            crate::metrics_store::MetricsStore::new(crate::db::metrics_dir(tmpdir.path())).unwrap();
+        let run_id = crate::db::create_run(&db, "tau3-mock", None).await.unwrap();
+        let builtin = crate::builtins::resolve("tau3-mock").unwrap();
+
+        builtin
+            .execute(BuiltinContext {
+                db: &db,
+                metrics_store: &metrics_store,
+                run_id,
+                workflow_name: "tau3-mock",
+                input: None,
+                quiet: true,
+            })
+            .await
+            .unwrap();
+
+        let run = crate::db::get_run(&db, run_id).await.unwrap();
+        let input: Value = serde_json::from_str(run.input.as_deref().unwrap()).unwrap();
+        let output: Value = serde_json::from_str(run.output.as_deref().unwrap()).unwrap();
+        assert_eq!(input["agent_model"], Tau3DemoToolChatModel::NAME);
+        assert_eq!(input["user_model"], Tau3DemoToolChatModel::NAME);
+        assert_eq!(output["tasks_completed"], 1);
+        assert_eq!(output["trials_completed"], 1);
     }
 }
