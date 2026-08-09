@@ -168,9 +168,19 @@ async fn prepare_remote_resume(
         );
     }
     let input = stored_input.context("remote benchmark run is missing stored input")?;
-    let builtin = super::run::remote_benchmark_builtin(workflow_name, input, remote)?;
+    let prepared = super::run::remote_benchmark_builtin(workflow_name, input, remote)?;
+    if prepared.prompt_template_sha256 != provenance.prompt_template_sha256 {
+        bail!(
+            "remote benchmark `{workflow_name}` local prompt template changed: expected SHA-256 `{}`, got `{}`",
+            provenance
+                .prompt_template_sha256
+                .as_deref()
+                .unwrap_or("none"),
+            prepared.prompt_template_sha256.as_deref().unwrap_or("none")
+        );
+    }
     Ok(RemoteResume {
-        builtin,
+        builtin: prepared.builtin,
         manifest_sha256: provenance.manifest_sha256.clone(),
     })
 }
@@ -331,6 +341,7 @@ mod tests {
             registry_url: "https://api.quantiles.io".to_owned(),
             version: "v1".to_owned(),
             manifest_sha256: "a".repeat(64),
+            prompt_template_sha256: None,
         };
 
         let plan = plan_resume(
@@ -450,6 +461,7 @@ mod tests {
             registry_url: server.uri(),
             version: "v1".to_owned(),
             manifest_sha256: "a".repeat(64),
+            prompt_template_sha256: None,
         };
         let run_id =
             qt::db::create_remote_benchmark_run(&db, "remote-resume-test", Some("{}"), &provenance)
@@ -467,6 +479,67 @@ mod tests {
 
         let error = result.unwrap_err();
         assert!(error.to_string().contains("is no longer available"));
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Failed);
+        assert_eq!(run.error.as_deref(), Some("simulated failure"));
+    }
+
+    #[tokio::test]
+    async fn changed_local_prompt_override_does_not_reset_run_status() {
+        use sha2::{Digest as _, Sha256};
+        use wiremock::MockServer;
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let server = MockServer::start().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let manifest_sha256 = mock_remote_registry(&server).await;
+        let prompt_path = root.join("local-prompt.txt");
+        let original_prompt = "{{ row.question }}\nOriginal answer:";
+        std::fs::write(&prompt_path, original_prompt).unwrap();
+
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+        let stored_input = serde_json::json!({
+            "dataset": { "name": "fixture/qa" },
+            "model": "random",
+            "prompt_template_file": prompt_path,
+            "limit": 2,
+            "style": { "type": "exact_match", "golden_column": "answer" }
+        })
+        .to_string();
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "remote-resume-test".to_owned(),
+            registry_url: server.uri(),
+            version: "v1".to_owned(),
+            manifest_sha256,
+            prompt_template_sha256: Some(format!(
+                "{:x}",
+                Sha256::digest(original_prompt.as_bytes())
+            )),
+        };
+        let run_id = qt::db::create_remote_benchmark_run(
+            &db,
+            "remote-resume-test",
+            Some(&stored_input),
+            &provenance,
+        )
+        .await
+        .unwrap();
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+        std::fs::write(&prompt_path, "{{ row.question }}\nChanged answer:").unwrap();
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("local prompt template changed"));
         let run = qt::db::get_run(&db, run_id).await.unwrap();
         assert_eq!(run.status, qt::db::RunStatus::Failed);
         assert_eq!(run.error.as_deref(), Some("simulated failure"));
@@ -508,6 +581,7 @@ mod tests {
             registry_url: server.uri(),
             version: "v1".to_owned(),
             manifest_sha256,
+            prompt_template_sha256: None,
         };
         let run_id = qt::db::create_remote_benchmark_run(
             &db,

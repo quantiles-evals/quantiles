@@ -31,6 +31,8 @@ pub struct RemoteBenchmarkProvenance {
     pub registry_url: String,
     pub version: String,
     pub manifest_sha256: String,
+    /// SHA-256 of a local `prompt_template_file` override, when one was used.
+    pub prompt_template_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

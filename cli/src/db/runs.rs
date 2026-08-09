@@ -110,6 +110,7 @@ async fn create_run_with_remote_provenance(
             registry_url: Set(provenance.registry_url.clone()),
             version: Set(provenance.version.clone()),
             manifest_sha256: Set(provenance.manifest_sha256.clone()),
+            prompt_template_sha256: Set(provenance.prompt_template_sha256.clone()),
         })
         .exec(&tx)
         .await?;
@@ -147,6 +148,7 @@ pub async fn get_remote_benchmark_provenance(
             registry_url: provenance.registry_url,
             version: provenance.version,
             manifest_sha256: provenance.manifest_sha256,
+            prompt_template_sha256: provenance.prompt_template_sha256,
         }))
 }
 
@@ -445,6 +447,7 @@ mod tests {
             registry_url: "https://api.quantiles.io".to_owned(),
             version: "v1".to_owned(),
             manifest_sha256: "a".repeat(64),
+            prompt_template_sha256: Some("b".repeat(64)),
         };
 
         let run_id = create_remote_benchmark_run(

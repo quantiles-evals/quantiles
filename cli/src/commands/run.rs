@@ -9,6 +9,7 @@ use anyhow::{Context, Result, bail};
 use comfy_table::{Cell, ContentArrangement, Table, presets::NOTHING};
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 
 use qt::builtins;
 use qt::client::QuantilesClient;
@@ -154,11 +155,13 @@ async fn run_remote_benchmark(
 ) -> Result<()> {
     let remote_hash = remote.manifest_sha256.clone();
     let input = assemble_custom_nocode_input(&remote.config, cli_input)?;
+    let prepared = remote_benchmark_builtin(workflow_name, &input, remote)?;
     let provenance = qt::db::RemoteBenchmarkProvenance {
         benchmark_name: workflow_name.to_owned(),
         registry_url: registry_url.to_owned(),
-        version: remote.version.clone(),
+        version: prepared.version.clone(),
         manifest_sha256: remote_hash.clone(),
+        prompt_template_sha256: prepared.prompt_template_sha256.clone(),
     };
 
     let cwd = std::env::current_dir()?;
@@ -171,18 +174,17 @@ async fn run_remote_benchmark(
     if !json {
         println!(
             "Resolved remote benchmark {workflow_name} version {} ({})",
-            remote.version, remote.manifest_sha256
+            prepared.version, remote_hash
         );
         println!("Created run {run_id}");
     }
 
-    let builtin = remote_benchmark_builtin(workflow_name, &input, remote)?;
     execute_builtin(ExecuteBuiltinArgs {
         db: &db,
         metrics_store: &metrics_store,
         run_id,
         workflow_name,
-        builtin,
+        builtin: prepared.builtin,
         input: Some(&input),
         json,
         process_start,
@@ -191,28 +193,43 @@ async fn run_remote_benchmark(
     .await
 }
 
+/// Executable remote benchmark and any provenance not covered by its registry manifest.
+pub(super) struct RemoteBenchmarkBuiltin {
+    pub builtin: Box<dyn qt::builtins::BuiltinWorkflow>,
+    pub version: String,
+    pub prompt_template_sha256: Option<String>,
+}
+
 /// Builds an executable no-code workflow from a downloaded remote benchmark.
 pub(super) fn remote_benchmark_builtin(
     workflow_name: &str,
     input: &str,
     remote: qt::benchmark_registry::RemoteBenchmark,
-) -> Result<Box<dyn qt::builtins::BuiltinWorkflow>> {
+) -> Result<RemoteBenchmarkBuiltin> {
     let configured_template_path = remote.config.params.prompt_template_file.clone();
     let effective_params: qt::config::CustomNoCodeParams = serde_json::from_str(input)
         .context("failed to parse assembled remote custom_nocode input")?;
 
-    if effective_params.prompt_template_file == configured_template_path {
-        Ok(Box::new(
-            qt::builtins::CustomNoCodeBuiltin::with_prompt_template(
-                workflow_name.to_owned(),
-                remote.prompt_template,
-            ),
-        ))
+    let (prompt_template, prompt_template_sha256) = if effective_params.prompt_template_file
+        == configured_template_path
+    {
+        (remote.prompt_template, None)
     } else {
-        Ok(Box::new(qt::builtins::CustomNoCodeBuiltin::new(
+        let prompt_path = &effective_params.prompt_template_file;
+        let prompt_template = std::fs::read_to_string(prompt_path)
+            .with_context(|| format!("failed to read prompt template override `{prompt_path}`"))?;
+        let sha256 = format!("{:x}", Sha256::digest(prompt_template.as_bytes()));
+        (prompt_template, Some(sha256))
+    };
+
+    Ok(RemoteBenchmarkBuiltin {
+        builtin: Box::new(qt::builtins::CustomNoCodeBuiltin::with_prompt_template(
             workflow_name.to_owned(),
-        )))
-    }
+            prompt_template,
+        )),
+        version: remote.version,
+        prompt_template_sha256,
+    })
 }
 
 fn assemble_builtin_input(
@@ -1003,6 +1020,39 @@ mod tests {
         assert_eq!(parsed["model"], "openai:gpt-5.6-luna");
         assert_eq!(parsed["limit"], 5);
         assert_eq!(parsed["prompt_template_file"], "prompts/other.txt");
+    }
+
+    #[test]
+    fn remote_benchmark_builtin_hashes_local_prompt_override() {
+        use sha2::{Digest as _, Sha256};
+
+        let tmpdir = tempfile::tempdir().unwrap();
+        let prompt_path = tmpdir.path().join("override.txt");
+        let prompt = "{{ row.question }}\nLocal answer:";
+        std::fs::write(&prompt_path, prompt).unwrap();
+        let benchmark = custom_nocode_benchmark_for_override_tests();
+        let input = super::assemble_custom_nocode_input(
+            &benchmark,
+            Some(&format!(
+                r#"{{"prompt_template_file":{}}}"#,
+                serde_json::to_string(&prompt_path).unwrap()
+            )),
+        )
+        .unwrap();
+        let remote = qt::benchmark_registry::RemoteBenchmark {
+            config: benchmark,
+            prompt_template: "{{ row.question }}\nRegistry answer:".to_owned(),
+            version: "v1".to_owned(),
+            manifest_sha256: "a".repeat(64),
+        };
+
+        let prepared = super::remote_benchmark_builtin("remote-test", &input, remote).unwrap();
+
+        assert_eq!(prepared.version, "v1");
+        assert_eq!(
+            prepared.prompt_template_sha256,
+            Some(format!("{:x}", Sha256::digest(prompt.as_bytes())))
+        );
     }
 
     /// Fields outside the intentionally narrow custom no-code override surface should

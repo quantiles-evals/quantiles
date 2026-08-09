@@ -9,6 +9,7 @@ pub struct Model {
     pub registry_url: String,
     pub version: String,
     pub manifest_sha256: String,
+    pub prompt_template_sha256: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
