@@ -8,3 +8,11 @@ input = { model_name = "openai:gpt-5.6", num_examples = 500 }
 [benchmarks.custom_prompt_eval]
 type = "custom_code"
 command = ["uv", "run", "src/prompt_eval.py"]
+
+# Grade existing patch predictions with Scale's official SWE-Bench Pro evaluator.
+# Clone and prepare https://github.com/scaleapi/SWE-bench_Pro-os first, then
+# override these paths with `qt run custom_swebench_pro --input '<json>'`.
+[benchmarks.custom_swebench_pro]
+type = "custom_code"
+command = ["uv", "run", "src/swebench_pro.py"]
+input = { repo_path = "../SWE-bench_Pro-os", evaluator_python = "../SWE-bench_Pro-os/.venv/bin/python", raw_sample_path = "../SWE-bench_Pro-os/swe_bench_pro_full.csv", patch_path = "../SWE-bench_Pro-os/predictions.json", output_dir = ".swebench-pro-results", num_workers = 1, use_local_docker = true }
