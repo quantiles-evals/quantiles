@@ -1,14 +1,20 @@
 use anyhow::Result;
 
+use crate::benchmark_registry::version::Version;
+
 use super::RemoteBenchmark;
 use super::client::{resolve_manifest, validate_remote_url};
 use super::download::download_resources;
 use super::manifest::{validate_resources, validate_response_identity};
 
-/// Resolve a benchmark and download all of its resources into memory.
+/// Resolve a benchmark, optionally with a version, and download all of its
+/// resources into memory.
 ///
-/// `Ok(None)` means the registry returned Connect's `not_found` status. Other transport and
-/// service failures are returned to the caller rather than treated as absence.
+/// If you pass `None` for `version`, this function returns the latest latest
+/// published version for that benchmark.
+///
+/// A return value of `Ok(None)` means the registry did not find that benchmark
+/// name and/or version.
 ///
 /// # Errors
 ///
@@ -16,14 +22,15 @@ use super::manifest::{validate_resources, validate_response_identity};
 /// digest mismatches, invalid UTF-8, or invalid no-code benchmark definitions.
 pub async fn resolve_and_download(
     benchmark_name: &str,
+    version: Option<Version>,
     remote_url: &str,
 ) -> Result<Option<RemoteBenchmark>> {
     let endpoint = validate_remote_url(remote_url)?;
-    let Some(response) = resolve_manifest(benchmark_name, &endpoint).await? else {
+    let Some(response) = resolve_manifest(benchmark_name, version.clone(), &endpoint).await? else {
         return Ok(None);
     };
 
-    validate_response_identity(benchmark_name, &response)?;
+    validate_response_identity(benchmark_name, version, &response)?;
     let resources = validate_resources(&response.resources, endpoint.scheme() == "http")?;
     let downloaded = download_resources(&resources).await?;
     let remote = RemoteBenchmark::new(benchmark_name, response, downloaded)?;
@@ -35,9 +42,11 @@ mod tests {
     use buffa::Message as _;
     use sha2::{Digest as _, Sha256};
     use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
 
-    use super::super::proto::v1::{BenchmarkResource, ResolveBenchmarkResponse, ResourceKind};
+    use super::super::proto::v1::{
+        BenchmarkResource, ResolveBenchmarkRequest, ResolveBenchmarkResponse, ResourceKind,
+    };
     use super::*;
 
     #[tokio::test]
@@ -80,6 +89,7 @@ mod tests {
             .and(path(
                 "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
             ))
+            .and(RequestedVersion(""))
             .respond_with(
                 ResponseTemplate::new(200)
                     .insert_header("content-type", "application/proto")
@@ -98,7 +108,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let benchmark = resolve_and_download("remote-test", &server.uri())
+        let benchmark = resolve_and_download("remote-test", None, &server.uri())
             .await
             .unwrap()
             .unwrap();
@@ -112,6 +122,52 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[tokio::test]
+    async fn rejects_a_response_for_a_different_version() {
+        let server = MockServer::start().await;
+        let response = ResolveBenchmarkResponse {
+            benchmark_name: "remote-test".to_owned(),
+            version: "v2".to_owned(),
+            manifest_sha256: "a".repeat(64),
+            ..Default::default()
+        };
+        Mock::given(method("POST"))
+            .and(path(
+                "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
+            ))
+            .and(RequestedVersion("v1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/proto")
+                    .set_body_bytes(response.encode_to_vec()),
+            )
+            .mount(&server)
+            .await;
+
+        let error = resolve_and_download(
+            "remote-test",
+            Some(Version::new("v1").unwrap()),
+            &server.uri(),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("does not match requested version")
+        );
+    }
+
+    struct RequestedVersion(&'static str);
+
+    impl Match for RequestedVersion {
+        fn matches(&self, request: &Request) -> bool {
+            ResolveBenchmarkRequest::decode_from_slice(&request.body)
+                .is_ok_and(|request| request.version == self.0)
+        }
     }
 
     fn resource(
