@@ -486,6 +486,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn changed_remote_manifest_does_not_reset_run_status() {
+        use wiremock::MockServer;
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let server = MockServer::start().await;
+        let returned_manifest_sha256 = "b".repeat(64);
+        mock_remote_registry_versions(&server, &["v1"], &returned_manifest_sha256).await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        qt::db::init_workspace(root).await.unwrap();
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let metrics_store =
+            qt::metrics_store::MetricsStore::new(qt::db::metrics_dir(root)).unwrap();
+        let stored_input = serde_json::json!({
+            "dataset": { "name": "fixture/qa" },
+            "model": "random",
+            "prompt_template_file": "prompts/qa.txt",
+            "limit": 2,
+            "style": { "type": "exact_match", "golden_column": "answer" }
+        })
+        .to_string();
+        let provenance = qt::db::RemoteBenchmarkProvenance {
+            benchmark_name: "remote-resume-test".to_owned(),
+            registry_url: server.uri(),
+            version: "v1".to_owned(),
+            manifest_sha256: "a".repeat(64),
+            prompt_template_sha256: None,
+        };
+        let run_id = qt::db::create_remote_benchmark_run(
+            &db,
+            "remote-resume-test",
+            Some(&stored_input),
+            &provenance,
+        )
+        .await
+        .unwrap();
+        qt::db::fail_run(&db, &metrics_store, run_id, "simulated failure")
+            .await
+            .unwrap();
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("manifest changed"));
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Failed);
+        assert_eq!(run.error.as_deref(), Some("simulated failure"));
+        assert!(
+            qt::db::list_steps_for_run(&db, run_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let events = qt::db::list_events_for_run(&db, run_id).await.unwrap();
+        assert!(!events.iter().any(|event| event.event_type == "run.resumed"));
+    }
+
+    #[tokio::test]
     async fn changed_local_prompt_override_does_not_reset_run_status() {
         use sha2::{Digest as _, Sha256};
         use wiremock::MockServer;
@@ -694,7 +755,82 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn remote_run_failure_resumes_from_its_persisted_provenance() {
+        use wiremock::MockServer;
+
+        let _cwd_guard = CWD_LOCK.lock().await;
+        let server = MockServer::start().await;
+        let expected_manifest_sha256 = "a".repeat(64);
+        mock_remote_registry_versions(&server, &["", "v1"], &expected_manifest_sha256).await;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let root = tmpdir.path();
+        let cache_dir = root.join("cache");
+
+        let original_hf = std::env::var("HF_DATASETS_SERVER").ok();
+        let original_cache = std::env::var("QUANTILES_DATASET_CACHE_DIR").ok();
+        let original_remote = std::env::var("QUANTILES_REMOTE_URL").ok();
+        unsafe {
+            std::env::set_var("HF_DATASETS_SERVER", server.uri());
+            std::env::set_var("QUANTILES_DATASET_CACHE_DIR", &cache_dir);
+            std::env::remove_var("QUANTILES_REMOTE_URL");
+        }
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(root).unwrap();
+        let initial_result = crate::commands::run::run(
+            "remote-resume-test",
+            None,
+            Some(&server.uri()),
+            true,
+            std::time::Instant::now(),
+        )
+        .await;
+        assert!(initial_result.is_err());
+
+        let db = qt::db::open_workspace(root).await.unwrap();
+        let runs = qt::db::list_runs(&db).await.unwrap();
+        assert_eq!(runs.len(), 1);
+        let run_id = runs[0].id;
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Failed);
+        let provenance = qt::db::get_remote_benchmark_provenance(&db, run_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(provenance.benchmark_name, "remote-resume-test");
+        assert_eq!(provenance.registry_url, server.uri());
+        assert_eq!(provenance.version, "v1");
+        assert_eq!(provenance.manifest_sha256, expected_manifest_sha256);
+        assert_eq!(provenance.prompt_template_sha256, None);
+
+        cache_fixture_rows(&cache_dir).await;
+        let resume_result = resume(run_id, true, std::time::Instant::now()).await;
+        std::env::set_current_dir(original_cwd).unwrap();
+        restore_env("HF_DATASETS_SERVER", original_hf);
+        restore_env("QUANTILES_DATASET_CACHE_DIR", original_cache);
+        restore_env("QUANTILES_REMOTE_URL", original_remote);
+        resume_result.unwrap();
+
+        let run = qt::db::get_run(&db, run_id).await.unwrap();
+        assert_eq!(run.status, qt::db::RunStatus::Completed);
+        assert_eq!(
+            qt::db::list_steps_for_run(&db, run_id).await.unwrap().len(),
+            2
+        );
+    }
+
     async fn mock_remote_registry(server: &wiremock::MockServer) -> String {
+        let manifest_sha256 = "a".repeat(64);
+        mock_remote_registry_versions(server, &["v1"], &manifest_sha256).await;
+        manifest_sha256
+    }
+
+    async fn mock_remote_registry_versions(
+        server: &wiremock::MockServer,
+        requested_versions: &[&'static str],
+        manifest_sha256: &str,
+    ) {
         use buffa::Message as _;
         use sha2::{Digest as _, Sha256};
         use wiremock::matchers::{method, path};
@@ -727,11 +863,10 @@ style = { type = "exact_match", golden_column = "answer" }
                     ..Default::default()
                 }
             };
-        let manifest_sha256 = "a".repeat(64);
         let response = ResolveBenchmarkResponse {
             benchmark_name: "remote-resume-test".to_owned(),
             version: "v1".to_owned(),
-            manifest_sha256: manifest_sha256.clone(),
+            manifest_sha256: manifest_sha256.to_owned(),
             resources: vec![
                 resource(
                     "definition",
@@ -751,19 +886,22 @@ style = { type = "exact_match", golden_column = "answer" }
             ..Default::default()
         };
 
-        Mock::given(method("POST"))
-            .and(path(
-                "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
-            ))
-            .and(RequestedVersion("v1"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .insert_header("content-type", "application/proto")
-                    .set_body_bytes(response.encode_to_vec()),
-            )
-            .expect(1)
-            .mount(server)
-            .await;
+        let response_body = response.encode_to_vec();
+        for requested_version in requested_versions {
+            Mock::given(method("POST"))
+                .and(path(
+                    "/quantiles.benchmark.v1.BenchmarkRegistryService/ResolveBenchmark",
+                ))
+                .and(RequestedVersion(requested_version))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .insert_header("content-type", "application/proto")
+                        .set_body_bytes(response_body.clone()),
+                )
+                .expect(1)
+                .mount(server)
+                .await;
+        }
         for (route, body) in [
             ("/definition", definition.as_slice()),
             ("/prompt", prompt.as_slice()),
@@ -775,7 +913,6 @@ style = { type = "exact_match", golden_column = "answer" }
                 .await;
         }
         mock_dataset_metadata(server).await;
-        manifest_sha256
     }
 
     async fn mock_dataset_metadata(server: &wiremock::MockServer) {
