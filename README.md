@@ -106,7 +106,7 @@ See the following resources for more details:
 
 - [Configuration guide](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) - Configure provider models and credentials, and troubleshoot common setup issues.
-- [Custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
+- [Custom-code benchmark examples](./custom-code-examples/README.md) - Runnable Python SDK evaluations with a shared configuration.
 - [Custom no-code examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
 
 #### Registry benchmarks

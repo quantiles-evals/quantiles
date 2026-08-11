@@ -1,0 +1,26 @@
+# Custom-code benchmarks in this directory run in isolated uv projects while
+# sharing the same local Quantiles workspace and run history.
+
+[benchmarks.t3-airline]
+type = "custom_code"
+command = ["uv", "run", "--project", "t3-airline", "python", "t3-airline/t3_airline.py"]
+
+[benchmarks.t3-airline.input]
+data_dir = "t3-airline/.tau3/tau2-bench/data"
+agent_model = "openai:gpt-4.1"
+user_model = "openai:gpt-4.1"
+num_tasks = 1
+num_trials = 1
+max_steps = 100
+max_concurrency = 1
+seed = 300
+
+[benchmarks.swebench-pro]
+type = "custom_code"
+command = ["uv", "run", "--project", "swebench-pro", "python", "swebench-pro/swebench_pro.py"]
+
+[benchmarks.swebench-pro.input]
+cache_dir = "swebench-pro/.swebench-pro-cache"
+output_dir = "swebench-pro/.swebench-pro-results"
+num_workers = 1
+use_local_docker = true

@@ -70,7 +70,7 @@ prompt_template_file = "prompts/qa.txt"
 style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
 ```
 
-See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in the [custom-code example](./examples/configs/custom_code/quantiles.toml) and [custom no-code examples](../custom-nocode-examples/quantiles.toml).
+See the [configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples. See the [model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues. Additional runnable configurations are available in the [custom-code example](./examples/configs/custom_code/quantiles.toml), the [custom-code benchmark examples](../custom-code-examples/README.md), and the [custom no-code examples](../custom-nocode-examples/quantiles.toml).
 
 ### Remote benchmark fallback
 
