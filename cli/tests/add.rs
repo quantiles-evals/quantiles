@@ -95,12 +95,13 @@ async fn missing_remote_benchmark_returns_json_and_does_not_create_config() {
 
     assert!(!temp.path().join("quantiles.toml").exists());
     assert!(!temp.path().join(".quantiles").exists());
+    assert!(!temp.path().join("missing-prompt").exists());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn successful_add_creates_config_and_emits_json_only() {
     let server = MockServer::start().await;
-    let manifest_sha256 = mock_successful_registry(&server).await;
+    mock_successful_registry(&server).await;
     let temp = tempfile::tempdir().unwrap();
     let config_path = temp.path().canonicalize().unwrap().join("quantiles.toml");
 
@@ -122,13 +123,13 @@ async fn successful_add_creates_config_and_emits_json_only() {
             "config_path": config_path.display().to_string(),
         })
     );
-    assert_added_files(temp.path(), &manifest_sha256, None);
+    assert_added_files(temp.path(), None);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn successful_add_appends_config_and_emits_human_output_only() {
     let server = MockServer::start().await;
-    let manifest_sha256 = mock_successful_registry(&server).await;
+    mock_successful_registry(&server).await;
     let temp = tempfile::tempdir().unwrap();
     let config_path = temp.path().canonicalize().unwrap().join("quantiles.toml");
     let original = "# preserve this comment\n[benchmarks.existing]\ntype = \"custom_code\"\ncommand = [\"echo\"]\n";
@@ -146,10 +147,10 @@ async fn successful_add_appends_config_and_emits_human_output_only() {
         )))
         .stderr(predicate::str::is_empty());
 
-    assert_added_files(temp.path(), &manifest_sha256, Some(original));
+    assert_added_files(temp.path(), Some(original));
 }
 
-async fn mock_successful_registry(server: &MockServer) -> String {
+async fn mock_successful_registry(server: &MockServer) {
     use buffa::Message as _;
     use registry_proto::quantiles::benchmark::v1::{
         BenchmarkResource, ResolveBenchmarkResponse, ResourceKind,
@@ -222,11 +223,9 @@ style = { type = "exact_match", golden_column = "answer" }
             .mount(server)
             .await;
     }
-
-    manifest_sha256
 }
 
-fn assert_added_files(root: &std::path::Path, manifest_sha256: &str, prefix: Option<&str>) {
+fn assert_added_files(root: &std::path::Path, prefix: Option<&str>) {
     let config_contents = std::fs::read_to_string(root.join("quantiles.toml")).unwrap();
     if let Some(prefix) = prefix {
         assert!(config_contents.starts_with(prefix));
@@ -236,11 +235,17 @@ fn assert_added_files(root: &std::path::Path, manifest_sha256: &str, prefix: Opt
     if prefix.is_some() {
         assert!(config.benchmarks.contains_key("existing"));
     }
+    let qt::config::BenchmarkConfig::CustomNoCode(remote) =
+        config.benchmarks.get("remote-test").unwrap()
+    else {
+        panic!("expected custom_nocode benchmark");
+    };
+    assert_eq!(
+        remote.params.prompt_template_file,
+        "remote-test-prompt/prompt.txt"
+    );
 
-    let prompt_path = root
-        .join(".quantiles/registry")
-        .join(manifest_sha256)
-        .join("prompt.txt");
+    let prompt_path = root.join("remote-test-prompt/prompt.txt");
     assert_eq!(
         std::fs::read_to_string(prompt_path).unwrap(),
         "{{ row.question }}\nAnswer:"

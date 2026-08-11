@@ -124,7 +124,7 @@ To save a registry benchmark in the local configuration, add it by name:
 qt add simpleqa-verified
 ```
 
-This command downloads the benchmark definition and prompt template, appends the benchmark to an existing `quantiles.toml` or `.quantiles.toml`, or creates `quantiles.toml` in the current directory. It returns an error if the benchmark is already configured or is not present in the registry. Pass `--json` for machine-readable output.
+This command downloads the benchmark definition and prompt template, appends the benchmark to an existing `quantiles.toml` or `.quantiles.toml`, or creates `quantiles.toml` in the current directory. The prompt template is stored beside the configuration at `<benchmark_name>-prompt/prompt.txt`. The command returns an error if the benchmark is already configured or is not present in the registry. Pass `--json` for machine-readable output.
 
 The [benchmark hub](https://quantiles.io/benchmark-hub) describes available benchmarks, their evaluation setup, and common metrics used across AI evaluation workflows.
 

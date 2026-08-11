@@ -29,7 +29,7 @@ pub async fn add(benchmark_name: &str, cli_remote_url: Option<&str>, json: bool)
 
     let config_path = config_path.unwrap_or_else(|| cwd.join("quantiles.toml"));
     let version = remote.version.clone();
-    persist_remote_benchmark(benchmark_name, remote, &config_path, &cwd)?;
+    persist_remote_benchmark(benchmark_name, remote, &config_path)?;
 
     if json {
         println!(
@@ -85,18 +85,27 @@ fn persist_remote_benchmark(
     benchmark_name: &str,
     mut remote: qt::benchmark_registry::RemoteBenchmark,
     config_path: &Path,
-    cwd: &Path,
 ) -> Result<()> {
-    let prompt_relative = PathBuf::from(".quantiles")
-        .join("registry")
-        .join(&remote.manifest_sha256)
-        .join("prompt.txt");
-    let prompt_path = cwd.join(&prompt_relative);
+    let prompt_relative = prompt_relative_path(benchmark_name)?;
+    let config_dir = config_path
+        .parent()
+        .context("configuration path has no parent directory")?;
+    let prompt_path = config_dir.join(&prompt_relative);
     persist_prompt(&prompt_path, remote.prompt_template.as_bytes())?;
     remote.config.params.prompt_template_file = path_for_toml(&prompt_relative);
 
     let section = render_benchmark_section(benchmark_name, &remote.config)?;
     append_section(config_path, &section)
+}
+
+fn prompt_relative_path(benchmark_name: &str) -> Result<PathBuf> {
+    let unsafe_character = benchmark_name
+        .chars()
+        .any(|character| character.is_control() || r#"/\:*?"<>|"#.contains(character));
+    if benchmark_name.is_empty() || matches!(benchmark_name, "." | "..") || unsafe_character {
+        bail!("benchmark name `{benchmark_name}` cannot be used for a local prompt directory");
+    }
+    Ok(PathBuf::from(format!("{benchmark_name}-prompt")).join("prompt.txt"))
 }
 
 fn persist_prompt(path: &Path, contents: &[u8]) -> Result<()> {
@@ -213,20 +222,23 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let config_path = temp.path().join("quantiles.toml");
 
-        persist_remote_benchmark("remote-test", remote(), &config_path, temp.path()).unwrap();
+        persist_remote_benchmark("remote-test", remote(), &config_path).unwrap();
 
         let contents = fs::read_to_string(&config_path).unwrap();
         let parsed: qt::config::WorkspaceConfig = toml::from_str(&contents).unwrap();
         assert!(parsed.benchmarks.contains_key("remote-test"));
         assert_eq!(
-            fs::read_to_string(
-                temp.path()
-                    .join(".quantiles/registry")
-                    .join("a".repeat(64))
-                    .join("prompt.txt")
-            )
-            .unwrap(),
+            fs::read_to_string(temp.path().join("remote-test-prompt/prompt.txt")).unwrap(),
             "{{ row.question }}"
+        );
+        let qt::config::BenchmarkConfig::CustomNoCode(config) =
+            parsed.benchmarks.get("remote-test").unwrap()
+        else {
+            panic!("expected custom_nocode benchmark");
+        };
+        assert_eq!(
+            config.params.prompt_template_file,
+            "remote-test-prompt/prompt.txt"
         );
     }
 
@@ -237,10 +249,21 @@ mod tests {
         let original = "# keep this comment\n[benchmarks.local]\ntype = \"custom_code\"\ncommand = [\"echo\"]\n";
         fs::write(&config_path, original).unwrap();
 
-        persist_remote_benchmark("remote-test", remote(), &config_path, temp.path()).unwrap();
+        persist_remote_benchmark("remote-test", remote(), &config_path).unwrap();
 
         let contents = fs::read_to_string(config_path).unwrap();
         assert!(contents.starts_with(original));
         assert!(contents.contains("[benchmarks.remote-test]"));
+    }
+
+    #[test]
+    fn rejects_benchmark_names_that_cannot_form_a_safe_prompt_directory() {
+        for name in ["../outside", "nested/name", r"nested\name"] {
+            let temp = tempfile::tempdir().unwrap();
+            let config_path = temp.path().join("quantiles.toml");
+            let error = persist_remote_benchmark(name, remote(), &config_path).unwrap_err();
+            assert!(error.to_string().contains("local prompt directory"));
+            assert!(!config_path.exists());
+        }
     }
 }

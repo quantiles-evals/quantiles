@@ -74,7 +74,7 @@ See the [configuration guide](https://quantiles.io/documentation/configuration) 
 
 ### Remote benchmark fallback
 
-Use `qt add <benchmark_name>` to download a registry benchmark and save it in the local configuration. If `quantiles.toml` or `.quantiles.toml` exists in the current directory, the command appends the benchmark section without rewriting the existing content. Otherwise, it creates `quantiles.toml`. The downloaded prompt template is stored under `.quantiles/registry/` and referenced by the added configuration.
+Use `qt add <benchmark_name>` to download a registry benchmark and save it in the local configuration. If `quantiles.toml` or `.quantiles.toml` exists in the current directory, the command appends the benchmark section without rewriting the existing content. Otherwise, it creates `quantiles.toml`. The downloaded prompt template is stored beside the configuration at `<benchmark_name>-prompt/prompt.txt` and referenced by the added configuration.
 
 ```bash
 qt add simpleqa-verified
