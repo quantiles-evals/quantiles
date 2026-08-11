@@ -74,6 +74,15 @@ See the [configuration guide](https://quantiles.io/documentation/configuration) 
 
 ### Remote benchmark fallback
 
+Use `qt add <benchmark_name>` to download a registry benchmark and save it in the local configuration. If `quantiles.toml` or `.quantiles.toml` exists in the current directory, the command appends the benchmark section without rewriting the existing content. Otherwise, it creates `quantiles.toml`. The downloaded prompt template is stored beside the configuration at `<benchmark_name>-prompt/prompt.txt` and referenced by the added configuration.
+
+```bash
+qt add simpleqa-verified
+qt add simpleqa-verified --json
+```
+
+The command fails without modifying the configuration if the benchmark is already configured or the registry does not contain it. If you pass `--json` to this command, output of any kind (successful or unsuccessful), returns machine-readable JSON. Resolving and downloading the benchmark requires network access.
+
 When you run `qt run <eval_name>`, the CLI first looks in the local configuration file for an evaluation called `eval_name`. If one is found, the CLI runs it immediately. If none is found, `qt` looks in the Quantiles remote benchmark service for an evaluation of the same name. If a match is found, the CLI downloads the benchmark definition and runs it.
 
 >If you want to override the location of the remote benchmark service, use the `--remote-url` flag or the `QUANTILES_REMOTE_URL` environment variable.
