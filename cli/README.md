@@ -27,35 +27,35 @@ qt list
 qt show <run_id>
 ```
 
-Running a built-in benchmark, such as `simpleqa-verified` above, requires an internet connection so that `qt` can retrieve its configuration from `https://api.quantiles.io`.
+Running a built-in benchmark directly from the hosted registry, such as `simpleqa-verified` above, requires an internet connection so that `qt` can retrieve its configuration from `https://api.quantiles.io`.
 
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
-> Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your LLM provider. Depending on your provider, model, and account limits, benchmark runs can hit API rate limits or concurrency quotas. Reduce request concurrency or use a model or provider with higher throughput limits. The example below shows how to adjust `max_workers` if you encounter throttling.
+> Note: Quantiles is designed for high-throughput execution and may issue many parallel requests to your model provider. Depending on your provider, model, and account limits, benchmark runs can hit API rate limits or concurrency quotas. Reduce `max_workers` or use a model or provider with higher throughput limits if you encounter throttling.
 
 ## Configure evaluations
 
-The CLI supports three evaluation types:
+The CLI supports built-in benchmarks and two custom evaluation approaches:
 
-- [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations, with optional configuration for custom settings such as a hosted AI model.
-- [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration.
-- [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
+- [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations retrieved by name from the hosted Quantiles benchmark registry and executed locally.
+- [Custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration using `type = "custom_nocode"`. Supported scoring styles include exact match, multiple choice, and text similarity.
+- [Custom code evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK using `type = "custom_code"`.
 
-Add a `quantiles.toml` or `.quantiles.toml` config file to configure an evaluation. When you run a benchmark, Quantiles first checks this file for a matching configuration. If none is found, it queries the remote Quantiles benchmark registry at `https://api.quantiles.io` for a built-in benchmark with that name.
+Add a `quantiles.toml` or `.quantiles.toml` config file to configure an evaluation. When you run a evaluation, Quantiles first checks this file for a matching configuration. If none is found, it queries the hosted Quantiles benchmark registry at for a built-in benchmark with that name.
 
-The following example configures the built-in PubMedQA benchmark to use an OpenAI model and limit the number of samples:
+The following `quantiles.toml` example configures PubMedQA to use an OpenAI model and evaluate a limited number of samples. Use `qt add <benchmark_name>` to add any built-in benchmark for local customization:
 
-```toml
+````toml
 # Define a local configuration for the PubMedQA benchmark.
 [benchmarks.pubmedqa]
 
-# Use the configurable no-code evaluation framework.
-type = "custom-nocode"
+# Type must be specified.
+type = "custom_nocode"
 
 # Use the same dataset as the built-in PubMedQA benchmark.
 dataset = "hf://quantiles/PubMedQA"
 
-# Run the evaluation on 50 samples.
+# Run 50 samples of the benchmark.
 # Omit this field to evaluate the full dataset.
 samples = 50
 
@@ -67,43 +67,37 @@ For additional guidance, see:
 
 - [Configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up hosted AI models, managing credentials, and troubleshooting configuration issues.
-- [CLI configuration examples](./examples/configs) and [custom no-code examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
+- [Custom-code example](./examples/configs/custom_code/quantiles.toml) and [custom configuration examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
+
+ASK AARON IS THIS SECTION IS RIGHT/NEED
 
 ## Architecture
 
-ASK AARON IF THIS NEEDS TO CHANGE
-
-The Quantiles CLI, `qt` runs code locally, while `qt` handles durability and observability.
+The Quantiles CLI, `qt`, resolves configuration, orchestrates evaluation runs, and stores results locally:
 
 ```
-+--------------------------------------+
-|   Benchmark / Custom Evaluation      |
-+-------------------+------------------+
-                    │
-                    │  HTTP / JSON
-                    │
-                    ▼
-+--------------------------------------+
-|            Quantiles Server          |
-+-------------------+------------------+
-                    │
-                    │  SQLite / Parquet
-                    │
-                    ▼
-+------------------------------------------------+
-|                 .quantiles/                    |
-|  quantiles.sqlite       metrics/*.parquet      |
-+-------------------+----------------------------+
-                    │
-                    │
-                    │
-                    ▼
-+--------------------------------------+
-|                 CLI                  |
-|        (list, show, compare)         |
-+--------------------------------------+
++------------------------------+
+|            qt CLI            |
++---------------+--------------+
+                |
+      +---------+---------+
+      |                   |
+      v                   v
++----------------+  +-------------------+
+| Built-in and   |  | custom_code child |
+| custom_nocode  |  | process + local   |
+| runtime        |  | API server        |
++--------+-------+  +---------+---------+
+         |                    |
+         +---------+----------+
+                   v
++---------------------------------------+
+|              .quantiles/              |
+|  quantiles.sqlite   metrics/*.parquet |
++---------------------------------------+
 ```
 
-- **Server** owns durability decisions for run state, and metrics.
-- **Client** (your script) owns code execution; the server never runs your evaluation logic.
-- **CLI** reads run data from SQLite and metrics from Parquet.
+- **Built-in and `custom_nocode` evaluations** execute inside the local CLI process.
+- **`custom_code` evaluations** execute as user-configured child processes and record workflow data through the local API server.
+- **CLI inspection commands** read run data from SQLite and metrics from Parquet.
+````

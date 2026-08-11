@@ -3,25 +3,31 @@
 # hosted AI model or number of samples to run.
 #
 # When you run a benchmark, Quantiles first checks for a matching local
-# configuration in `quantiles.tom` or `.quantiles.toml`. If none is found, 
-# it queries the remote Quantiles benchmark registry at `https://api.quantiles.io` 
+# configuration in `quantiles.toml` or `.quantiles.toml`. If none is found,
+# it queries the hosted Quantiles benchmark registry at `https://api.quantiles.io`
 # for a built-in benchmark with the requested name.
 #
-# Each benchmark below uses the `random` demo model. For exact-match
-# evaluations, the model generates random text. For multiple-choice
-# evaluations, it selects uniformly from the available answer choices.
+# Each benchmark below uses the `random` demo model. For exact-match and
+# similarity evaluations, the model generates random text; similarity scoring
+# then applies the configured local metric. For multiple-choice evaluations,
+# the model selects uniformly from the available answer choices.
 #
-# Each benchmark is limited to 10 samples. Set `samples` to any positive
+# Each benchmark is limited to 10 samples. Set `limit` to any positive
 # integer up to the number of available samples, or omit it to run the
 # full benchmark.
+#
+# To learn more about custom configuration evaluations, see:
+# https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
 
 # SimpleQA Verified
-# Read more about the SimpleQA-verified benchmark here:
+# This example uses cosine similarity with the local FastEmbed model. The first
+# run may download the embedding model if it is not already cached.
+# Read more about the SimpleQA Verified benchmark here:
 # https://arxiv.org/abs/2509.07968
 
 [benchmarks.simpleqa-verified]
 type = "custom_nocode"
-style = { type = "exact_match", golden_column = "answer" }
+style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }
 dataset = { name = "quantiles/simpleqa-verified" }
 model = "random"
 prompt_template_file = "prompts/qa.txt"
@@ -78,7 +84,7 @@ choices = { column = "options" }
 choice_labels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 answer = { label_column = "answer" }
 
-# GPQA Diamond 
+# GPQA Diamond
 # Read more about GPQA here:
 # https://arxiv.org/abs/2311.12022
 
@@ -87,7 +93,7 @@ type = "custom_nocode"
 dataset = { name = "quantiles/gpqa", config_name = "gpqa_diamond", split = "train" }
 model = "random"
 prompt_template_file = "prompts/gpqa.txt"
-limit=10
+limit = 10
 # This key shows F1 aggregate metrics whether or not the `--json` flag is passed to `qt show`,
 # and shows a confusion matrix only when the `--json` flag is passed.
 metrics = [{ name = "f1", show = "all" }, { name = "confusion", show = "json" }]

@@ -16,7 +16,7 @@ Before attempting tasks in this repository, read these files:
 
 ## Scope
 
-These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It retrieves and runs benchmarks and evaluations, executes evaluations locally, records steps, metrics, events, inputs, and outputs, and runs eval comparisons locally so teams can inspect results, identify regressions, and iterate with confidence.
+These instructions apply to the Quantiles open-source repository. Quantiles is a local-first CLI and SDK toolchain for running AI evaluation workflows with fast, continuous feedback. It retrieves built-in benchmark configurations, executes benchmarks and evaluations locally, records steps, metrics, events, inputs, and outputs, and compares runs locally so teams can inspect results, identify regressions, and iterate with confidence.
 
 Root-level files in this repository provide project-wide orientation, contribution guidance, security policy, licensing, and agent instructions. Implementation-specific work belongs in the relevant subdirectory. If a subdirectory has its own `AGENTS.md` file, follow the nearest one first. Subdirectory instructions should override this root guide for implementation details, package managers, commands, tests, and code style. User instructions may customize the workflow for their project, environment, or preferences, but they must not override safety requirements, system instructions, repository safeguards, or security boundaries.
 
@@ -112,6 +112,7 @@ Preserve Quantiles as local-first infrastructure. Follow the guidelines below to
 
 - The CLI and local server should store Quantiles state locally by default.
 - Load benchmark configurations only from a local configuration file or the hosted Quantiles benchmark registry. Do not use any other source unless explicitly requested by the user.
+- Evaluation workflows may download datasets or call remote model providers, hosted judges, APIs, or external tools only when the selected configuration requires them. Keep this network activity explicit.
 - Do not inspect, print, summarize, commit, or infer values from `.env` or `.envrc` files, secrets, tokens, private datasets, PHI, customer data, or local Quantiles databases unless the user explicitly asks and the data is safe to inspect.
 - Never commit the `.quantiles/` directory, SQLite databases, Parquet metrics, local traces, benchmark outputs, provider credentials, or temporary run artifacts.
 - Use placeholder names such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `QUANTILES_API_KEY` when examples need credentials.
