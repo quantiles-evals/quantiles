@@ -1,7 +1,7 @@
 monorepo_root = true
 
 [monorepo]
-config_roots = [".", "cli", "typescript", "python", "python-examples"]
+config_roots = [".", "cli", "typescript", "python", "python-examples", "custom-code-examples/t3-airline", "custom-code-examples/swebench-pro"]
 
 [tools]
 # needed by the `.use_buf()` call in cli/build.rs

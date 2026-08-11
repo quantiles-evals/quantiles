@@ -193,7 +193,7 @@ def run_tau3(config: Tau3AirlineConfig) -> dict[str, JsonValue]:
       f"task {first['task_id']}, trial {first['trial']}: {first['error']}"
     )
   return {
-    "benchmark": "tau3-airline",
+    "benchmark": "t3-airline",
     "config": config.to_json(),
     "summary": summarize_results(upstream),
     "upstream": upstream,
@@ -208,7 +208,7 @@ async def handler(input_value: JsonValue, ctx: WorkflowContext) -> JsonValue:
 
   result = await step(
     ctx,
-    step_key="run-official-tau3-airline",
+    step_key="run-official-t3-airline",
     input_value=config.to_json(),
     execute=execute,
   )
@@ -226,7 +226,7 @@ async def handler(input_value: JsonValue, ctx: WorkflowContext) -> JsonValue:
   return result
 
 
-tau3_airline = workflow("tau3-airline", handler)
+t3_airline = workflow("t3-airline", handler)
 
 if __name__ == "__main__":
-  entrypoint(tau3_airline)
+  entrypoint(t3_airline)

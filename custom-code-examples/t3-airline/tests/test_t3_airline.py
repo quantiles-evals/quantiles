@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-import tau3_airline
+import t3_airline
 
 
 def test_parse_config_uses_small_defaults_and_normalizes_models() -> None:
-  config = tau3_airline.parse_config(
+  config = t3_airline.parse_config(
     {
       "agent_model": "anthropic:claude-sonnet-4-5",
       "user_model": "openai:gpt-4.1",
@@ -22,7 +22,7 @@ def test_parse_config_uses_small_defaults_and_normalizes_models() -> None:
 
 
 def test_parse_config_accepts_task_ids() -> None:
-  config = tau3_airline.parse_config({"task_ids": ["0", "1"], "seed": 42})
+  config = t3_airline.parse_config({"task_ids": ["0", "1"], "seed": 42})
 
   assert config.task_ids == ("0", "1")
   assert config.seed == 42
@@ -39,11 +39,11 @@ def test_parse_config_accepts_task_ids() -> None:
 )
 def test_parse_config_rejects_invalid_input(input_value: object, message: str) -> None:
   with pytest.raises(ValueError, match=message):
-    tau3_airline.parse_config(input_value)  # type: ignore[arg-type]
+    t3_airline.parse_config(input_value)  # type: ignore[arg-type]
 
 
 def test_summarize_results_uses_official_rewards() -> None:
-  summary = tau3_airline.summarize_results(
+  summary = t3_airline.summarize_results(
     {
       "simulations": [
         {"reward_info": {"reward": 1.0}},
@@ -61,7 +61,7 @@ def test_summarize_results_uses_official_rewards() -> None:
 
 
 def test_infrastructure_failures_extracts_upstream_error() -> None:
-  failures = tau3_airline.infrastructure_failures(
+  failures = t3_airline.infrastructure_failures(
     {
       "simulations": [
         {
@@ -110,11 +110,11 @@ def test_run_tau3_delegates_to_official_runner(
     assert config is captured
     return _FakeResults({"simulations": [{"reward_info": {"reward": 1.0}}]})
 
-  monkeypatch.setattr(tau3_airline, "_load_tau3", lambda: (fake_run_domain, fake_config))
+  monkeypatch.setattr(t3_airline, "_load_tau3", lambda: (fake_run_domain, fake_config))
 
   data_dir = tmp_path / "data"
   data_dir.mkdir()
-  result = tau3_airline.run_tau3(tau3_airline.Tau3AirlineConfig(data_dir=str(data_dir)))
+  result = t3_airline.run_tau3(t3_airline.Tau3AirlineConfig(data_dir=str(data_dir)))
 
   assert captured["domain"] == "airline"
   assert captured["task_split_name"] == "base"
@@ -128,10 +128,10 @@ def test_run_tau3_delegates_to_official_runner(
 
 
 def test_run_tau3_requires_upstream_data_checkout(tmp_path: Path) -> None:
-  config = tau3_airline.Tau3AirlineConfig(data_dir=str(tmp_path / "missing"))
+  config = t3_airline.Tau3AirlineConfig(data_dir=str(tmp_path / "missing"))
 
   with pytest.raises(FileNotFoundError, match="tau3 data directory not found"):
-    tau3_airline.run_tau3(config)
+    t3_airline.run_tau3(config)
 
 
 def test_run_tau3_raises_for_upstream_infrastructure_failure(
@@ -154,13 +154,13 @@ def test_run_tau3_raises_for_upstream_infrastructure_failure(
       }
     )
 
-  monkeypatch.setattr(tau3_airline, "_load_tau3", lambda: (fake_run_domain, fake_config))
+  monkeypatch.setattr(t3_airline, "_load_tau3", lambda: (fake_run_domain, fake_config))
   data_dir = tmp_path / "data"
   data_dir.mkdir()
-  config = tau3_airline.Tau3AirlineConfig(data_dir=str(data_dir))
+  config = t3_airline.Tau3AirlineConfig(data_dir=str(data_dir))
 
   with pytest.raises(
     RuntimeError,
     match=r"tau3 reported 1 infrastructure failure\(s\); task 0, trial 0: provider denied",
   ):
-    tau3_airline.run_tau3(config)
+    t3_airline.run_tau3(config)
