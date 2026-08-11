@@ -39,7 +39,9 @@ pub async fn run(
             run_configured_benchmark(workflow_name, cli_input, json, process_start, bench).await
         }
         None => {
-            if let Some(remote) =
+            if let Some(builtin) = builtins::resolve(workflow_name) {
+                run_native_benchmark(workflow_name, cli_input, json, process_start, builtin).await
+            } else if let Some(remote) =
                 qt::benchmark_registry::resolve_and_download(workflow_name, None, &remote_url)
                     .await?
             {
@@ -57,6 +59,37 @@ pub async fn run(
             }
         }
     }
+}
+
+/// Creates and executes a benchmark implemented natively inside the CLI.
+async fn run_native_benchmark(
+    workflow_name: &str,
+    input: Option<&str>,
+    json: bool,
+    process_start: Instant,
+    builtin: Box<dyn builtins::BuiltinWorkflow>,
+) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let root = db::resolve_workspace_root(&cwd, true).await?;
+    let db = db::open_workspace(&root).await?;
+    let metrics_store = MetricsStore::new(db::metrics_dir(&root))?;
+    let run_id = db::create_run(&db, workflow_name, input).await?;
+    if !json {
+        println!("Created run {run_id}");
+    }
+
+    execute_builtin(ExecuteBuiltinArgs {
+        db: &db,
+        metrics_store: &metrics_store,
+        run_id,
+        workflow_name,
+        builtin,
+        input,
+        json,
+        process_start,
+        remote_hash: None,
+    })
+    .await
 }
 
 /// Runs a benchmark defined in the local configuration.

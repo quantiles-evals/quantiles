@@ -36,6 +36,8 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a 
 The CLI supports two locally configured evaluation types and remote registry benchmarks:
 
 - [`custom_nocode` evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration. Supported scoring styles include exact match, multiple choice, and text similarity.
+- `tau3-mock` is a native structured-tool-calling conformance benchmark for the in-process τ³-style agent harness. With no model configured, it uses a local deterministic structured-tool demo model. It records tool trajectories, isolated environment state, component rewards, and `pass_at_k`; it is not an official τ³ leaderboard domain. See [`src/builtins/tau3/README.md`](src/builtins/tau3/README.md).
+- `tau3-airline` is reserved for the forthcoming official-compatible airline implementation and currently returns a not-implemented error.
 - [`custom_code` evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 - Registry benchmarks are downloaded by name from the Quantiles remote benchmark service and executed locally using the native `custom_nocode` runtime.
 

@@ -12,6 +12,7 @@ use qt::metrics_store::MetricsStore;
 #[derive(Debug)]
 pub(crate) enum ResumePlan {
     CustomNoCode,
+    NativeBuiltin,
     CustomCode(Vec<String>),
     RemoteBenchmark,
 }
@@ -55,10 +56,16 @@ pub(crate) fn plan_resume(
                 qt::config::BenchmarkConfig::CustomNoCode(_) => Ok(ResumePlan::CustomNoCode),
             }
         }
-        None => bail!(
-            "no config section found for benchmark `{workflow_name}`; \
-             cannot resume custom eval without config"
-        ),
+        None => {
+            if builtins::resolve(workflow_name).is_some() {
+                Ok(ResumePlan::NativeBuiltin)
+            } else {
+                bail!(
+                    "no config section found for benchmark `{workflow_name}`; \
+                     cannot resume custom eval without config"
+                )
+            }
+        }
     }
 }
 
@@ -212,6 +219,22 @@ async fn execute_resume_plan(args: ExecuteResumeArgs<'_>) -> Result<()> {
         process_start,
     } = args;
     match plan {
+        ResumePlan::NativeBuiltin => {
+            let builtin = builtins::resolve(workflow_name)
+                .with_context(|| format!("native benchmark `{workflow_name}` not found"))?;
+            super::run::execute_builtin(super::run::ExecuteBuiltinArgs {
+                db,
+                metrics_store,
+                run_id,
+                workflow_name,
+                builtin,
+                input: stored_input,
+                json,
+                process_start,
+                remote_hash: None,
+            })
+            .await
+        }
         ResumePlan::CustomNoCode => {
             let Some(qt::config::BenchmarkConfig::CustomNoCode(config)) = bench_config else {
                 unreachable!("custom no-code resume plan requires custom no-code config");
@@ -346,6 +369,14 @@ mod tests {
     fn plan_resume_unknown_without_config_errors() {
         let err = plan_resume("unknown-eval", &RunStatus::Failed, None, None).unwrap_err();
         assert!(err.to_string().contains("no config section found"));
+    }
+
+    #[test]
+    fn plan_resume_native_tau3_without_config() {
+        for workflow_name in ["tau3-mock", "tau3-airline"] {
+            let plan = plan_resume(workflow_name, &RunStatus::Failed, None, None).unwrap();
+            assert!(matches!(plan, ResumePlan::NativeBuiltin));
+        }
     }
 
     /// Even when a config section is present, it must pass `validate()` before resume

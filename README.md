@@ -57,6 +57,16 @@ qt run simpleqa-verified
 
 > The command above downloads the [`simpleqa-verified`](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) definition from the Quantiles benchmark registry and runs it locally with a demo model that generates random text. Fetching the benchmark definition and an uncached dataset requires network access, but no provider API key or paid model inference is required. Do not use demo-model results to draw conclusions about model quality.
 
+The CLI also includes `tau3-mock`, a small native conformance benchmark for
+structured tool calling, model-driven user simulation, mutable task
+environments, trajectory recording, component rewards, and `pass_at_k`. It is
+not an official τ³ leaderboard domain; see the
+[`tau3-mock` implementation notes](cli/src/builtins/tau3/README.md).
+Running `qt run tau3-mock` uses a local deterministic structured-tool demo model
+to validate the harness without provider calls.
+The `tau3-airline` name is reserved for the forthcoming airline implementation
+and currently returns a not-implemented error.
+
 Inspect the recorded run:
 
 ```bash

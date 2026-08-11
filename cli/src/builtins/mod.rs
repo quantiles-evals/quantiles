@@ -2,6 +2,7 @@ mod common;
 mod custom_nocode;
 mod dataset_runner;
 mod output;
+mod tau3;
 
 pub use custom_nocode::CustomNoCodeBuiltin;
 pub use custom_nocode::metrics::{
@@ -33,4 +34,14 @@ pub trait BuiltinWorkflow: Send + Sync {
     fn name(&self) -> String;
     /// Execute the native evaluation and persist its metrics/output.
     async fn execute(&self, ctx: BuiltinContext<'_>) -> Result<()>;
+}
+
+/// Resolve an evaluation that is implemented natively inside the CLI.
+#[must_use]
+pub fn resolve(name: &str) -> Option<Box<dyn BuiltinWorkflow>> {
+    match name {
+        "tau3-mock" => Some(Box::new(tau3::Tau3MockBuiltin)),
+        "tau3-airline" => Some(Box::new(tau3::Tau3AirlineBuiltin)),
+        _ => None,
+    }
 }
