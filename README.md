@@ -86,6 +86,7 @@ Common commands:
 
 ```bash
 qt --version
+qt add <benchmark_name>
 qt run <eval_name>
 qt list
 qt show <run_id>
@@ -116,6 +117,14 @@ Registry benchmarks are ready-to-run evaluations with predefined datasets, scori
 ```bash
 qt run simpleqa-verified --input '{"model":"random","limit":10}'
 ```
+
+To save a registry benchmark in the local configuration, add it by name:
+
+```bash
+qt add simpleqa-verified
+```
+
+This command downloads the benchmark definition and prompt template, appends the benchmark to an existing `quantiles.toml` or `.quantiles.toml`, or creates `quantiles.toml` in the current directory. It returns an error if the benchmark is already configured or is not present in the registry. Pass `--json` for machine-readable output.
 
 The [benchmark hub](https://quantiles.io/benchmark-hub) describes available benchmarks, their evaluation setup, and common metrics used across AI evaluation workflows.
 

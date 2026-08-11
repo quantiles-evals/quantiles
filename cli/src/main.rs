@@ -9,7 +9,10 @@ use clap::Parser;
 
 fn main() -> ExitCode {
     let cli = cli::Cli::parse();
-    let json_errors = matches!(&cli.command, Some(cli::Command::Resume { json: true, .. }));
+    let json_errors = matches!(
+        &cli.command,
+        Some(cli::Command::Add { json: true, .. } | cli::Command::Resume { json: true, .. })
+    );
 
     match try_main(cli) {
         Ok(()) => ExitCode::SUCCESS,
@@ -50,6 +53,11 @@ async fn async_main(cli: cli::Cli, process_start: Instant) -> Result<()> {
     }
 
     match cli.command.expect("clap requires a subcommand") {
+        cli::Command::Add {
+            benchmark_name,
+            remote_url,
+            json,
+        } => commands::add(&benchmark_name, remote_url.as_deref(), json).await,
         cli::Command::Init => commands::init().await,
         cli::Command::List { json } => commands::list(json).await,
         cli::Command::Compare { run_a, run_b, json } => commands::compare(run_a, run_b, json).await,

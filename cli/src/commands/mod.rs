@@ -1,3 +1,4 @@
+mod add;
 mod compare;
 mod custom_nocode_metrics;
 mod init;
@@ -7,6 +8,7 @@ mod run;
 mod serve;
 mod show;
 
+pub use add::add;
 pub use compare::compare;
 pub use init::init;
 pub use list::list;
