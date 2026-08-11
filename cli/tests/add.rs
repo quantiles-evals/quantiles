@@ -19,6 +19,22 @@ command = ["echo"]
 "#;
 
 #[test]
+fn missing_benchmark_argument_error_is_json_when_requested() {
+    assert_json_parse_error(
+        &["add", "--json"],
+        "the following required arguments were not provided",
+    );
+}
+
+#[test]
+fn unknown_option_error_is_json_when_requested() {
+    assert_json_parse_error(
+        &["add", "remote-test", "--json", "--unknown"],
+        "unexpected argument '--unknown'",
+    );
+}
+
+#[test]
 fn duplicate_benchmark_error_is_json_when_requested() {
     let temp = tempfile::tempdir().unwrap();
     std::fs::write(temp.path().join("quantiles.toml"), CONFIG).unwrap();
@@ -96,6 +112,19 @@ async fn missing_remote_benchmark_returns_json_and_does_not_create_config() {
     assert!(!temp.path().join("quantiles.toml").exists());
     assert!(!temp.path().join(".quantiles").exists());
     assert!(!temp.path().join("missing-prompt").exists());
+}
+
+fn assert_json_parse_error(args: &[&str], expected_message: &str) {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("qt"))
+        .args(args)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stderr.is_empty());
+    let stdout: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(stdout.as_object().unwrap().len(), 1);
+    assert!(stdout["error"].as_str().unwrap().contains(expected_message));
 }
 
 #[tokio::test(flavor = "multi_thread")]
