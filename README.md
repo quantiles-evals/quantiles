@@ -27,7 +27,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 **[2026.07.27]** Published the [model configuration guide](https://quantiles.io/documentation/model-configuration), covering the built-in demo model, supported model providers, credentials, request concurrency, cost and data handling, and troubleshooting.
 
-**[2026.07.19]** Added custom no-code (`custom_nocode`) evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom no-code evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
+**[2026.07.19]** Added custom configuration (`custom_nocode`) evaluations, which let users configure custom evals in `quantiles.toml` without writing or maintaining custom code. See the [custom configuration evaluation documentation](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) for details.
 
 ## Why use Quantiles?
 
@@ -109,14 +109,14 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 ### Configuration and customization
 
 
-You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
+You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
 
 See the following resources for more details:
 
 - [Configuration documentation](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) - Configure provider models and credentials, and troubleshoot common setup issues.
 - [Custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
-- [Custom no-code examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
+- [Custom configuration examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
 
 #### Registry benchmarks
 
@@ -140,10 +140,10 @@ The [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub) describes avai
 
 Custom evaluations measure behavior specific to your product, workflow, prompt, dataset, rubric, or release process. Quantiles provides two ways to build them:
 
-- [Custom no-code (`custom_nocode`) evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations): define a custom evaluation entirely in configuration without writing or maintaining Python.
+- [Custom configuration (`custom_nocode`) evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations): define a custom evaluation entirely in configuration without writing or maintaining Python.
 - [Custom code (`custom_code`) evaluations](https://quantiles.io/documentation/custom-evaluations): build specialized evaluation logic with [Python](https://quantiles.io/documentation/reference/python-sdk).
 
-Prefer custom no-code evaluations wherever possible because they are easier for humans and agents to create and maintain. Use a custom code evaluation when the required behavior cannot be expressed in configuration.
+Prefer custom configuration evaluations wherever possible because they are easier for humans and agents to create and maintain. Use a custom code evaluation when the required behavior cannot be expressed in configuration.
 
 ##### Python SDK for `custom_code` evaluations
 

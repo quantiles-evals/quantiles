@@ -39,7 +39,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a 
 The CLI supports built-in benchmarks and two locally configured evaluation types:
 
 - [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations retrieved by name from the hosted Quantiles benchmark registry and executed locally using the native `custom_nocode` runtime.
-- [Custom no-code (`custom_nocode`) evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration. Supported scoring styles include exact match, multiple choice, and text similarity.
+- [Custom configuration (`custom_nocode`) evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) define the dataset, prompt template, model, and scoring method entirely in configuration. Supported scoring styles include exact match, multiple choice, and text similarity.
 - [Custom code (`custom_code`) evaluations](https://quantiles.io/documentation/custom-evaluations) run your own Python evaluation through the Quantiles Python SDK.
 
 Add a `quantiles.toml` or `.quantiles.toml` file to configure a custom evaluation. For example:
@@ -53,7 +53,7 @@ command = ["uv", "run", "eval.py"]
 model = "openai:gpt-5.6"
 ```
 
-Custom no-code similarity evaluations support Levenshtein distance and cosine similarity. The following configuration uses Levenshtein distance:
+Custom configuration similarity evaluations support Levenshtein distance and cosine similarity. The following configuration uses Levenshtein distance:
 
 ```toml
 [benchmarks.simpleqa-levenshtein]
@@ -77,7 +77,7 @@ For additional guidance, see:
 
 - [Configuration documentation](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up provider models, managing credentials, and troubleshooting configuration issues.
-- [Custom-code example](./examples/configs/custom_code/quantiles.toml) and [custom no-code examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
+- [Custom-code example](./examples/configs/custom_code/quantiles.toml) and [custom configuration examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
 
 ### Hosted benchmark registry
 
