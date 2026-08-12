@@ -86,7 +86,7 @@ qt --help
 
 ## CLI
 
-The `qt` CLI runs local evaluation workflows. It stores run metadata in the local workspace, starts a local HTTP server when needed, records workflow steps and metrics, and compares runs from the command line.
+The `qt` CLI starts a local HTTP server when needed, runs evaluation workflows, stores run metadata in the local workspace, records and analyzes workflow steps and metrics, compares runs from the command line, and resumes failed or interrupted evaluation runs.
 
 Common commands:
 
@@ -96,7 +96,7 @@ qt add <eval_name>
 ```
 
 ```bash
-# Run a built-in benchmark, custom configuration evaluation, or custom code evaluation
+# Run a benchmark or evaluation
 qt run <eval_name>
 ```
 
@@ -136,23 +136,24 @@ You can customize how the CLI executes [built-in benchmarks](https://quantiles.i
 See the following resources for more details:
 
 - [Configuration documentation](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
-- [Model configuration guide](https://quantiles.io/documentation/model-configuration) - Configure provider models and credentials, and troubleshoot common setup issues.
-- [Custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
 - [Custom configuration examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
+- [Custom-code configuration examples](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
 
-#### Registry benchmarks
+#### Built-in benchmarks
 
-[Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methods, and metrics. Run them directly from the hosted registry without a local configuration, and apply supported run-specific overrides such as the model and sample limit with `--input`. To save and persistently customize a built-in benchmark, use `qt add` as described below.
+[Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methods, and metrics. Run them directly from the hosted Quantiles benchmark registry with their default configuration, or configure their settings in one of two ways:
 
-When a built-in benchmark is run, Quantiles downloads its definition and prompt files into memory and verifies each file against its declared size and SHA-256 hash. These files are not cached on disk. Benchmark datasets are downloaded separately and may be cached locally.
-
-To save and customize a built-in benchmark locally, add it by name:
+- [Apply a one-time override](https://quantiles.io/documentation/built-in-benchmarks#apply-one-time-configuration-overrides), such as the AI model or sample limit, with `--input`. For example:
 
 ```bash
-qt add <benchmark>
+qt run gpqa --input '{"model":"openai:gpt-5.6-luna","limit":10}'
 ```
 
-This command downloads the benchmark definition and prompt template, appends the benchmark to an existing `quantiles.toml` or `.quantiles.toml`, or creates `quantiles.toml` in the current directory. The prompt template is stored beside the configuration at `<benchmark_name>-prompt/prompt.txt`. The command returns an error if the benchmark is already configured or is not present in the registry. Pass `--json` for machine-readable output.
+- [Add a customized built-in benchmark](https://quantiles.io/documentation/built-in-benchmarks#apply-persistent-configuration-settings) to a config file to apply the same settings in future runs. For example:
+
+```bash
+qt add gpqa
+```
 
 The [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub) describes available benchmarks, their evaluation setup, and common metrics used across AI evaluation workflows.
 
