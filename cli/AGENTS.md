@@ -2,12 +2,15 @@
 
 ## Project Overview
 
-`qt`, the Quantiles CLI, is a local-first Rust CLI for running and analyzing AI evaluations, benchmarks, and agent loops. It stores run data in `.quantiles/quantiles.sqlite`, stores metrics as Parquet files, and provides commands for inspecting recorded evaluation runs. Dataset downloads may occur when a user selects a benchmark, while model-provider calls occur only when configured. The long-term goal is a developer tool for reliable AI/ML evaluation workflows where evaluation runs, execution history, aggregrate and sample-level outputs, and events are queryable from the start.
+`qt`, the Quantiles CLI, is a local-first Rust CLI for running and analyzing AI evaluations, benchmarks, and agent loops. It stores run data in `.quantiles/quantiles.sqlite`, stores metrics as Parquet files, and provides commands for inspecting recorded evaluation runs. The CLI can retrieve ready-to-run benchmark configurations from the hosted Quantiles registry and call hosted AI model providers when configured. Its goal is to provide a developer tool for reliable AI/ML evaluation workflows where evaluation runs, execution history, aggregate and sample-level outputs, and events are queryable from the start.
 
 ## Working in This Repository
 
 - Prefer focused changes that fit the current CLI and library structure.
-- Preserve local-first, offline-by-default behavior. Do not introduce implicit network or cloud behavior. When a task explicitly adds remote behavior, make it user-configured, document it clearly, and call it out to the user.
+- Preserve local evaluation execution and storage. Keep all network boundaries explicit and documented.
+- Do not add telemetry or background uploads.
+- Any non-local network activity must be directly triggered by a user-invoked command or explicitly configured workflow, be necessary for that workflow, and be clearly documented.
+- Preserve supported network-dependent workflows such as resolving built-in benchmarks, downloading datasets, and calling configured model providers.
 - Preserve existing SQLite data model assumptions unless the change includes a deliberate schema migration or initialization update.
 - Use idiomatic Rust and keep error handling clear. This project uses [`anyhow`](https://docs.rs/anyhow) to create and propagate application-level errors.
 - Avoid broad refactors while implementing narrow behavior changes.
