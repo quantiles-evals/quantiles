@@ -109,7 +109,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 ### Configuration and customization
 
 
-You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
+You can define [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
 
 See the following resources for more details:
 
@@ -120,7 +120,7 @@ See the following resources for more details:
 
 #### Registry benchmarks
 
-[Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methods, and metrics. Use them to start evaluating quickly or establish a repeatable baseline. Configuration is optional and can override execution settings such as the model and sample count.
+[Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methods, and metrics. Run them directly from the hosted registry without a local configuration, and apply supported run-specific overrides such as the model and sample limit with `--input`. To save and persistently customize a built-in benchmark, use `qt add` as described below.
 
 When a built-in benchmark is run, Quantiles downloads its definition and prompt files into memory and verifies each file against its declared size and SHA-256 hash. These files are not cached on disk. Benchmark datasets are downloaded separately and may be cached locally.
 
