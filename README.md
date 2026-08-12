@@ -23,7 +23,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
-**[2026.08.08]** Added built-in benchmark support for `gpqa`, `medmcqa`, `medqa`, `mmlu-pro`, and `pubmedqa`. The new `qt add <benchmark_name>` command downloads a built-in benchmark’s configuration and prompt from the hosted registry, adds them to the local project, and makes the benchmark easy to customize. See [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) for details.
+**[2026.08.12]** Added built-in benchmark support for `gpqa`, `medmcqa`, `medqa`, `mmlu-pro`, and `pubmedqa`. The new `qt add <benchmark_name>` command downloads a built-in benchmark’s configuration and prompt from the hosted registry, adds them to the local project, and makes the benchmark easy to customize. See [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) for details and the [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub#built-in) for detailed information on each benchmark.
 
 **[2026.07.27]** Published the [model configuration guide](https://quantiles.io/documentation/model-configuration), covering the built-in demo model, supported model providers, credentials, request concurrency, cost and data handling, and troubleshooting.
 
@@ -107,7 +107,6 @@ qt resume <run_id>
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for available commands, options, and usage details.
 
 ### Configuration and customization
-
 
 You can define [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
 
