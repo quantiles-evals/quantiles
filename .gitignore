@@ -3,3 +3,4 @@
 /.quantiles
 node_modules
 .fastembed_cache
+/python-examples/.swebench-pro-results/
