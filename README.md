@@ -41,7 +41,7 @@ Evaluation workflows quickly outgrow one-off scripts once teams need caching, re
 - Write standard Python with familiar Pythonic patterns
 - Resume failed or interrupted evaluation runs without repeating completed work
 
-Quantiles borrows concepts from durable workflow execution systems to make evaluation runs resilient to crashes and restarts, while adding a high-throughput execution engine, rich observability, metrics, and eval reproducibility. Use it to build and run custom evals or built-in benchmarks, then inspect what changed across runs without requiring notebooks, pipelines, or manual comparisons.
+Quantiles borrows concepts from durable workflow execution systems to make evaluation runs resilient to crashes and restarts, while adding a high-throughput execution engine, rich observability, metrics, and eval reproducibility. Use it to run custom evaluations or benchmarks from the Quantiles registry, then inspect what changed across runs without requiring notebooks, pipelines, manual comparisons, or a hosted evaluation service.
 
 ## Quickstart
 
@@ -51,7 +51,7 @@ Install the CLI:
 curl -fsSL https://cli.quantiles.io/install.sh | bash
 ```
 
-Run the [SimpleQA Verified](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) built-in benchmark:
+Run [SimpleQA Verified](https://quantiles.io/benchmark-hub/benchmark/simpleqa-verified) from the Quantiles benchmark registry:
 
 ```bash
 qt run simpleqa-verified
@@ -108,6 +108,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 
 ### Configuration and customization
 
+
 You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
 
 See the following resources for more details:
@@ -117,7 +118,7 @@ See the following resources for more details:
 - [Custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
 - [Custom no-code examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
 
-#### Built-in benchmarks
+#### Registry benchmarks
 
 [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) are ready-to-run evaluations with predefined datasets, scoring methods, and metrics. Use them to start evaluating quickly or establish a repeatable baseline. Configuration is optional and can override execution settings such as the model and sample count.
 
@@ -133,7 +134,7 @@ This command downloads the benchmark definition and prompt template, appends the
 
 The [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub) describes available benchmarks, their evaluation setup, and common metrics used across AI evaluation workflows.
 
-> To request another open-source built-in benchmark, [file an issue](https://github.com/quantiles-evals/quantiles/issues) with its name, source dataset or repository, and any available reference implementation.
+> To request another registry benchmark, [file an issue](https://github.com/quantiles-evals/quantiles/issues) with its name, source dataset or repository, and any available reference implementation.
 
 #### Custom evaluations
 

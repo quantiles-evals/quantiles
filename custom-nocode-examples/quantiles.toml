@@ -19,12 +19,14 @@
 # To learn more about custom configuration evaluations, see:
 # https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations
 
+
 # SimpleQA Verified
+#
 # This example uses cosine similarity with the local FastEmbed model. The first
 # run may download the embedding model if it is not already cached.
 # Read more about the SimpleQA Verified benchmark here:
+#
 # https://arxiv.org/abs/2509.07968
-
 [benchmarks.simpleqa-verified]
 type = "custom_nocode"
 style = { type = "similarity", golden_column = "answer", metric = { type = "cosine", embedding_model = "fastembed" } }

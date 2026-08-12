@@ -98,7 +98,7 @@ Start with the smallest useful sample limit before running a full benchmark with
 
 Ask before running any evaluation that is expected to be slow, expensive, call an external model API, network-dependent, destructive, or likely to meaningfully modify local run state. Note that demo model runs are for workflow validation only. Do not treat them as model-quality benchmark evidence.
 
-Do not run evaluations that call external model APIs unless the user explicitly requests one or provides a provider-prefixed model name. Configure providers in the `quantiles.toml` config file using the [model configuration guide](https://quantiles.io/documentation/model-configuration). Follow configuration examples in the [`cli/examples/configs`](./cli/examples/configs) directory. Before running an evaluation that calls an external model API, verify that the required provider API key is configured, but never print or expose the key value.
+Do not run evaluations that call external model APIs unless the user explicitly requests one or provides a provider-prefixed model name. Configure providers using the [model configuration guide](https://quantiles.io/documentation/model-configuration). For local evaluations, follow the [`custom_code`](./cli/examples/configs/custom_code/quantiles.toml) and [`custom_nocode`](./custom-nocode-examples/quantiles.toml) configuration examples. For registry benchmarks, pass supported run-specific overrides with `--input`. Before running an evaluation that calls an external model API, verify that the required provider API key is configured, but never print or expose the key value.
 
 Model inputs should use provider-prefixed model names, for example:
 

@@ -11,15 +11,24 @@ message ResolveBenchmarkRequest {
   // Stable benchmark name, such as "simpleqa-verified".
   string benchmark_name = 1;
 
-  // Immutable version to resolve. An empty value requests the latest published version.
+  // Immutable version to resolve.
+  //
+  // Versions that were previously published are immutable, so
+  // any valid version request should return a valid response.
+  //
+  // If you pass an empty value for a valid benchmark, you'll
+  // get the latest published version.
   string version = 2;
 }
 
 message ResolveBenchmarkResponse {
   string benchmark_name = 1;
+
+  // Immutable published version resolved by the registry.
   string version = 2;
 
-  // SHA-256 digest of the canonical resource manifest.
+  // SHA-256 digest of the canonical resource manifest. After a
+  // version is published, this value must be stable.
   string manifest_sha256 = 3;
 
   repeated BenchmarkResource resources = 4;

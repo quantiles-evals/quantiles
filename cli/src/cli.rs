@@ -28,6 +28,16 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Add a benchmark from the remote registry to the local configuration.
+    Add {
+        benchmark_name: String,
+        /// Override the remote benchmark service URL.
+        #[arg(long)]
+        remote_url: Option<String>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Initialize or update a local Quantiles workspace.
     Init,
     /// Show a list of all eval runs.

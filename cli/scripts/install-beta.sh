@@ -10,7 +10,7 @@ exe="$bin_dir/qt"
 installed_help_text() {
     echo "Quantiles is a full-featured local-native toolchain for running and analyzing AI evals at scale."
     echo ""
-    echo "Run your first benchmark example without calling an external model API or incurring any usage charges:"
+    echo "Download a registry benchmark and run it locally without calling an external model API or incurring model usage charges:"
     echo ""
     echo "    qt run pubmedqa"
     echo ""

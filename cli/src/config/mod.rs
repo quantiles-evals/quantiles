@@ -3,15 +3,12 @@ use std::collections::HashMap;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Deserializer};
 
-use crate::llm::Sampler;
-
 /// Configuration for a single benchmark.
 ///
 /// Exactly one of the variants is deserialized based on the `type` field:
-/// `builtin` (default when absent), `custom_code`, or `custom_nocode`.
+/// `custom_code` or `custom_nocode`.
 #[derive(Debug, Clone)]
 pub enum BenchmarkConfig {
-    Builtin(BuiltinBenchmarkConfig),
     CustomCode(CustomCodeBenchmarkConfig),
     CustomNoCode(Box<CustomNoCodeBenchmarkConfig>),
 }
@@ -24,7 +21,6 @@ impl BenchmarkConfig {
     /// Returns an error when a field has an invalid value.
     pub fn validate(&self) -> Result<()> {
         match self {
-            BenchmarkConfig::Builtin(_) => Ok(()),
             BenchmarkConfig::CustomCode(c) => {
                 if c.command.is_empty() {
                     bail!("custom_code benchmark config must have a non-empty `command` field");
@@ -73,39 +69,14 @@ impl<'de> Deserialize<'de> for BenchmarkConfig {
                 })?;
                 Ok(BenchmarkConfig::CustomNoCode(Box::new(config)))
             }
-            Some("builtin") | None => {
-                let config = BuiltinBenchmarkConfig::deserialize(value).map_err(|e| {
-                    serde::de::Error::custom(format!(
-                        "failed to deserialize builtin benchmark config: {e}"
-                    ))
-                })?;
-                Ok(BenchmarkConfig::Builtin(config))
-            }
             Some(other) => Err(serde::de::Error::custom(format!(
-                "invalid benchmark type `{other}`; expected `builtin`, `custom_code`, or `custom_nocode`",
+                "invalid benchmark type `{other}`; expected `custom_code` or `custom_nocode`",
             ))),
+            None => Err(serde::de::Error::custom(
+                "benchmark config requires a `type` field; expected `custom_code` or `custom_nocode`",
+            )),
         }
     }
-}
-
-/// Built-in benchmark configuration.
-#[derive(Debug, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct BuiltinBenchmarkConfig {
-    #[serde(default = "default_type_builtin", rename = "type")]
-    pub type_: String,
-    /// Number of samples (rows) to evaluate.
-    pub samples: Option<usize>,
-    /// Dataset source for this benchmark.
-    pub dataset: String,
-    /// Which model sampler to use for this benchmark.
-    pub model: Option<Sampler>,
-    /// Maximum number of concurrent workers for this benchmark.
-    pub max_workers: Option<usize>,
-}
-
-fn default_type_builtin() -> String {
-    "builtin".to_owned()
 }
 
 /// Custom-code benchmark configuration.
@@ -176,30 +147,22 @@ pub fn load() -> Result<WorkspaceConfig> {
 }
 
 #[cfg(test)]
-#[expect(clippy::needless_raw_string_hashes)]
 mod tests {
     use super::*;
 
     #[test]
-    fn deserialize_builtin_without_type() {
+    fn benchmark_without_type_errors() {
         let toml = r#"
             [benchmarks.demo]
             dataset = "hf://quantiles/demo"
             samples = 10
         "#;
-        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
-        let bench = config.benchmarks.get("demo").unwrap();
-        assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
-        if let BenchmarkConfig::Builtin(b) = bench {
-            assert_eq!(b.type_, "builtin");
-            assert_eq!(b.samples, Some(10));
-            assert_eq!(b.dataset, "hf://quantiles/demo");
-            assert!(b.model.is_none());
-        }
+        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn deserialize_builtin_with_explicit_type() {
+    fn builtin_type_errors() {
         let toml = r#"
             [benchmarks.demo]
             type = "builtin"
@@ -207,22 +170,8 @@ mod tests {
             dataset = "hf://quantiles/demo"
             model = "openai:gpt-4"
         "#;
-        let config: WorkspaceConfig = toml::from_str(toml).unwrap();
-        let bench = config.benchmarks.get("demo").unwrap();
-        assert!(matches!(bench, BenchmarkConfig::Builtin(_)));
-        if let BenchmarkConfig::Builtin(b) = bench {
-            assert_eq!(b.dataset, "hf://quantiles/demo");
-        }
-    }
-
-    #[test]
-    fn builtin_requires_dataset_field() {
-        let toml = r#"
-            [benchmarks.demo]
-            samples = 5
-        "#;
         let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
-        assert!(result.is_err(), "builtin should require dataset field");
+        assert!(result.is_err());
     }
 
     #[test]
@@ -261,30 +210,6 @@ mod tests {
         if let BenchmarkConfig::CustomCode(c) = bench {
             assert!(c.input.is_none());
         }
-    }
-
-    #[test]
-    fn builtin_rejects_command_field() {
-        let toml = r#"
-            [benchmarks.demo]
-            type = "builtin"
-            command = ["echo", "hello"]
-        "#;
-        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
-        assert!(result.is_err(), "builtin should reject command field");
-    }
-
-    #[test]
-    fn builtin_rejects_input_field() {
-        let toml = r#"
-            [benchmarks.demo]
-            type = "builtin"
-
-            [benchmarks.demo.input]
-            foo = "bar"
-        "#;
-        let result: Result<WorkspaceConfig, _> = toml::from_str(toml);
-        assert!(result.is_err(), "builtin should reject input field");
     }
 
     #[test]
