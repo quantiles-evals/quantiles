@@ -27,7 +27,7 @@ qt list
 qt show <run_id>
 ```
 
-Running a built-in benchmark directly from the hosted registry, such as `simpleqa-verified` above, requires an internet connection so that `qt` can retrieve its configuration from `https://api.quantiles.io`.
+Running a built-in benchmark directly from the hosted registry, such as `simpleqa-verified` above, requires an internet connection so that `qt` can retrieve its configuration from the Quantiles hosted benchmark registry (hosted at `api.quantiles.io`).
 
 See the [CLI reference](https://quantiles.io/documentation/reference/cli) for a detailed list of `qt` commands.
 
@@ -65,11 +65,9 @@ model = "openai:gpt-5.6-luna"
 
 For additional guidance, see:
 
-- [Configuration guide](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples.
+- [Configuration documentation](https://quantiles.io/documentation/configuration) for file location, supported fields, validation behavior, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) for guidance on setting up hosted AI models, managing credentials, and troubleshooting configuration issues.
 - [Custom-code example](./examples/configs/custom_code/quantiles.toml) and [custom configuration examples](../custom-nocode-examples/quantiles.toml) for additional runnable examples.
-
-ASK AARON IS THIS SECTION IS RIGHT/NEED
 
 ## Architecture
 

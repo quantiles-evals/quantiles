@@ -4,8 +4,8 @@
 #
 # When you run a benchmark, Quantiles first checks for a matching local
 # configuration in `quantiles.toml` or `.quantiles.toml`. If none is found,
-# it queries the hosted Quantiles benchmark registry at `https://api.quantiles.io`
-# for a built-in benchmark with the requested name.
+# it queries the hosted Quantiles benchmark registry, which is available
+# at `api.quantiles.io`, for a built-in benchmark with the requested name.
 #
 # Each benchmark below uses the `random` demo model. For exact-match and
 # similarity evaluations, the model generates random text; similarity scoring

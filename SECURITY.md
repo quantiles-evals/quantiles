@@ -4,11 +4,11 @@
 
 Quantiles provides security fixes for the latest released versions of actively maintained open source project components.
 
-| Component                 | Supported                                     |
-| ------------------------- | --------------------------------------------- |
-| Latest `qt` CLI release   | Yes                                           |
-| Latest Python SDK release | Yes                                           |
-| Older releases            | No, unless explicitly stated in release notes |
+| Component | Supported |
+| --- | --- |
+| Latest `qt` CLI release   | Yes |
+| Latest Python SDK release | Yes |
+| Older releases | No, unless explicitly stated in release notes |
 
 ## Reporting a Vulnerability
 

@@ -90,7 +90,11 @@ Common commands:
 
 ```bash
 qt --version
-qt add <benchmark_name>
+# download an eval from the Quantiles hosted benchmark registry
+# and save it to the local quantiles.toml configuration file
+qt add <eval_name>
+# run the eval that was just downloaded and saved with the previous
+# `qt add` command.
 qt run <eval_name> [--input <json>]
 qt list
 qt show <run_id>
@@ -104,11 +108,11 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 
 ### Configuration and customization
 
-You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry at `https://api.quantiles.io` for a built-in benchmark with that name.
+You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom no-code evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
 
 See the following resources for more details:
 
-- [Configuration guide](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
+- [Configuration documentation](https://quantiles.io/documentation/configuration) - Detailed configuration instructions and reference documentation for supported fields, validation rules, and examples.
 - [Model configuration guide](https://quantiles.io/documentation/model-configuration) - Configure provider models and credentials, and troubleshoot common setup issues.
 - [Custom-code configuration example](./cli/examples/configs/custom_code/quantiles.toml) - A complete Python SDK evaluation configuration.
 - [Custom no-code examples](./custom-nocode-examples/quantiles.toml) - Complete dataset, prompt, model, and scoring configurations.
