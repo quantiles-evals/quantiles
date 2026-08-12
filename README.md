@@ -23,7 +23,7 @@ Quantiles centralizes its components in this monorepo so developers, researchers
 
 ## ![New](./docs/assets/new-badge.svg) What's New
 
-**[2026.08.12]** Added built-in benchmark support for `gpqa`, `medmcqa`, `medqa`, `mmlu-pro`, and `pubmedqa`. The new `qt add <benchmark_name>` command downloads a built-in benchmark’s configuration and prompt from the hosted registry, adds them to the local project, and makes the benchmark easy to customize. See [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) for details and the [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub#built-in) for detailed information on each benchmark.
+**[2026.08.12]** Added built-in benchmark support for `gpqa`, `medmcqa`, `medqa`, `mmlu-pro`, and `pubmedqa`. The new `qt add <benchmark>` command downloads a built-in benchmark’s configuration and prompt from the hosted registry, adds them to the local project, and makes the benchmark easy to customize. See [Built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks) for details and the [Quantiles Benchmark Hub](https://quantiles.io/benchmark-hub#built-in) for detailed information on each benchmark.
 
 **[2026.07.27]** Published the [model configuration guide](https://quantiles.io/documentation/model-configuration), covering the built-in demo model, supported model providers, credentials, request concurrency, cost and data handling, and troubleshooting.
 
