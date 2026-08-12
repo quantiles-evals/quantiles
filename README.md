@@ -64,13 +64,15 @@ The command above downloads the [`simpleqa-verified`](https://quantiles.io/bench
 Inspect the recorded run:
 
 ```bash
-# If you've run `qt run` before, you might need to pass a different integer to `qt show`
+# If you have run `qt run` previously, replace the value passed to `qt show`
+# with the ID of the evaluation run you want to inspect.
 #
-# See all your runs with `qt list`.
+# Use `qt list` to view all evaluation runs and their IDs.
+
 qt show 1
 ```
 
-Or output machine- and agent-readable JSON:
+To output machine- and agent-readable JSON:
 
 ```bash
 qt show 1 --json
@@ -84,21 +86,42 @@ qt --help
 
 ## CLI
 
-Use `qt show` to inspect a single run, `qt list` to see a list of all runs, and `qt compare` to compare behavior across runs.
+The `qt` CLI runs local evaluation workflows. It stores run metadata in the local workspace, starts a local HTTP server when needed, records workflow steps and metrics, and compares runs from the command line.
 
 Common commands:
 
 ```bash
-qt --version
-# download an eval from the Quantiles hosted benchmark registry
-# and save it to the local quantiles.toml configuration file
+# Import a built-in benchmark configuration and prompt from the hosted Quantiles benchmark registry into quantiles.toml:
 qt add <eval_name>
-# run the eval that was just downloaded and saved with the previous
-# `qt add` command.
+```
+
+```bash
+# Run a built-in benchmark, custom configuration evaluation, or custom code evaluation
+qt run <eval_name>
+```
+
+```bash
+# Add a one-time override to the evaluation run
 qt run <eval_name> [--input <json>]
+```
+
+```bash
+# List all evaluation runs
 qt list
+```
+
+```bash
+# Show details of a given evaluation run
 qt show <run_id>
+```
+
+```bash
+# Compare two evaluation runs
 qt compare <run_id_a> <run_id_b>
+```
+
+```bash
+# Resume a failed or interrupted evaluation run
 qt resume <run_id>
 ```
 
@@ -108,7 +131,7 @@ See the [CLI reference](https://quantiles.io/documentation/reference/cli) for av
 
 ### Configuration and customization
 
-You can define [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations) and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the hosted Quantiles benchmark registry (hosted at `api.quantiles.io`) for a built-in benchmark with that name.
+You can customize how the CLI executes [built-in benchmarks](https://quantiles.io/documentation/built-in-benchmarks), [custom configuration evaluations](https://quantiles.io/documentation/custom-evaluations/custom-nocode-evaluations), and [custom code evaluations](https://quantiles.io/documentation/custom-evaluations) using a `quantiles.toml` or `.quantiles.toml` configuration file in the current working directory. When you run a benchmark or evaluation, Quantiles first checks the configuration file for a matching local definition. If none is found, it queries the Quantiles benchmark registry (hosted at `https://api.quantiles.io`) for a built-in benchmark with that name.
 
 See the following resources for more details:
 
@@ -126,7 +149,7 @@ When a built-in benchmark is run, Quantiles downloads its definition and prompt 
 To save and customize a built-in benchmark locally, add it by name:
 
 ```bash
-qt add simpleqa-verified
+qt add <benchmark>
 ```
 
 This command downloads the benchmark definition and prompt template, appends the benchmark to an existing `quantiles.toml` or `.quantiles.toml`, or creates `quantiles.toml` in the current directory. The prompt template is stored beside the configuration at `<benchmark_name>-prompt/prompt.txt`. The command returns an error if the benchmark is already configured or is not present in the registry. Pass `--json` for machine-readable output.
